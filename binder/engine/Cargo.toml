@@ -1,0 +1,28 @@
+[package]
+name = "libra-engine"
+description = "The main engine for High-Fidelity Symbolic Execution"
+version = "0.1.0"
+authors = ["Meng Xu <meng.xu.cs@uwaterloo.ca>"]
+license = "GPL-3.0"
+edition = "2021"
+
+[build-dependencies]
+bindgen = "*"
+libra-builder = { path = "../builder" }
+libra-shared = { path = "../shared" }
+
+[dependencies]
+anyhow = "*"
+datatest-stable = "*"
+either = "*"
+fs_extra = "*"
+llvm-ir = { version = "*", features = ["llvm-14"] }
+petgraph = "*"
+simplelog = "*"
+structopt = "*"
+tempfile = "*"
+libra-shared = { path = "../shared" }
+
+[[test]]
+name = "integration"
+harness = false
