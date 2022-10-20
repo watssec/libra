@@ -1,15 +1,15 @@
-#ifndef HISE_SHARED_LOGGER_H
-#define HISE_SHARED_LOGGER_H
+#ifndef LIBRA_SHARED_LOGGER_H
+#define LIBRA_SHARED_LOGGER_H
 
 #include "Deps.h"
 
-namespace hise {
+namespace libra {
 
-/// Custom logger for HISE
+/// Custom logger for LIBRA passes
 class Logger {
 public:
   /// The significance or severity of this message.
-  enum Level : unsigned char { Debug, Info, Warning, Error, None };
+  enum Level : unsigned char { Debug, Info, Warning, Error, Fatal };
 
 private:
   const Level target_level_;
@@ -23,7 +23,7 @@ public:
 
 private:
   /// An indicator for the log message level
-  static char indicator(Level level) { return "DIWE"[level]; }
+  static char indicator(Level level) { return "DIWEF"[level]; }
 
 private:
   /// Display one log message to the stream
@@ -49,13 +49,20 @@ public:
   template <typename... Ts> void error(const char *fmt, Ts &&...vals) {
     record(Level::Error, formatv(fmt, vals...));
   }
+
+  /// Log a fatal message
+  template <typename... Ts>
+  [[noreturn]] void fatal(const char *fmt, Ts &&...vals) {
+    record(Level::Fatal, formatv(fmt, vals...));
+    llvm_unreachable("fatal exception happened");
+  }
 };
 
 /// The global logger
 extern std::unique_ptr<Logger> LOG;
 
 /// Create and initialize the default logger
-void init_default_logger(Logger::Level level = Logger::Level::None,
+void init_default_logger(Logger::Level level = Logger::Level::Info,
                          bool no_timestamp = false) {
   assert(LOG == nullptr);
   LOG = std::make_unique<Logger>(level, no_timestamp);
@@ -67,6 +74,6 @@ void destroy_default_logger() {
   LOG = nullptr;
 }
 
-} // namespace hise
+} // namespace libra
 
-#endif // HISE_SHARED_LOGGER_H
+#endif // LIBRA_SHARED_LOGGER_H

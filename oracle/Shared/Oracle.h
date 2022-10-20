@@ -1,9 +1,9 @@
-#ifndef HISE_SHARED_ORACLE_H
-#define HISE_SHARED_ORACLE_H
+#ifndef LIBRA_SHARED_ORACLE_H
+#define LIBRA_SHARED_ORACLE_H
 
 #include "Deps.h"
 
-namespace hise {
+namespace libra {
 
 class ModuleOracle {
 public:
@@ -54,6 +54,6 @@ public:
   FunctionOracle(FunctionOracle &&oracle) noexcept = default;
 };
 
-} // namespace hise
+} // namespace libra
 
-#endif // HISE_SHARED_ORACLE_H
+#endif // LIBRA_SHARED_ORACLE_H

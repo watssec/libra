@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(hise)
+project(libra)
 
 # options
 set(CFG_LLVM_INSTALL_DIR "" CACHE PATH "LLVM installation directory")

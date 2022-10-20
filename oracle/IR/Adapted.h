@@ -1,9 +1,9 @@
-#ifndef HISE_IR_ADAPTED_H
-#define HISE_IR_ADAPTED_H
+#ifndef LIBRA_IR_ADAPTED_H
+#define LIBRA_IR_ADAPTED_H
 
 #include "Shared/Deps.h"
 
-namespace hise::ir::adapted {
+namespace libra::ir::adapted {
 
 /// A fully defined function
 class Function {
@@ -29,6 +29,6 @@ public:
   explicit Module(const llvm::Module &m);
 };
 
-} // namespace hise::ir::adapted
+} // namespace libra::ir::adapted
 
-#endif // HISE_IR_ADAPTED_H
+#endif // LIBRA_IR_ADAPTED_H

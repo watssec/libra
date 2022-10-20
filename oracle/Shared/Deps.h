@@ -1,5 +1,5 @@
-#ifndef HISE_SHARED_DEPS_H
-#define HISE_SHARED_DEPS_H
+#ifndef LIBRA_SHARED_DEPS_H
+#define LIBRA_SHARED_DEPS_H
 
 #include <chrono>
 #include <memory>
@@ -32,8 +32,9 @@
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FormatAdapters.h>
 #include <llvm/Support/FormatVariadic.h>
+#include <llvm/Support/JSON.h>
 #include <llvm/Support/raw_ostream.h>
 
 using namespace llvm;
 
-#endif // HISE_SHARED_DEPS_H
+#endif // LIBRA_SHARED_DEPS_H

@@ -1,6 +1,6 @@
 #include "Oracle.h"
 
-namespace hise {
+namespace libra {
 
 static TargetLibraryInfo getTargetLibraryInfo(Function &f) {
   TargetLibraryInfoWrapperPass pass;
@@ -40,4 +40,4 @@ FunctionOracle::FunctionOracle(Function &f)
   alias_results.addAAResult(alias_result_scope_);
 }
 
-} // namespace hise
+} // namespace libra

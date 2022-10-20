@@ -1,7 +1,7 @@
 #include "Adapted.h"
 #include "Shared/Logger.h"
 
-namespace hise::ir::adapted {
+namespace libra::ir::adapted {
 
 Function::Function(const llvm::Function &f) {
   // set basics
@@ -15,12 +15,8 @@ Module::Module(const llvm::Module &m) {
 
   bool broken_debug_info = false;
   bool verified = llvm::verifyModule(broken_debug_info, m, &ostream);
-  if (!verified) {
-    LOG->error("Corrupted LLVM module\n{0}", message);
-    llvm_unreachable("Corrupted LLVM module");
-  }
-  if (broken_debug_info) {
-    LOG->warning("Corrupted debug information LLVM module\n{0}", message);
+  if (!verified || broken_debug_info) {
+    LOG->fatal("Corrupted LLVM module\n{0}", message);
   }
 
   // set basics
@@ -36,4 +32,4 @@ Module::Module(const llvm::Module &m) {
   }
 }
 
-} // namespace hise::ir::adapted
+} // namespace libra::ir::adapted

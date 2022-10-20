@@ -1,11 +1,13 @@
-#ifndef HISE_SHARED_COMMAND_H
-#define HISE_SHARED_COMMAND_H
+#ifndef LIBRA_SHARED_COMMAND_H
+#define LIBRA_SHARED_COMMAND_H
 
 #include "Deps.h"
 
-namespace hise {
+namespace libra {
+
 extern cl::opt<bool> OptTest;
 extern cl::opt<bool> OptVerbose;
-}
 
-#endif // HISE_SHARED_COMMAND_H
+} // namespace libra
+
+#endif // LIBRA_SHARED_COMMAND_H

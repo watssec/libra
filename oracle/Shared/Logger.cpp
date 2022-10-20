@@ -1,6 +1,6 @@
 #include "Logger.h"
 
-namespace hise {
+namespace libra {
 
 void Logger::record(Level level, const formatv_object_base &message) {
   if (level < target_level_) {
@@ -18,4 +18,4 @@ void Logger::record(Level level, const formatv_object_base &message) {
 
 std::unique_ptr<Logger> LOG = nullptr;
 
-} // namespace hise
+} // namespace libra
