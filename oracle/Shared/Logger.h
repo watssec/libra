@@ -5,6 +5,9 @@
 
 namespace libra {
 
+/// Verbosity flag to control log level
+extern cl::opt<bool> OptVerbose;
+
 /// Custom logger for LIBRA passes
 class Logger {
 public:

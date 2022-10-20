@@ -1,7 +1,7 @@
-#ifndef LIBRA_SHARED_ORACLE_H
-#define LIBRA_SHARED_ORACLE_H
+#ifndef LIBRA_ORACLE_H
+#define LIBRA_ORACLE_H
 
-#include "Deps.h"
+#include "Shared/Deps.h"
 
 namespace libra {
 
@@ -56,4 +56,4 @@ public:
 
 } // namespace libra
 
-#endif // LIBRA_SHARED_ORACLE_H
+#endif // LIBRA_ORACLE_H

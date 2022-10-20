@@ -1,31 +1,23 @@
-#include "Shared/Command.h"
 #include "Shared/Deps.h"
 #include "Shared/Logger.h"
 
-using namespace hise;
+using namespace libra;
 
 namespace {
 
-constexpr const char *PASS_NAME = "HiseSymbolizer";
+constexpr const char *PASS_NAME = "LIBRA";
 
-struct HiseSymbolizer : PassInfoMixin<HiseSymbolizer> {
+struct LibraPass : PassInfoMixin<LibraPass> {
   // pass entrypoint
   static PreservedAnalyses run(Module &module, ModuleAnalysisManager &) {
     // start of execution
     auto level = Logger::Level::Info;
-    if (OptTest || OptVerbose) {
+    if (OptVerbose) {
       level = Logger::Level::Debug;
     }
-    init_default_logger(level, OptTest);
-
-    if (OptTest) {
-      LOG->debug("==== testing ====");
-    }
+    init_default_logger(level, OptVerbose);
 
     // end of execution
-    if (OptTest) {
-      LOG->debug("==== test ok ====");
-    }
     destroy_default_logger();
 
     // mark that all analysis results are invalidated
@@ -47,7 +39,7 @@ llvm::PassPluginLibraryInfo getPassInfo() {
                 [](StringRef Name, ModulePassManager &MPM,
                    ArrayRef<PassBuilder::PipelineElement>) {
                   if (Name == PASS_NAME) {
-                    MPM.addPass(HiseSymbolizer());
+                    MPM.addPass(LibraPass());
                     return true;
                   }
                   return false;

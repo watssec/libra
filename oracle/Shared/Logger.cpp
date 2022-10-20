@@ -2,6 +2,9 @@
 
 namespace libra {
 
+cl::opt<bool> OptVerbose("libra-verbose", cl::init(false),
+                         cl::desc("Verbose logging"));
+
 void Logger::record(Level level, const formatv_object_base &message) {
   if (level < target_level_) {
     return;

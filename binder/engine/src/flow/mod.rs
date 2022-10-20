@@ -63,6 +63,8 @@ impl Workflow {
                     // do not include standard items
                     "-nostdinc",
                     "-nostdlib",
+                    // feature selection
+                    "-std=c17",
                 ],
             )
             .map_err(|e| EngineError::CompilationError(format!("Error during clang: {}", e)))?;

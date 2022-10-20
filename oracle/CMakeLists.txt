@@ -26,4 +26,4 @@ endfunction()
 
 # targets: helpers
 add_subdirectory(Shared)
-add_subdirectory(IR)
+add_subdirectory(Libra)
