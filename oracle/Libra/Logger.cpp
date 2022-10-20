@@ -21,4 +21,14 @@ void Logger::record(Level level, const formatv_object_base &message) {
 
 std::unique_ptr<Logger> LOG = nullptr;
 
+void init_default_logger(Logger::Level level, bool no_timestamp) {
+  assert(LOG == nullptr);
+  LOG = std::make_unique<Logger>(level, no_timestamp);
+}
+
+void destroy_default_logger() {
+  assert(LOG != nullptr);
+  LOG = nullptr;
+}
+
 } // namespace libra

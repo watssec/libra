@@ -1,7 +1,7 @@
 #ifndef LIBRA_ORACLE_H
 #define LIBRA_ORACLE_H
 
-#include "Shared/Deps.h"
+#include "Deps.h"
 
 namespace libra {
 

@@ -1,5 +1,5 @@
-#ifndef LIBRA_SHARED_DEPS_H
-#define LIBRA_SHARED_DEPS_H
+#ifndef LIBRA_DEPS_H
+#define LIBRA_DEPS_H
 
 #include <chrono>
 #include <memory>
@@ -37,4 +37,4 @@
 
 using namespace llvm;
 
-#endif // LIBRA_SHARED_DEPS_H
+#endif // LIBRA_DEPS_H

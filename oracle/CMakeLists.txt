@@ -24,6 +24,5 @@ function(add_llvm_pass name)
   add_library(${name} SHARED ${ARGN})
 endfunction()
 
-# targets: helpers
-add_subdirectory(Shared)
+# targets
 add_subdirectory(Libra)

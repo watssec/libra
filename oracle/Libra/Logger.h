@@ -1,7 +1,7 @@
-#ifndef LIBRA_SHARED_LOGGER_H
-#define LIBRA_SHARED_LOGGER_H
+#ifndef LIBRA_LOGGER_H
+#define LIBRA_LOGGER_H
 
-#include "Deps.h"
+#include "Libra/Deps.h"
 
 namespace libra {
 
@@ -66,17 +66,11 @@ extern std::unique_ptr<Logger> LOG;
 
 /// Create and initialize the default logger
 void init_default_logger(Logger::Level level = Logger::Level::Info,
-                         bool no_timestamp = false) {
-  assert(LOG == nullptr);
-  LOG = std::make_unique<Logger>(level, no_timestamp);
-}
+                         bool no_timestamp = false);
 
 /// Destroy the default logger and release it
-void destroy_default_logger() {
-  assert(LOG != nullptr);
-  LOG = nullptr;
-}
+void destroy_default_logger();
 
 } // namespace libra
 
-#endif // LIBRA_SHARED_LOGGER_H
+#endif // LIBRA_LOGGER_H
