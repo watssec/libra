@@ -99,7 +99,7 @@ impl Workflow {
         step += 1;
 
         // TODO: optimization until a fixedpoint
-        debug!("Number of steps to reach fixedpoint: {}", step);
+        debug!("number of steps to reach fixedpoint: {}", step);
 
         // TODO: analysis
         Ok(())

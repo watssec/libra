@@ -8,3 +8,5 @@ edition = "2021"
 
 [dependencies]
 lazy_static = "*"
+log = "*"
+simplelog = "*"

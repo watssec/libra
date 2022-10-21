@@ -2,12 +2,12 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
 use structopt::StructOpt;
 use tempfile::tempdir;
 
 use libra_engine::analyze;
 use libra_shared::config::PATH_STUDIO;
+use libra_shared::logging;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -44,16 +44,7 @@ fn main() -> Result<()> {
     let studio = studio.as_ref().unwrap_or(&PATH_STUDIO);
 
     // setup logging
-    TermLogger::init(
-        if verbose {
-            LevelFilter::Debug
-        } else {
-            LevelFilter::Info
-        },
-        Config::default(),
-        TerminalMode::Mixed,
-        ColorChoice::Auto,
-    )?;
+    logging::setup(verbose)?;
 
     // decide on the workspace
     let (temp, output) = if keep {

@@ -18,7 +18,6 @@ either = "*"
 fs_extra = "*"
 log = "*"
 petgraph = "*"
-simplelog = "*"
 structopt = "*"
 tempfile = "*"
 libra-shared = { path = "../shared" }

@@ -8,10 +8,15 @@ use fs_extra::dir::CopyOptions;
 use tempfile::tempdir;
 
 use libra_engine::analyze;
+use libra_shared::logging;
 
 fn run_test(path_output: &Path) -> Result<()> {
     // config based on environment variable
     let keep = env::var("KEEP").map_or(false, |v| v == "1");
+    let log_level: usize = env::var("LOG").map_or(0, |v| v.parse::<usize>().unwrap());
+    if log_level != 0 {
+        logging::setup(log_level > 1)?;
+    }
 
     // load the expected result
     let expected = fs::read_to_string(path_output)
