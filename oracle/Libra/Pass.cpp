@@ -1,9 +1,14 @@
 #include "Deps.h"
 #include "Logger.h"
+#include "Serializer.h"
 
 using namespace libra;
 
 namespace {
+
+/// Output of the result
+cl::opt<std::string> OptOutput("libra-output",
+                               cl::desc("The output file name"));
 
 constexpr const char *PASS_NAME = "LIBRA";
 
@@ -16,6 +21,17 @@ struct LibraPass : PassInfoMixin<LibraPass> {
       level = Logger::Level::Debug;
     }
     init_default_logger(level, OptVerbose);
+
+    // serialize and dump to file
+    auto data = serialize_module(module);
+    std::error_code ec;
+    raw_fd_ostream stm(OptOutput, ec,
+                       sys::fs::CreationDisposition::CD_CreateNew);
+    if (ec) {
+      LOG->fatal("unable to create output file: {0}", OptOutput);
+    }
+    stm << json::Value(std::move(data));
+    stm.close();
 
     // end of execution
     destroy_default_logger();
