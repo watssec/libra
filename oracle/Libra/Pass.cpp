@@ -10,7 +10,7 @@ namespace {
 cl::opt<std::string> OptOutput("libra-output",
                                cl::desc("The output file name"));
 
-constexpr const char *PASS_NAME = "LIBRA";
+constexpr const char *PASS_NAME = "Libra";
 
 struct LibraPass : PassInfoMixin<LibraPass> {
   // pass entrypoint
