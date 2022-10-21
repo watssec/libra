@@ -16,7 +16,7 @@ anyhow = "*"
 datatest-stable = "*"
 either = "*"
 fs_extra = "*"
-llvm-ir = { version = "*", features = ["llvm-14"] }
+log = "*"
 petgraph = "*"
 simplelog = "*"
 structopt = "*"

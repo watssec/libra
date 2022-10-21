@@ -13,7 +13,7 @@ mod common;
 mod llvm;
 
 #[derive(StructOpt)]
-pub enum DepCommand {
+pub enum DepAction {
     /// Build the dependency
     Build {
         /// Temporary directory for the build process
@@ -41,7 +41,7 @@ pub struct DepArgs {
 
     /// Subcommand
     #[structopt(subcommand)]
-    command: DepCommand,
+    action: DepAction,
 }
 
 impl DepArgs {
@@ -49,12 +49,12 @@ impl DepArgs {
         let Self {
             name: _,
             version,
-            command,
+            action: command,
         } = self;
         let mut state: DepState<T> = DepState::new(studio, version.as_deref())?;
 
         match command {
-            DepCommand::Build {
+            DepAction::Build {
                 tmpdir,
                 config,
                 force,
@@ -131,4 +131,3 @@ fn get_artifact_path<T: Dependency>(studio: &Path, version: Option<&str>) -> Res
 pub fn artifact_for_llvm(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
     get_artifact_path::<DepLLVM>(studio, version)
 }
-

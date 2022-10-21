@@ -4,10 +4,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{bail, Result};
-use llvm_ir::Module as LLVMModule;
+use log::debug;
 
 use crate::error::{EngineError, EngineResult};
-use crate::ir;
 
 pub struct Workflow {
     // llvm binaries
@@ -15,6 +14,8 @@ pub struct Workflow {
     bin_clang: PathBuf,
     bin_llvm_link: PathBuf,
     bin_llvm_dis: PathBuf,
+    // llvm passes
+    lib_pass: PathBuf,
     /// Source file
     inputs: Vec<PathBuf>,
     /// Workspace for the analysis
@@ -24,11 +25,13 @@ pub struct Workflow {
 impl Workflow {
     pub fn new(inputs: Vec<PathBuf>, output: PathBuf) -> Self {
         let pkg_llvm = Path::new(env!("LIBRA_CONST_LLVM_ARTIFACT"));
+        let lib_pass = Path::new(env!("LIBRA_CONST_PASS_ARTIFACT"));
         Self {
             bin_opt: pkg_llvm.join("bin").join("opt"),
             bin_clang: pkg_llvm.join("bin").join("clang"),
             bin_llvm_link: pkg_llvm.join("bin").join("llvm-link"),
             bin_llvm_dis: pkg_llvm.join("bin").join("llvm-dis"),
+            lib_pass: lib_pass.to_path_buf(),
             inputs,
             output,
         }
@@ -41,6 +44,9 @@ impl Workflow {
     }
     fn get_merged_bc_path(&self) -> PathBuf {
         self.output.join("merged.bc")
+    }
+    fn get_serialized_path(&self, step: usize) -> PathBuf {
+        self.output.join(format!("bitcode-{}.json", step))
     }
 
     pub fn execute(&self) -> EngineResult<()> {
@@ -86,11 +92,14 @@ impl Workflow {
             .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
 
         // baseline loading
-        let llvm_module =
-            LLVMModule::from_bc_path(&merged_bc_path).map_err(EngineError::LLVMLoadingError)?;
-        ir::bridge::convert(&llvm_module)?;
+        let mut step = 0;
+        self.serialize(&merged_bc_path, step).map_err(|e| {
+            EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
+        })?;
+        step += 1;
 
         // TODO: optimization until a fixedpoint
+        debug!("Number of steps to reach fixedpoint: {}", step);
 
         // TODO: analysis
         Ok(())
@@ -99,6 +108,22 @@ impl Workflow {
     fn disassemble(&self, input: &Path) -> Result<()> {
         let output = input.with_extension("ll");
         self.run_llvm_dis(input, &output)
+    }
+
+    fn serialize(&self, input: &Path, step: usize) -> Result<()> {
+        let output = self.get_serialized_path(step);
+        let lib_pass = self.lib_pass.to_str().unwrap();
+        self.run_opt(
+            input,
+            None,
+            &[
+                "-load",
+                lib_pass,
+                &format!("-load-pass-plugin={}", lib_pass),
+                "-passes=Libra",
+                &format!("--libra-output={}", output.to_str().unwrap()),
+            ],
+        )
     }
 }
 
