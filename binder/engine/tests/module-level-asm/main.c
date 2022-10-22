@@ -1,0 +1,1 @@
+__asm(".global __use_realtime_heap");
