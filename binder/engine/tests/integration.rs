@@ -10,12 +10,33 @@ use tempfile::tempdir;
 use libra_engine::analyze;
 use libra_shared::logging;
 
+#[derive(Copy, Clone)]
+enum Verbosity {
+    None,
+    Normal,
+    Verbose,
+    Extensive,
+}
+
 fn run_test(path_output: &Path) -> Result<()> {
     // config based on environment variable
     let keep = env::var("KEEP").map_or(false, |v| v == "1");
-    let log_level: usize = env::var("LOG").map_or(0, |v| v.parse::<usize>().unwrap());
-    if log_level != 0 {
-        logging::setup(log_level > 1)?;
+    let verbosity =
+        env::var("LOG").map_or(Verbosity::None, |v| match v.parse::<usize>().unwrap() {
+            0 => Verbosity::None,
+            1 => Verbosity::Normal,
+            2 => Verbosity::Verbose,
+            _ => Verbosity::Extensive,
+        });
+
+    match verbosity {
+        Verbosity::None => (),
+        Verbosity::Normal => {
+            logging::setup(false)?;
+        }
+        Verbosity::Verbose | Verbosity::Extensive => {
+            logging::setup(true)?;
+        }
     }
 
     // load the expected result
@@ -73,8 +94,8 @@ fn run_test(path_output: &Path) -> Result<()> {
         }
     };
 
-    // save the workspace on failed test cases, if requested
-    if keep && !success {
+    // save the workspace if on verbose mode or on failed test cases, if requested
+    if matches!(verbosity, Verbosity::Extensive) || (keep && !success) {
         fs::create_dir(&path_artifact)?;
         // copy over the content
         let options = CopyOptions {
