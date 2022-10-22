@@ -1,12 +1,13 @@
-use std::env;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{env, fs};
 
 use anyhow::{bail, Result};
 use log::debug;
 
 use crate::error::{EngineError, EngineResult};
+use crate::ir::{adapter, bridge};
 
 pub struct Workflow {
     // llvm binaries
@@ -96,6 +97,8 @@ impl Workflow {
         self.serialize(&merged_bc_path, step).map_err(|e| {
             EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
         })?;
+
+        let _ = self.deserialize(step)?;
         step += 1;
 
         // TODO: optimization until a fixedpoint
@@ -124,6 +127,18 @@ impl Workflow {
                 &format!("--libra-output={}", output.to_str().unwrap()),
             ],
         )
+    }
+
+    fn deserialize(&self, step: usize) -> EngineResult<bridge::module::Module> {
+        let input = self.get_serialized_path(step);
+        let content = fs::read_to_string(input)
+            .map_err(|e| EngineError::LLVMLoadingError(format!("Corrupted JSON file: {}", e)))?;
+        let module_adapted: adapter::module::Module =
+            serde_json::from_str(&content).map_err(|e| {
+                EngineError::LLVMLoadingError(format!("Error during deserialization: {}", e))
+            })?;
+        let module_bridge = bridge::module::Module::convert(&module_adapted)?;
+        Ok(module_bridge)
     }
 }
 
