@@ -7,6 +7,7 @@ use petgraph::graph::DiGraph;
 
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
+use crate::ir::adapter::typing::UserDefinedStruct;
 use crate::ir::bridge::shared::Identifier;
 use crate::EngineResult;
 
@@ -113,11 +114,20 @@ impl TypeToken {
             AdaptedType::Vector { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
             }
-            AdaptedType::Label | AdaptedType::Token | AdaptedType::Metadata => {
-                return Err(EngineError::InvalidAssumption(format!(
-                    "no unexpected llvm primitive type: {:?}",
-                    ty
-                )));
+            AdaptedType::Label => {
+                return Err(EngineError::InvalidAssumption(
+                    "no unexpected llvm primitive type: label".into(),
+                ));
+            }
+            AdaptedType::Token => {
+                return Err(EngineError::InvalidAssumption(
+                    "no unexpected llvm primitive type: token".into(),
+                ));
+            }
+            AdaptedType::Metadata => {
+                return Err(EngineError::InvalidAssumption(
+                    "no unexpected llvm primitive type: metadata".into(),
+                ));
             }
             AdaptedType::Other { name } => {
                 return Err(EngineError::InvalidAssumption(format!(
@@ -350,40 +360,29 @@ impl TypeRegistry {
         Type::convert_token(&token, self, &BTreeSet::new())
     }
 
-    pub fn populate(user_defined_structs: &[adapter::typing::Type]) -> EngineResult<Self> {
-        use adapter::typing::Type as AdaptedType;
-
+    pub fn populate(user_defined_structs: &[UserDefinedStruct]) -> EngineResult<Self> {
         // collect user-defined structs
         let mut type_graph = DiGraph::new();
         let mut type_ident_to_index = BTreeMap::new();
         let mut type_ident_to_fields = BTreeMap::new();
 
-        for ty in user_defined_structs {
-            let (ident, items) = match ty {
-                AdaptedType::Struct { name, fields } => {
-                    let ident: Identifier = match name {
-                        None => {
-                            return Err(EngineError::InvalidAssumption(
-                                "user-defined struct type cannot be anonymous".into(),
-                            ));
-                        }
-                        Some(n) => n.into(),
-                    };
-                    let items = match fields {
-                        None => {
-                            return Err(EngineError::NotSupportedYet(
-                                Unsupported::OpaqueStructDefinition,
-                            ));
-                        }
-                        Some(tys) => tys,
-                    };
-                    (ident, items)
-                }
-                _ => {
+        for def in user_defined_structs {
+            let UserDefinedStruct { name, fields } = def;
+            let ident: Identifier = match name {
+                None => {
                     return Err(EngineError::InvalidAssumption(
-                        "user-defined types must be a struct type".into(),
+                        "user-defined struct type cannot be anonymous".into(),
                     ));
                 }
+                Some(n) => n.into(),
+            };
+            let items = match fields {
+                None => {
+                    return Err(EngineError::NotSupportedYet(
+                        Unsupported::OpaqueStructDefinition,
+                    ));
+                }
+                Some(tys) => tys,
             };
 
             let index = type_graph.add_node(ident.clone());

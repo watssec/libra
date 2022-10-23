@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A representation of an LLVM type
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub enum Type {
     /// Void type
     Void,
@@ -41,4 +41,11 @@ pub enum Type {
     Metadata,
     /// A catch-all case
     Other { name: String },
+}
+
+/// User-defined struct (high-level) to the module
+#[derive(Serialize, Deserialize)]
+pub struct UserDefinedStruct {
+    pub name: Option<String>,
+    pub fields: Option<Vec<Type>>,
 }
