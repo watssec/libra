@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A representation of an LLVM type
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub enum Type {
     /// Void type
     Void,

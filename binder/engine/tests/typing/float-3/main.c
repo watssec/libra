@@ -1,0 +1,1 @@
+long double g;  // at least 80 bits
