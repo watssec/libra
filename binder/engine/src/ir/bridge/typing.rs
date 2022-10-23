@@ -284,29 +284,29 @@ impl TypeRegistry {
 
         for def in user_defined_structs {
             let UserDefinedStruct { name, fields } = def;
-            let ident: Identifier = match name {
-                None => {
-                    return Err(EngineError::InvalidAssumption(
+            let ident: Identifier = name
+                .as_ref()
+                .ok_or_else(|| {
+                    EngineError::InvalidAssumption(
                         "user-defined struct type cannot be anonymous".into(),
-                    ));
-                }
-                Some(n) => n.into(),
-            };
-            let items = match fields {
-                None => {
-                    return Err(EngineError::NotSupportedYet(
-                        Unsupported::OpaqueStructDefinition,
-                    ));
-                }
-                Some(tys) => tys.clone(),
-            };
+                    )
+                })?
+                .into();
+            let items = fields
+                .as_ref()
+                .ok_or_else(|| {
+                    EngineError::InvalidAssumption(
+                        "user-defined struct type cannot be opaque".into(),
+                    )
+                })?
+                .clone();
 
-            match type_ident_to_fields.insert(ident.clone(), items) {
+            match type_ident_to_fields.insert(ident, items) {
                 None => (),
                 Some(_) => {
                     return Err(EngineError::InvalidAssumption(format!(
                         "no duplicated definition of struct: {}",
-                        ident
+                        name.as_ref().unwrap()
                     )));
                 }
             }

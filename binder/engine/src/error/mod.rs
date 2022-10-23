@@ -10,7 +10,6 @@ pub enum Unsupported {
     Vectorization,
     VariadicArguments,
     ArchSpecificExtension,
-    OpaqueStructDefinition,
     ThreadLocalStorage,
     PointerAddressSpace,
     OutOfBoundConstantGEP,
@@ -36,9 +35,6 @@ impl Display for Unsupported {
             }
             Self::ArchSpecificExtension => {
                 write!(f, "architecture-specific extension")
-            }
-            Self::OpaqueStructDefinition => {
-                write!(f, "opaque struct definition")
             }
             Self::ThreadLocalStorage => {
                 write!(f, "thread-local storage")
