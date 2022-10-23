@@ -11,8 +11,19 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn convert(module_adapted: &adapter::module::Module) -> EngineResult<Self> {
+    pub fn convert(prefix: &str, module_adapted: &adapter::module::Module) -> EngineResult<Self> {
         let adapter::module::Module { name, asm } = module_adapted;
+
+        // check name
+        let ident = match name.strip_prefix(prefix) {
+            None => {
+                return Err(EngineError::InvariantViolation(format!(
+                    "module name `{}` does not start with prefix `{}`",
+                    name, prefix
+                )));
+            }
+            Some(n) => n.into(),
+        };
 
         // reject module-level inline assembly
         if !asm.is_empty() {
@@ -22,6 +33,6 @@ impl Module {
         }
 
         // done
-        Ok(Self { name: name.into() })
+        Ok(Self { name: ident })
     }
 }

@@ -137,7 +137,8 @@ impl Workflow {
             serde_json::from_str(&content).map_err(|e| {
                 EngineError::LLVMLoadingError(format!("Error during deserialization: {}", e))
             })?;
-        let module_bridge = bridge::module::Module::convert(&module_adapted)?;
+        let module_bridge =
+            bridge::module::Module::convert(self.output.to_str().unwrap(), &module_adapted)?;
         Ok(module_bridge)
     }
 }
