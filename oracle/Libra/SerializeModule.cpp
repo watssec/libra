@@ -9,7 +9,10 @@ json::Object serialize_module(const Module &module) {
   result["name"] = module.getModuleIdentifier();
   result["asm"] = module.getModuleInlineAsm();
 
-  // user-defined structs
+  // user-defined struct types
+  for (const auto *ty_def : module.getIdentifiedStructTypes()) {
+    serialize_type_struct(*ty_def);
+  }
   // TODO
 
   // globals

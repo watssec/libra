@@ -15,6 +15,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 
 # flags
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 if (NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif ()
