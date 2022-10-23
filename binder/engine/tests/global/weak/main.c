@@ -1,0 +1,1 @@
+__attribute__((weak)) const int g;
