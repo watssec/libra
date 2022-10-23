@@ -140,6 +140,7 @@ json::Object serialize_type_pointer(const PointerType &type) {
   if (!type.isOpaque()) {
     result["pointee"] = serialize_type(*type.getNonOpaquePointerElementType());
   }
+  result["address_space"] = type.getAddressSpace();
   return result;
 }
 

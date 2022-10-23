@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A representation of an LLVM type
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Type {
     /// Void type
     Void,
@@ -23,7 +23,10 @@ pub enum Type {
         ret: Box<Type>,
     },
     /// Pointer type
-    Pointer { pointee: Option<Box<Type>> },
+    Pointer {
+        pointee: Option<Box<Type>>,
+        address_space: usize,
+    },
     /// SIMD vector type
     Vector {
         element: Box<Type>,

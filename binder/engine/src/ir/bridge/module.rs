@@ -1,6 +1,7 @@
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::shared::Identifier;
+use crate::ir::bridge::typing::TypeRegistry;
 use crate::EngineResult;
 
 /// An adapted representation of an LLVM module
@@ -8,15 +9,13 @@ use crate::EngineResult;
 pub struct Module {
     /// module name
     name: Identifier,
+    /// type registry
+    typing: TypeRegistry,
 }
 
 impl Module {
     pub fn convert(prefix: &str, module_adapted: &adapter::module::Module) -> EngineResult<Self> {
-        let adapter::module::Module {
-            name,
-            asm,
-            structs: _,
-        } = module_adapted;
+        let adapter::module::Module { name, asm, structs } = module_adapted;
 
         // check name
         let ident = match name.strip_prefix(prefix) {
@@ -36,7 +35,13 @@ impl Module {
             ));
         }
 
+        // build type registry
+        let typing = TypeRegistry::populate(structs)?;
+
         // done
-        Ok(Self { name: ident })
+        Ok(Self {
+            name: ident,
+            typing,
+        })
     }
 }

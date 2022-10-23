@@ -11,6 +11,7 @@ pub enum Unsupported {
     VariadicArguments,
     ArchSpecificExtension,
     OpaqueStructDefinition,
+    OpaquePointerType,
     ThreadLocalStorage,
     PointerAddressSpace,
     OutOfBoundConstantGEP,
@@ -39,6 +40,9 @@ impl Display for Unsupported {
             }
             Self::OpaqueStructDefinition => {
                 write!(f, "opaque struct definition")
+            }
+            Self::OpaquePointerType => {
+                write!(f, "opaque pointer type")
             }
             Self::ThreadLocalStorage => {
                 write!(f, "thread-local storage")
