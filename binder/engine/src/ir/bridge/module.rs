@@ -12,7 +12,11 @@ pub struct Module {
 
 impl Module {
     pub fn convert(prefix: &str, module_adapted: &adapter::module::Module) -> EngineResult<Self> {
-        let adapter::module::Module { name, asm } = module_adapted;
+        let adapter::module::Module {
+            name,
+            asm,
+            structs: _,
+        } = module_adapted;
 
         // check name
         let ident = match name.strip_prefix(prefix) {

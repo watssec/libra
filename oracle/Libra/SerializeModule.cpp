@@ -10,10 +10,11 @@ json::Object serialize_module(const Module &module) {
   result["asm"] = module.getModuleInlineAsm();
 
   // user-defined struct types
+  json::Array structs;
   for (const auto *ty_def : module.getIdentifiedStructTypes()) {
-    serialize_type_struct(*ty_def);
+    structs.push_back(serialize_type_struct(*ty_def));
   }
-  // TODO
+  result["structs"] = std::move(structs);
 
   // globals
   // TODO

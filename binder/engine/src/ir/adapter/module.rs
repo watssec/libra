@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ir::adapter::typing::Type;
+
 /// A representation of an LLVM module
 #[derive(Serialize, Deserialize)]
 pub struct Module {
@@ -7,4 +9,6 @@ pub struct Module {
     pub name: String,
     /// module-level assembly
     pub asm: String,
+    /// user-defined structs
+    pub structs: Vec<Type>,
 }
