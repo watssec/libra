@@ -17,7 +17,11 @@ json::Object serialize_module(const Module &module) {
   result["structs"] = std::move(structs);
 
   // globals
-  // TODO
+  json::Array global_vars;
+  for (const auto &global_var : module.globals()) {
+    global_vars.push_back(serialize_global_variable(global_var));
+  }
+  result["global_variables"] = std::move(global_vars);
 
   // functions
   // TODO

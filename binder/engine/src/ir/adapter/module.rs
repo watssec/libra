@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ir::adapter::global::GlobalVariable;
 use crate::ir::adapter::typing::UserDefinedStruct;
 
 /// A representation of an LLVM module
@@ -11,4 +12,6 @@ pub struct Module {
     pub asm: String,
     /// user-defined structs
     pub structs: Vec<UserDefinedStruct>,
+    /// global variables
+    pub global_variables: Vec<GlobalVariable>,
 }

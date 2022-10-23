@@ -1,5 +1,8 @@
+use std::collections::BTreeMap;
+
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
+use crate::ir::bridge::global::GlobalVariable;
 use crate::ir::bridge::shared::Identifier;
 use crate::ir::bridge::typing::TypeRegistry;
 use crate::EngineResult;
@@ -15,7 +18,12 @@ pub struct Module {
 
 impl Module {
     pub fn convert(prefix: &str, module_adapted: &adapter::module::Module) -> EngineResult<Self> {
-        let adapter::module::Module { name, asm, structs } = module_adapted;
+        let adapter::module::Module {
+            name,
+            asm,
+            structs,
+            global_variables,
+        } = module_adapted;
 
         // check name
         let ident = match name.strip_prefix(prefix) {
@@ -37,6 +45,21 @@ impl Module {
 
         // build type registry
         let typing = TypeRegistry::populate(structs)?;
+
+        // collect global variables
+        let mut globals = BTreeMap::new();
+        for gvar in global_variables.iter() {
+            let converted = GlobalVariable::convert(gvar, &typing)?;
+            match globals.insert(converted.name.clone(), converted) {
+                None => (),
+                Some(_) => {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "no duplicated global variable: {}",
+                        gvar.name.as_ref().unwrap()
+                    )));
+                }
+            }
+        }
 
         // done
         Ok(Self {

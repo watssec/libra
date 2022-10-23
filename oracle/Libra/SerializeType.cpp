@@ -1,5 +1,22 @@
 #include "Serializer.h"
 
+namespace {
+
+json::Object mk_float(uint64_t width, const char *name) {
+  json::Object result;
+  result["width"] = width;
+  result["name"] = name;
+  return result;
+}
+
+json::Object mk_other(const char *name) {
+  json::Object result;
+  result["name"] = name;
+  return result;
+}
+
+} // namespace
+
 namespace libra {
 
 json::Object serialize_type(const Type &type) {
@@ -13,46 +30,25 @@ json::Object serialize_type(const Type &type) {
     result["Int"] = serialize_type_int(cast<IntegerType>(type));
     break;
   case Type::TypeID::HalfTyID:
-    result["Float"] = {
-        {"width", 16},
-        {"name", "half"},
-    };
+    result["Float"] = mk_float(16, "half");
     break;
   case Type::TypeID::BFloatTyID:
-    result["Float"] = {
-        {"width", 16},
-        {"name", "bfloat"},
-    };
+    result["Float"] = mk_float(16, "bfloat");
     break;
   case Type::TypeID::FloatTyID:
-    result["Float"] = {
-        {"width", 32},
-        {"name", "float"},
-    };
+    result["Float"] = mk_float(32, "float");
     break;
   case Type::TypeID::DoubleTyID:
-    result["Float"] = {
-        {"width", 64},
-        {"name", "double"},
-    };
+    result["Float"] = mk_float(64, "double");
     break;
   case Type::TypeID::X86_FP80TyID:
-    result["Float"] = {
-        {"width", 80},
-        {"name", "x86_fp80"},
-    };
+    result["Float"] = mk_float(80, "x86_fp80");
     break;
   case Type::TypeID::FP128TyID:
-    result["Float"] = {
-        {"width", 128},
-        {"name", "fp128"},
-    };
+    result["Float"] = mk_float(128, "fp128");
     break;
   case Type::TypeID::PPC_FP128TyID:
-    result["Float"] = {
-        {"width", 128},
-        {"name", "ppc_fp128"},
-    };
+    result["Float"] = mk_float(128, "ppc_fp128");
     break;
   case Type::TypeID::ArrayTyID:
     result["Array"] = serialize_type_array(cast<ArrayType>(type));
@@ -82,7 +78,7 @@ json::Object serialize_type(const Type &type) {
     result["Metadata"] = {};
     break;
   case Type::DXILPointerTyID:
-    result["Other"] = {{"name", "DXIL pointer"}};
+    result["Other"] = mk_other("DXIL pointer");
     break;
   }
   return result;

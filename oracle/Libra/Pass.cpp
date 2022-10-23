@@ -23,6 +23,9 @@ struct LibraPass : PassInfoMixin<LibraPass> {
     init_default_logger(level, OptVerbose);
 
     // serialize and dump to file
+    if (auto e = module.materializeAll()) {
+      LOG->fatal("unable to materialize module: {0}", e);
+    }
     auto data = serialize_module(module);
     std::error_code ec;
     raw_fd_ostream stm(OptOutput, ec,
@@ -30,7 +33,7 @@ struct LibraPass : PassInfoMixin<LibraPass> {
     if (ec) {
       LOG->fatal("unable to create output file: {0}", OptOutput);
     }
-    stm << json::Value(std::move(data));
+    stm << formatv("{0:2}", json::Value(std::move(data)));
     stm.close();
 
     // end of execution

@@ -16,6 +16,8 @@ json::Object serialize_type_function(const FunctionType &type);
 json::Object serialize_type_pointer(const PointerType &type);
 json::Object serialize_type_vector(const VectorType &type);
 
+json::Object serialize_global_variable(const GlobalVariable &gvar);
+
 } // namespace libra
 
 #endif // LIBRA_SERIALIZER_H
