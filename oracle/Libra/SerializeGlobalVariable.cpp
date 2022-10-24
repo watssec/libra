@@ -19,8 +19,12 @@ json::Object serialize_global_variable(const GlobalVariable &gvar) {
   result["is_exact"] = gvar.isDefinitionExact();
   result["is_thread_local"] = gvar.isThreadLocal();
   result["address_space"] = gvar.getAddressSpace();
+  // TODO: additional attributes or metadata?
 
-  // TODO: other things (e.g., initializer)
+  // initializer
+  if (gvar.hasInitializer()) {
+    result["initializer"] = serialize_const(*gvar.getInitializer());
+  }
 
   return result;
 }
