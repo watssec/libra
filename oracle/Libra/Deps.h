@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include <llvm/ADT/SmallString.h>
 #include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/Analysis/AssumptionCache.h>
 #include <llvm/Analysis/BasicAliasAnalysis.h>

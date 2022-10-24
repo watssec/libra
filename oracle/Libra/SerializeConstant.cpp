@@ -1,5 +1,44 @@
 #include "Serializer.h"
 
+namespace {
+using namespace libra;
+
+json::Object populate(const Constant &val) {
+  json::Object result;
+  result["ty"] = serialize_type(*val.getType());
+  return result;
+}
+
+json::Object serialize_const_data_sequence(const ConstantDataSequential &val) {
+  auto result = populate(val);
+  json::Array elements;
+  for (unsigned i = 0; i < val.getNumElements(); i++) {
+    elements.push_back(serialize_const(*val.getElementAsConstant(i)));
+  }
+  result["elements"] = std::move(elements);
+  return result;
+}
+
+json::Object serialize_const_pack_aggregate(const ConstantAggregate &val) {
+  auto result = populate(val);
+  json::Array elements;
+  for (unsigned i = 0; i < val.getNumOperands(); i++) {
+    elements.push_back(serialize_const(*val.getOperand(i)));
+  }
+  result["elements"] = std::move(elements);
+  return result;
+}
+
+json::Object serialize_const_ref_global(const GlobalValue &val) {
+  auto result = populate(val);
+  if (val.hasName()) {
+    result["name"] = val.getName();
+  }
+  return result;
+}
+
+} // namespace
+
 namespace libra {
 
 json::Object serialize_const(const Constant &val) {
@@ -81,6 +120,75 @@ json::Object serialize_const(const Constant &val) {
   }
 
   return result;
+}
+
+json::Object serialize_const_data_int(const ConstantInt &val) {
+  auto result = populate(val);
+  if (val.getBitWidth() > OPT_MAX_BITS_FOR_INT) {
+    LOG->fatal("constant integer width exceeds limited");
+  }
+  result["value"] = val.getValue().getLimitedValue(UINT64_MAX);
+  return result;
+}
+
+json::Object serialize_const_data_float(const ConstantFP &val) {
+  auto result = populate(val);
+  SmallString<64> dump;
+  val.getValue().toString(dump);
+  result["value"] = dump;
+  return result;
+}
+
+json::Object serialize_const_data_ptr_null(const ConstantPointerNull &val) {
+  return populate(val);
+}
+
+json::Object serialize_const_data_token_none(const ConstantTokenNone &val) {
+  return populate(val);
+}
+
+json::Object serialize_const_data_undef(const UndefValue &val) {
+  return populate(val);
+}
+
+json::Object serialize_const_data_all_zero(const ConstantAggregateZero &val) {
+  return populate(val);
+}
+
+json::Object serialize_const_data_array(const ConstantDataArray &val) {
+  return serialize_const_data_sequence(val);
+}
+
+json::Object serialize_const_data_vector(const ConstantDataVector &val) {
+  return serialize_const_data_sequence(val);
+}
+
+json::Object serialize_const_pack_array(const ConstantArray &val) {
+  return serialize_const_pack_aggregate(val);
+}
+
+json::Object serialize_const_pack_struct(const ConstantStruct &val) {
+  return serialize_const_pack_aggregate(val);
+}
+
+json::Object serialize_const_pack_vector(const ConstantVector &val) {
+  return serialize_const_pack_aggregate(val);
+}
+
+json::Object serialize_const_ref_global_alias(const GlobalAlias &val) {
+  return serialize_const_ref_global(val);
+}
+
+json::Object serialize_const_ref_global_variable(const GlobalVariable &val) {
+  return serialize_const_ref_global(val);
+}
+
+json::Object serialize_const_ref_function(const Function &val) {
+  return serialize_const_ref_global(val);
+}
+
+json::Object serialize_const_ref_interface(const GlobalIFunc &val) {
+  return serialize_const_ref_global(val);
 }
 
 } // namespace libra
