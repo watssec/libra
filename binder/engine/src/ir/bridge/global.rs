@@ -1,5 +1,8 @@
+use std::collections::BTreeSet;
+
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
+use crate::ir::bridge::constant::Constant;
 use crate::ir::bridge::shared::Identifier;
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::EngineResult;
@@ -11,24 +14,25 @@ pub struct GlobalVariable {
     pub name: Identifier,
     /// variable type
     pub ty: Type,
-    // TODO initializer
-    //pub initializer: Option<Constant>,
+    /// initializer
+    pub initializer: Option<Constant>,
 }
 
 impl GlobalVariable {
     pub fn convert(
         gvar: &adapter::global::GlobalVariable,
         typing: &TypeRegistry,
+        allowed_gvars: &BTreeSet<Identifier>,
     ) -> EngineResult<Self> {
         let adapter::global::GlobalVariable {
             name,
             ty,
             is_extern,
-            is_const: _,
+            is_const,
             is_exact,
             is_thread_local,
             address_space,
-            initializer: _,
+            initializer,
         } = gvar;
 
         // filter out unsupported cases
@@ -52,6 +56,12 @@ impl GlobalVariable {
                 Unsupported::PointerAddressSpace,
             ));
         }
+        if *is_const && initializer.is_none() {
+            return Err(EngineError::InvalidAssumption(format!(
+                "must have an initializer for a constant global: {}",
+                name.as_ref().map_or("<unknown>", |e| e.as_str())
+            )));
+        }
 
         // convert the name
         let ident: Identifier = name
@@ -61,14 +71,21 @@ impl GlobalVariable {
 
         // convert the type
         let gvar_ty = typing.convert(ty)?;
-
-        // TODO: convert constant
-        // TODO: check that all immutable globals have initializer
+        let gvar_init = match initializer {
+            None => None,
+            Some(constant) => Some(Constant::convert(
+                constant,
+                &gvar_ty,
+                typing,
+                allowed_gvars,
+            )?),
+        };
 
         // done with the construction
         Ok(Self {
             name: ident,
             ty: gvar_ty,
+            initializer: gvar_init,
         })
     }
 }

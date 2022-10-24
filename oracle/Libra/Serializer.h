@@ -29,9 +29,9 @@ json::Object serialize_const_data_vector(const ConstantDataVector &val);
 json::Object serialize_const_pack_array(const ConstantArray &val);
 json::Object serialize_const_pack_struct(const ConstantStruct &val);
 json::Object serialize_const_pack_vector(const ConstantVector &val);
-json::Object serialize_const_ref_global_alias(const GlobalAlias &val);
 json::Object serialize_const_ref_global_variable(const GlobalVariable &val);
 json::Object serialize_const_ref_function(const Function &val);
+json::Object serialize_const_ref_global_alias(const GlobalAlias &val);
 json::Object serialize_const_ref_interface(const GlobalIFunc &val);
 
 json::Object serialize_global_variable(const GlobalVariable &gvar);

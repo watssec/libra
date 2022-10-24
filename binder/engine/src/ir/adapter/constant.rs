@@ -14,8 +14,8 @@ pub enum Constant {
     Array { ty: Type, elements: Vec<Constant> },
     Vector { ty: Type, elements: Vec<Constant> },
     Struct { ty: Type, elements: Vec<Constant> },
-    Alias { ty: Type, name: Option<String> },
     Variable { ty: Type, name: Option<String> },
     Function { ty: Type, name: Option<String> },
+    Alias { ty: Type, name: Option<String> },
     Interface { ty: Type, name: Option<String> },
 }

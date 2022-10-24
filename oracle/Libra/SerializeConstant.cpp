@@ -96,14 +96,14 @@ json::Object serialize_const(const Constant &val) {
 
   // reference to global declarations
   else if (isa<GlobalValue>(val)) {
-    if (isa<GlobalAlias>(val)) {
-      result["Alias"] =
-          serialize_const_ref_global_alias(cast<GlobalAlias>(val));
-    } else if (isa<GlobalVariable>(val)) {
+    if (isa<GlobalVariable>(val)) {
       result["Variable"] =
           serialize_const_ref_global_variable(cast<GlobalVariable>(val));
     } else if (isa<Function>(val)) {
       result["Function"] = serialize_const_ref_function(cast<Function>(val));
+    } else if (isa<GlobalAlias>(val)) {
+      result["Alias"] =
+          serialize_const_ref_global_alias(cast<GlobalAlias>(val));
     } else if (isa<GlobalIFunc>(val)) {
       result["Interface"] =
           serialize_const_ref_interface(cast<GlobalIFunc>(val));
@@ -175,15 +175,15 @@ json::Object serialize_const_pack_vector(const ConstantVector &val) {
   return serialize_const_pack_aggregate(val);
 }
 
-json::Object serialize_const_ref_global_alias(const GlobalAlias &val) {
-  return serialize_const_ref_global(val);
-}
-
 json::Object serialize_const_ref_global_variable(const GlobalVariable &val) {
   return serialize_const_ref_global(val);
 }
 
 json::Object serialize_const_ref_function(const Function &val) {
+  return serialize_const_ref_global(val);
+}
+
+json::Object serialize_const_ref_global_alias(const GlobalAlias &val) {
   return serialize_const_ref_global(val);
 }
 

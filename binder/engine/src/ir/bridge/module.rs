@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
@@ -14,6 +14,8 @@ pub struct Module {
     name: Identifier,
     /// type registry
     typing: TypeRegistry,
+    /// global variables
+    globals: BTreeMap<Identifier, GlobalVariable>,
 }
 
 impl Module {
@@ -47,9 +49,14 @@ impl Module {
         let typing = TypeRegistry::populate(structs)?;
 
         // collect global variables
+        let allowed_globals: BTreeSet<Identifier> = global_variables
+            .iter()
+            .filter_map(|gvar| gvar.name.as_ref().map(|e| e.into()))
+            .collect();
+
         let mut globals = BTreeMap::new();
         for gvar in global_variables.iter() {
-            let converted = GlobalVariable::convert(gvar, &typing)?;
+            let converted = GlobalVariable::convert(gvar, &typing, &allowed_globals)?;
             match globals.insert(converted.name.clone(), converted) {
                 None => (),
                 Some(_) => {
@@ -65,6 +72,7 @@ impl Module {
         Ok(Self {
             name: ident,
             typing,
+            globals,
         })
     }
 }

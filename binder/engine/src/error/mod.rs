@@ -15,6 +15,7 @@ pub enum Unsupported {
     ExternGlobalVariable,
     PointerAddressSpace,
     OutOfBoundConstantGEP,
+    InterfaceResolver,
 }
 
 impl Display for Unsupported {
@@ -52,6 +53,9 @@ impl Display for Unsupported {
             }
             Self::OutOfBoundConstantGEP => {
                 write!(f, "intentional out-of-bound GEP on constant")
+            }
+            Self::InterfaceResolver => {
+                write!(f, "load-time interface resolving")
             }
         }
     }
