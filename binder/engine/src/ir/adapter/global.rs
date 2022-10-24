@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ir::adapter::constant::Constant;
 use crate::ir::adapter::typing::Type;
 
 /// An adapted representation of an LLVM global variable
@@ -19,6 +20,6 @@ pub struct GlobalVariable {
     pub is_thread_local: bool,
     /// address space of the global variable
     pub address_space: usize,
-    // TODO: initializer
-    //pub initializer: Option<Constant>,
+    /// initializer
+    pub initializer: Option<Constant>,
 }

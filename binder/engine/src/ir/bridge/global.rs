@@ -28,6 +28,7 @@ impl GlobalVariable {
             is_exact,
             is_thread_local,
             address_space,
+            initializer: _,
         } = gvar;
 
         // filter out unsupported cases
