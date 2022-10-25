@@ -36,6 +36,9 @@ json::Object serialize_const_ref_interface(const GlobalIFunc &val);
 
 json::Object serialize_global_variable(const GlobalVariable &gvar);
 
+json::Object serialize_function(const Function &func);
+json::Object serialize_parameter(const Argument &param);
+
 } // namespace libra
 
 #endif // LIBRA_SERIALIZER_H

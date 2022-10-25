@@ -48,12 +48,13 @@ impl Module {
         // build type registry
         let typing = TypeRegistry::populate(structs)?;
 
-        // collect global variables
+        // build symbol registry
         let allowed_globals: BTreeSet<Identifier> = global_variables
             .iter()
             .filter_map(|gvar| gvar.name.as_ref().map(|e| e.into()))
             .collect();
 
+        // collect global variables
         let mut globals = BTreeMap::new();
         for gvar in global_variables.iter() {
             let converted = GlobalVariable::convert(gvar, &typing, &allowed_globals)?;

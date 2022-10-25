@@ -24,7 +24,11 @@ json::Object serialize_module(const Module &module) {
   result["global_variables"] = std::move(global_vars);
 
   // functions
-  // TODO
+  json::Array functions;
+  for (const auto &func : module.functions()) {
+    functions.push_back(serialize_function(func));
+  }
+  result["functions"] = std::move(functions);
 
   // done
   return result;

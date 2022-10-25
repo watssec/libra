@@ -5,6 +5,7 @@ add_llvm_pass(Libra
               Oracle.cpp
               SerializeConstant.cpp
               SerializeGlobalVariable.cpp
+              SerializeFunction.cpp
               SerializeModule.cpp
               SerializeType.cpp
               Pass.cpp)
