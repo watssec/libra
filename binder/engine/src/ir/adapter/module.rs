@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ir::adapter::function::Function;
 use crate::ir::adapter::global::GlobalVariable;
 use crate::ir::adapter::typing::UserDefinedStruct;
 
@@ -14,4 +15,6 @@ pub struct Module {
     pub structs: Vec<UserDefinedStruct>,
     /// global variables
     pub global_variables: Vec<GlobalVariable>,
+    /// functions
+    pub functions: Vec<Function>,
 }

@@ -12,6 +12,7 @@ pub enum Unsupported {
     ArchSpecificExtension,
     ThreadLocalStorage,
     WeakGlobalVariable,
+    WeakFunction,
     ExternGlobalVariable,
     PointerAddressSpace,
     OutOfBoundConstantGEP,
@@ -44,6 +45,9 @@ impl Display for Unsupported {
             }
             Self::WeakGlobalVariable => {
                 write!(f, "weak definition for global variable")
+            }
+            Self::WeakFunction => {
+                write!(f, "weak definition for function")
             }
             Self::ExternGlobalVariable => {
                 write!(f, "global variable externally initialized")

@@ -14,6 +14,8 @@ pub struct GlobalVariable {
     pub is_extern: bool,
     /// is constant (immutable) during execution
     pub is_const: bool,
+    /// is not just a declaration
+    pub is_defined: bool,
     /// the definition (initialization) is exact
     pub is_exact: bool,
     /// is thread-local (one copy per thread)

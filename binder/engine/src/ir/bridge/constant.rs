@@ -1,8 +1,6 @@
-use std::collections::BTreeSet;
-
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
-use crate::ir::bridge::shared::Identifier;
+use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::EngineResult;
 
@@ -22,6 +20,8 @@ pub enum Constant {
     },
     /// Global variable
     Variable { name: Identifier },
+    /// Function
+    Function { name: Identifier },
 }
 
 impl Constant {
@@ -64,7 +64,7 @@ impl Constant {
         constant: &adapter::constant::Constant,
         expected_type: &Type,
         typing: &TypeRegistry,
-        allowed_gvars: &BTreeSet<Identifier>,
+        symbols: &SymbolRegistry,
     ) -> EngineResult<Self> {
         use adapter::constant::Constant as AdaptedConstant;
 
@@ -142,7 +142,7 @@ impl Constant {
 
                         let elements_new = elements
                             .iter()
-                            .map(|e| Self::convert(e, element, typing, allowed_gvars))
+                            .map(|e| Self::convert(e, element, typing, symbols))
                             .collect::<EngineResult<_>>()?;
                         Self::Array {
                             sub: element.as_ref().clone(),
@@ -175,7 +175,7 @@ impl Constant {
                         let elements_new = elements
                             .iter()
                             .zip(fields.iter())
-                            .map(|(e, t)| Self::convert(e, t, typing, allowed_gvars))
+                            .map(|(e, t)| Self::convert(e, t, typing, symbols))
                             .collect::<EngineResult<_>>()?;
                         Self::Struct {
                             name: name.clone(),
@@ -198,7 +198,6 @@ impl Constant {
                         expected_type
                     )));
                 }
-
                 match name {
                     None => {
                         return Err(EngineError::InvalidAssumption(
@@ -207,7 +206,7 @@ impl Constant {
                     }
                     Some(n) => {
                         let ident = n.into();
-                        if !allowed_gvars.contains(&ident) {
+                        if !symbols.has_global(&ident) {
                             return Err(EngineError::InvalidAssumption(format!(
                                 "reference to an unknown global variable: {}",
                                 ident
@@ -217,8 +216,31 @@ impl Constant {
                     }
                 }
             }
-            AdaptedConstant::Function { .. } => {
-                todo!("implement function conversion")
+            AdaptedConstant::Function { ty, name } => {
+                check_type(ty)?;
+                if !matches!(expected_type, Type::Pointer) {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "type mismatch: expect pointer, found {}",
+                        expected_type
+                    )));
+                }
+                match name {
+                    None => {
+                        return Err(EngineError::InvalidAssumption(
+                            "no reference to an anonymous function".into(),
+                        ));
+                    }
+                    Some(n) => {
+                        let ident = n.into();
+                        if !symbols.has_function(&ident) {
+                            return Err(EngineError::InvalidAssumption(format!(
+                                "reference to an unknown function: {}",
+                                ident
+                            )));
+                        }
+                        Self::Function { name: ident }
+                    }
+                }
             }
             AdaptedConstant::Alias { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::GlobalAlias));

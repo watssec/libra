@@ -1,9 +1,7 @@
-use std::collections::BTreeSet;
-
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::constant::Constant;
-use crate::ir::bridge::shared::Identifier;
+use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::EngineResult;
 
@@ -22,13 +20,14 @@ impl GlobalVariable {
     pub fn convert(
         gvar: &adapter::global::GlobalVariable,
         typing: &TypeRegistry,
-        allowed_gvars: &BTreeSet<Identifier>,
+        symbols: &SymbolRegistry,
     ) -> EngineResult<Self> {
         let adapter::global::GlobalVariable {
             name,
             ty,
             is_extern,
             is_const,
+            is_defined,
             is_exact,
             is_thread_local,
             address_space,
@@ -62,6 +61,12 @@ impl GlobalVariable {
                 name.as_ref().map_or("<unknown>", |e| e.as_str())
             )));
         }
+        if *is_defined && initializer.is_none() {
+            return Err(EngineError::InvalidAssumption(format!(
+                "must have an initializer for a defined global: {}",
+                name.as_ref().map_or("<unknown>", |e| e.as_str())
+            )));
+        }
 
         // convert the name
         let ident: Identifier = name
@@ -71,14 +76,11 @@ impl GlobalVariable {
 
         // convert the type
         let gvar_ty = typing.convert(ty)?;
+
+        // convert the initializer (if any)
         let gvar_init = match initializer {
             None => None,
-            Some(constant) => Some(Constant::convert(
-                constant,
-                &gvar_ty,
-                typing,
-                allowed_gvars,
-            )?),
+            Some(constant) => Some(Constant::convert(constant, &gvar_ty, typing, symbols)?),
         };
 
         // done with the construction

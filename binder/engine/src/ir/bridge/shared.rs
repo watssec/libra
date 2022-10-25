@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 
 /// Represents an identifier in the LLVM system
@@ -29,5 +30,26 @@ impl From<&str> for Identifier {
 impl AsRef<str> for Identifier {
     fn as_ref(&self) -> &str {
         self.0.as_str()
+    }
+}
+
+/// Symbol registry
+#[derive(Eq, PartialEq)]
+pub struct SymbolRegistry {
+    globals: BTreeSet<Identifier>,
+    functions: BTreeSet<Identifier>,
+}
+
+impl SymbolRegistry {
+    pub fn new(globals: BTreeSet<Identifier>, functions: BTreeSet<Identifier>) -> Self {
+        Self { globals, functions }
+    }
+
+    pub fn has_global(&self, ident: &Identifier) -> bool {
+        self.globals.contains(ident)
+    }
+
+    pub fn has_function(&self, ident: &Identifier) -> bool {
+        self.functions.contains(ident)
     }
 }
