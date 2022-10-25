@@ -24,7 +24,7 @@ json::Object serialize_type(const Type &type) {
 
   switch (type.getTypeID()) {
   case Type::TypeID::VoidTyID:
-    result["Void"] = {};
+    result["Void"] = json::Value(nullptr);
     break;
   case Type::TypeID::IntegerTyID:
     result["Int"] = serialize_type_int(cast<IntegerType>(type));
@@ -69,13 +69,13 @@ json::Object serialize_type(const Type &type) {
     result["Vector"] = serialize_type_vector(cast<VectorType>(type));
     break;
   case Type::LabelTyID:
-    result["Label"] = {};
+    result["Label"] = json::Value(nullptr);
     break;
   case Type::TokenTyID:
-    result["Token"] = {};
+    result["Token"] = json::Value(nullptr);
     break;
   case Type::MetadataTyID:
-    result["Metadata"] = {};
+    result["Metadata"] = json::Value(nullptr);
     break;
   case Type::DXILPointerTyID:
     result["Other"] = mk_other("DXIL pointer");
