@@ -6,6 +6,8 @@ struct simple {
 };
 struct simple g_simple = {0};
 
+typedef int (*t_somefunc)(int, int);
+
 struct complex {
   int f_int;
   long f_arr_long[1];
@@ -21,5 +23,8 @@ struct complex {
   struct simple *f_arr_ptr_simple[6];
   struct complex *f_ptr_complex;
   struct complex *f_arr_ptr_complex[7];
+  void (*f_fun_ptr)(int);
+  t_somefunc f_fun_ptr_some;
+  t_somefunc f_arr_fun_ptr_some[8];
 };
 struct complex g_defined = {0};
