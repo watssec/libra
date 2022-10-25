@@ -14,3 +14,6 @@ struct simple {
   void **g_ptr_void;
 };
 struct simple g_simple = {&g_int, &g_long, g_ptr_void};
+
+void func_1(int a) {}
+void (*g_ptr_func_1)(int) = func_1;
