@@ -34,6 +34,7 @@ json::Object serialize_const_ref_global_variable(const GlobalVariable &val);
 json::Object serialize_const_ref_function(const Function &val);
 json::Object serialize_const_ref_global_alias(const GlobalAlias &val);
 json::Object serialize_const_ref_interface(const GlobalIFunc &val);
+json::Object serialize_const_expr(const ConstantExpr &expr);
 
 json::Object serialize_global_variable(const GlobalVariable &gvar);
 

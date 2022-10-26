@@ -112,7 +112,10 @@ json::Object serialize_const(const Constant &val) {
     }
   }
 
-  // TODO: constant expression
+  // constant expression
+  else if (isa<ConstantExpr>(val)) {
+    result["Expr"] = serialize_const_expr(cast<ConstantExpr>(val));
+  }
 
   // should have exhausted all types of constant
   else {
@@ -189,6 +192,23 @@ json::Object serialize_const_ref_global_alias(const GlobalAlias &val) {
 
 json::Object serialize_const_ref_interface(const GlobalIFunc &val) {
   return serialize_const_ref_global(val);
+}
+
+json::Object serialize_const_expr(const ConstantExpr &expr) {
+  const auto *inst = expr.getAsInstruction();
+  std::map<const BasicBlock *, uint64_t> block_labels;
+  std::map<const Instruction *, uint64_t> inst_labels;
+  inst_labels.emplace(inst, UINT64_MAX);
+
+  // a constant expr is an instruction with the index
+  auto result = serialize_instruction(*inst, block_labels, inst_labels);
+  const auto index = result.getInteger("index");
+  if (!index.hasValue() || (uint64_t)index.value() != UINT64_MAX) {
+    LOG->fatal("invalid instruction created by constant expr");
+  }
+  result.erase("index");
+
+  return result;
 }
 
 } // namespace libra

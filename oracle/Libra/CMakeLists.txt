@@ -4,8 +4,9 @@ add_llvm_pass(Libra
               Logger.cpp
               MetadataFunction.cpp
               SerializeConstant.cpp
-              SerializeGlobalVariable.cpp
               SerializeFunction.cpp
+              SerializeGlobalVariable.cpp
+              SerializeInstruction.cpp
               SerializeModule.cpp
               SerializeType.cpp
               Pass.cpp)
