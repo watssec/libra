@@ -39,6 +39,15 @@ json::Object serialize_global_variable(const GlobalVariable &gvar);
 
 json::Object serialize_function(const Function &func);
 json::Object serialize_parameter(const Argument &param);
+json::Object
+serialize_block(const BasicBlock &block,
+                const std::map<const BasicBlock *, uint64_t> &block_labels,
+                const std::map<const Instruction *, uint64_t> &inst_labels);
+
+json::Object serialize_instruction(
+    const Instruction &inst,
+    const std::map<const BasicBlock *, uint64_t> &block_labels,
+    const std::map<const Instruction *, uint64_t> &inst_labels);
 
 } // namespace libra
 
