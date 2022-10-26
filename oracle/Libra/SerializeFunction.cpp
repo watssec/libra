@@ -30,7 +30,7 @@ json::Object serialize_function(const Function &func) {
     result["intrinsic"] = func.getIntrinsicID();
   }
 
-  // first label the blocks and instructions
+  // first label the blocks, instructions, and arguments
   uint64_t block_counter = 0;
   uint64_t inst_counter = 0;
   std::map<const BasicBlock *, uint64_t> block_labels;
@@ -42,6 +42,13 @@ json::Object serialize_function(const Function &func) {
       inst_labels.emplace(&inst, inst_counter);
       inst_counter++;
     }
+  }
+
+  uint64_t arg_counter = 0;
+  std::map<const Argument *, uint64_t> arg_labels;
+  for (const auto &arg : func.args()) {
+    arg_labels.emplace(&arg, arg_counter);
+    arg_counter++;
   }
 
   // deserialize the block
@@ -56,12 +63,10 @@ json::Object serialize_function(const Function &func) {
 
 json::Object serialize_parameter(const Argument &param) {
   json::Object result;
-
+  result["ty"] = serialize_type(*param.getType());
   if (param.hasName()) {
     result["name"] = param.getName();
   }
-  result["ty"] = serialize_type(*param.getType());
-
   return result;
 }
 

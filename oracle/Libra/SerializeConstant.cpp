@@ -195,19 +195,9 @@ json::Object serialize_const_ref_interface(const GlobalIFunc &val) {
 }
 
 json::Object serialize_const_expr(const ConstantExpr &expr) {
+  auto result = populate(expr);
   const auto *inst = expr.getAsInstruction();
-  std::map<const BasicBlock *, uint64_t> block_labels;
-  std::map<const Instruction *, uint64_t> inst_labels;
-  inst_labels.emplace(inst, UINT64_MAX);
-
-  // a constant expr is an instruction with the index
-  auto result = serialize_instruction(*inst, block_labels, inst_labels);
-  const auto index = result.getInteger("index");
-  if (!index.hasValue() || (uint64_t)index.value() != UINT64_MAX) {
-    LOG->fatal("invalid instruction created by constant expr");
-  }
-  result.erase("index");
-
+  result["repr"] = serialize_inst(*inst);
   return result;
 }
 

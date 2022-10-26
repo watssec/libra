@@ -43,12 +43,21 @@ json::Object serialize_parameter(const Argument &param);
 json::Object
 serialize_block(const BasicBlock &block,
                 const std::map<const BasicBlock *, uint64_t> &block_labels,
-                const std::map<const Instruction *, uint64_t> &inst_labels);
+                const std::map<const Instruction *, uint64_t> &inst_labels,
+                const std::map<const Argument *, uint64_t> &arg_labels);
 
 json::Object serialize_instruction(
     const Instruction &inst,
     const std::map<const BasicBlock *, uint64_t> &block_labels,
-    const std::map<const Instruction *, uint64_t> &inst_labels);
+    const std::map<const Instruction *, uint64_t> &inst_labels,
+    const std::map<const Argument *, uint64_t> &arg_labels);
+json::Object serialize_inst(const Instruction &inst);
+
+json::Value serialize_inst_alloca(const AllocaInst &inst);
+json::Value serialize_inst_unreachable(const UnreachableInst &inst);
+
+json::Object serialize_value(const Value &val);
+json::Object serialize_value_argument(const Argument &arg);
 
 } // namespace libra
 

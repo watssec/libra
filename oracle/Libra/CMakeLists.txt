@@ -9,4 +9,5 @@ add_llvm_pass(Libra
               SerializeInstruction.cpp
               SerializeModule.cpp
               SerializeType.cpp
+              SerializeValue.cpp
               Pass.cpp)
