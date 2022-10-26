@@ -40,24 +40,39 @@ json::Object serialize_global_variable(const GlobalVariable &gvar);
 
 json::Object serialize_function(const Function &func);
 json::Object serialize_parameter(const Argument &param);
-json::Object
-serialize_block(const BasicBlock &block,
-                const std::map<const BasicBlock *, uint64_t> &block_labels,
-                const std::map<const Instruction *, uint64_t> &inst_labels,
-                const std::map<const Argument *, uint64_t> &arg_labels);
 
-json::Object serialize_instruction(
-    const Instruction &inst,
-    const std::map<const BasicBlock *, uint64_t> &block_labels,
-    const std::map<const Instruction *, uint64_t> &inst_labels,
-    const std::map<const Argument *, uint64_t> &arg_labels);
-json::Object serialize_inst(const Instruction &inst);
+json::Object serialize_inline_asm(const InlineAsm &assembly);
 
-json::Value serialize_inst_alloca(const AllocaInst &inst);
-json::Value serialize_inst_unreachable(const UnreachableInst &inst);
+class FunctionSerializationContext {
+private:
+  std::map<const BasicBlock *, uint64_t> block_labels_;
+  std::map<const Instruction *, uint64_t> inst_labels_;
+  std::map<const Argument *, uint64_t> arg_labels_;
 
-json::Object serialize_value(const Value &val);
-json::Object serialize_value_argument(const Argument &arg);
+public:
+  FunctionSerializationContext() = default;
+
+public:
+  void add_block(const BasicBlock &block);
+  void add_instruction(const Instruction &inst);
+  void add_argument(const Argument &arg);
+
+private:
+  uint64_t get_block(const BasicBlock &block) const;
+  uint64_t get_instruction(const Instruction &inst) const;
+  uint64_t get_argument(const Argument &arg) const;
+
+public:
+  json::Object serialize_block(const BasicBlock &block) const;
+
+  json::Object serialize_instruction(const Instruction &inst) const;
+  json::Object serialize_inst(const Instruction &inst) const;
+  json::Object serialize_inst_alloca(const AllocaInst &inst) const;
+
+  json::Object serialize_value(const Value &val) const;
+  json::Object serialize_value_argument(const Argument &arg) const;
+  json::Object serialize_value_instruction(const Instruction &inst) const;
+};
 
 } // namespace libra
 

@@ -31,30 +31,21 @@ json::Object serialize_function(const Function &func) {
   }
 
   // first label the blocks, instructions, and arguments
-  uint64_t block_counter = 0;
-  uint64_t inst_counter = 0;
-  std::map<const BasicBlock *, uint64_t> block_labels;
-  std::map<const Instruction *, uint64_t> inst_labels;
+  FunctionSerializationContext ctxt;
   for (const auto &block : func) {
-    block_labels.emplace(&block, block_counter);
-    block_counter++;
+    ctxt.add_block(block);
     for (const auto &inst : block) {
-      inst_labels.emplace(&inst, inst_counter);
-      inst_counter++;
+      ctxt.add_instruction(inst);
     }
   }
-
-  uint64_t arg_counter = 0;
-  std::map<const Argument *, uint64_t> arg_labels;
   for (const auto &arg : func.args()) {
-    arg_labels.emplace(&arg, arg_counter);
-    arg_counter++;
+    ctxt.add_argument(arg);
   }
 
   // deserialize the block
   json::Array blocks;
   for (const auto &block : func) {
-    blocks.push_back(serialize_block(block, block_labels, inst_labels));
+    blocks.push_back(ctxt.serialize_block(block));
   }
   result["blocks"] = std::move(blocks);
 
@@ -71,13 +62,11 @@ json::Object serialize_parameter(const Argument &param) {
 }
 
 json::Object
-serialize_block(const BasicBlock &block,
-                const std::map<const BasicBlock *, uint64_t> &block_labels,
-                const std::map<const Instruction *, uint64_t> &inst_labels) {
+FunctionSerializationContext::serialize_block(const BasicBlock &block) const {
   json::Object result;
 
   // basics
-  result["label"] = block_labels.at(&block);
+  result["label"] = this->get_block(block);
   if (block.hasName()) {
     result["name"] = block.getName();
   }
@@ -91,13 +80,12 @@ serialize_block(const BasicBlock &block,
     if (term == &inst) {
       continue;
     }
-    body.push_back(serialize_instruction(inst, block_labels, inst_labels));
+    body.push_back(this->serialize_instruction(inst));
   }
   result["body"] = std::move(body);
 
   // terminator
-  result["terminator"] =
-      serialize_instruction(*term, block_labels, inst_labels);
+  result["terminator"] = this->serialize_instruction(*term);
 
   return result;
 }

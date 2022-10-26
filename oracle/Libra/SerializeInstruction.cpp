@@ -2,19 +2,18 @@
 
 namespace libra {
 
-json::Object serialize_instruction(
-    const Instruction &inst,
-    const std::map<const BasicBlock *, uint64_t> &block_labels,
-    const std::map<const Instruction *, uint64_t> &inst_labels) {
+json::Object FunctionSerializationContext::serialize_instruction(
+    const Instruction &inst) const {
 
   json::Object result;
   result["ty"] = serialize_type(*inst.getType());
-  result["index"] = inst_labels.at(&inst);
-  result["repr"] = serialize_inst(inst);
+  result["index"] = this->get_instruction(inst);
+  result["repr"] = this->serialize_inst(inst);
   return result;
 }
 
-json::Object serialize_inst(const Instruction &inst) {
+json::Object
+FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   json::Object result;
 
   // memory
@@ -24,8 +23,7 @@ json::Object serialize_inst(const Instruction &inst) {
 
   // terminators
   else if (isa<UnreachableInst>(inst)) {
-    result["Unreachable"] =
-        serialize_inst_unreachable(cast<UnreachableInst>(inst));
+    result["Unreachable"] = json::Value(nullptr);
   }
 
   // should have exhausted all valid cases
@@ -36,17 +34,14 @@ json::Object serialize_inst(const Instruction &inst) {
   return result;
 }
 
-json::Value serialize_inst_alloca(const AllocaInst &inst) {
+json::Object FunctionSerializationContext::serialize_inst_alloca(
+    const AllocaInst &inst) const {
   json::Object result;
   result["allocated_type"] = serialize_type(*inst.getAllocatedType());
   if (inst.isArrayAllocation()) {
-    result["size"] = serialize_value(*inst.getArraySize());
+    result["size"] = this->serialize_value(*inst.getArraySize());
   }
   return result;
-}
-
-json::Value serialize_inst_unreachable(const UnreachableInst &inst) {
-  return {nullptr};
 }
 
 } // namespace libra

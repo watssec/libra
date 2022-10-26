@@ -197,7 +197,8 @@ json::Object serialize_const_ref_interface(const GlobalIFunc &val) {
 json::Object serialize_const_expr(const ConstantExpr &expr) {
   auto result = populate(expr);
   const auto *inst = expr.getAsInstruction();
-  result["repr"] = serialize_inst(*inst);
+  FunctionSerializationContext ctxt;
+  result["repr"] = ctxt.serialize_inst(*inst);
   return result;
 }
 

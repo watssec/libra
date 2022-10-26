@@ -14,6 +14,7 @@
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/GlobalsModRef.h>
 #include <llvm/Analysis/LoopInfo.h>
+#include <llvm/Analysis/MemorySSA.h>
 #include <llvm/Analysis/PhiValues.h>
 #include <llvm/Analysis/ScalarEvolution.h>
 #include <llvm/Analysis/ScalarEvolutionAliasAnalysis.h>
@@ -22,6 +23,7 @@
 #include <llvm/Analysis/TypeBasedAliasAnalysis.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
