@@ -48,6 +48,8 @@ impl Function {
             .ok_or_else(|| EngineError::InvalidAssumption("no anonymous function".into()))?
             .into();
 
+        // filter out intrinsic functions
+
         // convert the signature
         let func_ty = typing.convert(ty)?;
         let (param_tys, ret_ty) = match func_ty {
