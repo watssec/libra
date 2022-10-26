@@ -26,7 +26,10 @@ json::Object serialize_module(const Module &module) {
   // functions
   json::Array functions;
   for (const auto &func : module.functions()) {
-    // filter out intrinsic functions
+    // filter out debug functions
+    if (is_debug_function(func)) {
+      continue;
+    }
     functions.push_back(serialize_function(func));
   }
   result["functions"] = std::move(functions);

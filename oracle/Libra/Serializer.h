@@ -4,6 +4,7 @@
 #include "Config.hpp"
 #include "Deps.h"
 #include "Logger.h"
+#include "Metadata.h"
 
 namespace libra {
 
