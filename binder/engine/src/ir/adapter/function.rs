@@ -14,10 +14,10 @@ pub struct Function {
     pub is_defined: bool,
     /// the definition (function body) is exact
     pub is_exact: bool,
+    /// whether the function is intrinsic
+    pub is_intrinsic: bool,
     /// parameters
     pub params: Vec<Parameter>,
-    /// intrinsics id (if applicable)
-    pub intrinsics: Option<usize>,
     /// body of the function
     pub blocks: Vec<Block>,
 }

@@ -14,6 +14,7 @@ pub enum Unsupported {
     WeakGlobalVariable,
     WeakFunction,
     ExternGlobalVariable,
+    ExternFunction,
     PointerAddressSpace,
     OutOfBoundConstantGEP,
     InterfaceResolver,
@@ -51,6 +52,9 @@ impl Display for Unsupported {
             }
             Self::ExternGlobalVariable => {
                 write!(f, "global variable externally initialized")
+            }
+            Self::ExternFunction => {
+                write!(f, "function externally defined")
             }
             Self::PointerAddressSpace => {
                 write!(f, "address space of a pointer")

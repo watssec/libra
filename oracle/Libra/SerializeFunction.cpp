@@ -16,6 +16,7 @@ json::Object serialize_function(const Function &func) {
   // attributes
   result["is_defined"] = !func.isDeclaration();
   result["is_exact"] = func.isDefinitionExact();
+  result["is_intrinsic"] = is_intrinsic_function(func);
   // TODO: additional attributes or metadata?
 
   // parameters
@@ -24,11 +25,6 @@ json::Object serialize_function(const Function &func) {
     params.push_back(serialize_parameter(param));
   }
   result["params"] = std::move(params);
-
-  // body
-  if (func.isIntrinsic()) {
-    result["intrinsic"] = func.getIntrinsicID();
-  }
 
   // first label the blocks, instructions, and arguments
   FunctionSerializationContext ctxt;

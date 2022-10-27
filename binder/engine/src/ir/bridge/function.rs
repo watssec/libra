@@ -25,18 +25,19 @@ impl Function {
             ty,
             is_defined,
             is_exact,
+            is_intrinsic,
             params,
-            intrinsics,
             blocks,
         } = func;
 
         // filter out unsupported cases
-        if !*is_exact {
-            return Err(EngineError::NotSupportedYet(
-                Unsupported::WeakGlobalVariable,
-            ));
+        if !*is_defined && !*is_intrinsic {
+            return Err(EngineError::NotSupportedYet(Unsupported::ExternFunction));
         }
-        if *is_defined && intrinsics.is_some() {
+        if !*is_exact {
+            return Err(EngineError::NotSupportedYet(Unsupported::WeakFunction));
+        }
+        if *is_defined && *is_intrinsic {
             return Err(EngineError::InvalidAssumption(format!(
                 "a defined function cannot be an intrinsic: {}",
                 name.as_ref().map_or("<unknown>", |e| e.as_str())

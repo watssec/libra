@@ -12,8 +12,10 @@ pub struct GlobalVariable {
     pub name: Identifier,
     /// variable type
     pub ty: Type,
+    /// mutability
+    pub is_constant: bool,
     /// initializer
-    pub initializer: Option<Constant>,
+    pub initializer: Constant,
 }
 
 impl GlobalVariable {
@@ -35,7 +37,7 @@ impl GlobalVariable {
         } = gvar;
 
         // filter out unsupported cases
-        if *is_extern {
+        if *is_extern || !*is_defined {
             return Err(EngineError::NotSupportedYet(
                 Unsupported::ExternGlobalVariable,
             ));
@@ -55,18 +57,6 @@ impl GlobalVariable {
                 Unsupported::PointerAddressSpace,
             ));
         }
-        if *is_const && initializer.is_none() {
-            return Err(EngineError::InvalidAssumption(format!(
-                "must have an initializer for a constant global: {}",
-                name.as_ref().map_or("<unknown>", |e| e.as_str())
-            )));
-        }
-        if *is_defined && initializer.is_none() {
-            return Err(EngineError::InvalidAssumption(format!(
-                "must have an initializer for a defined global: {}",
-                name.as_ref().map_or("<unknown>", |e| e.as_str())
-            )));
-        }
 
         // convert the name
         let ident: Identifier = name
@@ -79,14 +69,20 @@ impl GlobalVariable {
 
         // convert the initializer (if any)
         let gvar_init = match initializer {
-            None => None,
-            Some(constant) => Some(Constant::convert(constant, &gvar_ty, typing, symbols)?),
+            None => {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "must have an initializer for a defined global: {}",
+                    name.as_ref().map_or("<unknown>", |e| e.as_str())
+                )));
+            }
+            Some(constant) => Constant::convert(constant, &gvar_ty, typing, symbols)?,
         };
 
         // done with the construction
         Ok(Self {
             name: ident,
             ty: gvar_ty,
+            is_constant: *is_const,
             initializer: gvar_init,
         })
     }
