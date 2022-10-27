@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ir::adapter::cfg::Block;
 use crate::ir::adapter::typing::Type;
 
 /// A representation of an LLVM function
@@ -17,6 +18,8 @@ pub struct Function {
     pub params: Vec<Parameter>,
     /// intrinsics id (if applicable)
     pub intrinsics: Option<usize>,
+    /// body of the function
+    pub blocks: Vec<Block>,
 }
 
 /// A representation of an LLVM function parameter

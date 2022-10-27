@@ -27,6 +27,7 @@ impl Function {
             is_exact,
             params,
             intrinsics,
+            blocks,
         } = func;
 
         // filter out unsupported cases

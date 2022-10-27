@@ -25,7 +25,7 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   } else if (isa<LoadInst>(inst)) {
     result["Load"] = serialize_inst_load(cast<LoadInst>(inst));
   } else if (isa<StoreInst>(inst)) {
-    result["Load"] = serialize_inst_store(cast<StoreInst>(inst));
+    result["Store"] = serialize_inst_store(cast<StoreInst>(inst));
   }
 
   // terminators
