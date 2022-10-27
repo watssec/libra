@@ -5,10 +5,10 @@ use crate::ir::adapter::typing::Type;
 
 #[derive(Serialize, Deserialize)]
 pub enum Value {
-    /// reference to an argument
-    Argument { ty: Type, index: usize },
     /// constant
     Constant(Constant),
+    /// reference to an argument
+    Argument { ty: Type, index: usize },
     /// reference to an instruction
     Instruction { ty: Type, index: usize },
 }

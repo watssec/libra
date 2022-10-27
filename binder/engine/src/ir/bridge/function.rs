@@ -1,10 +1,11 @@
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
+use crate::ir::bridge::cfg::ControlFlowGraph;
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 
 /// An adapted representation of an LLVM function
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq)]
 pub struct Function {
     /// variable name
     pub name: Identifier,
@@ -12,6 +13,8 @@ pub struct Function {
     pub params: Vec<(Option<Identifier>, Type)>,
     /// return type
     pub ret: Option<Type>,
+    /// body of the function (in terms of a CFG)
+    pub body: Option<ControlFlowGraph>,
 }
 
 impl Function {
@@ -36,12 +39,6 @@ impl Function {
         }
         if !*is_exact {
             return Err(EngineError::NotSupportedYet(Unsupported::WeakFunction));
-        }
-        if *is_defined && *is_intrinsic {
-            return Err(EngineError::InvalidAssumption(format!(
-                "a defined function cannot be an intrinsic: {}",
-                name.as_ref().map_or("<unknown>", |e| e.as_str())
-            )));
         }
 
         // convert the name
@@ -69,7 +66,7 @@ impl Function {
                 ident
             )));
         }
-        let params_new = params
+        let params_new: Vec<_> = params
             .iter()
             .zip(param_tys)
             .map(|(p, t)| {
@@ -90,11 +87,39 @@ impl Function {
             })
             .collect::<EngineResult<_>>()?;
 
+        let body = if *is_defined {
+            if blocks.is_empty() {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "a defined function must have at least one basic block: {}",
+                    ident
+                )));
+            }
+            if *is_intrinsic {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "a defined function cannot be an intrinsic: {}",
+                    name.as_ref().map_or("<unknown>", |e| e.as_str())
+                )));
+            }
+
+            // construct the CFG
+            Some(ControlFlowGraph::build(
+                typing,
+                symbols,
+                &params_new,
+                ret_ty.as_ref(),
+                blocks,
+            )?)
+        } else {
+            assert!(*is_intrinsic);
+            None
+        };
+
         // done with the construction
         Ok(Self {
             name: ident,
             params: params_new,
             ret: ret_ty,
+            body,
         })
     }
 }

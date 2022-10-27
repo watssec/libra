@@ -72,6 +72,7 @@ impl Workflow {
                     "-nostdlib",
                     // feature selection
                     "-std=c17",
+                    "-Wno-c2x-extensions",
                 ],
             )
             .map_err(|e| EngineError::CompilationError(format!("Error during clang: {}", e)))?;
