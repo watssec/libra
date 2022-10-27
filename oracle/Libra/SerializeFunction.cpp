@@ -80,6 +80,10 @@ FunctionSerializationContext::serialize_block(const BasicBlock &block) const {
     if (term == &inst) {
       continue;
     }
+    // handle debug instructions separately
+    if (is_debug_instruction(inst)) {
+      continue;
+    }
     body.push_back(this->serialize_instruction(inst));
   }
   result["body"] = std::move(body);

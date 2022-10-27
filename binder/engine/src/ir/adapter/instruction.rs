@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 use crate::ir::adapter::typing::Type;
-use crate::ir::adapter::value::Value;
+use crate::ir::adapter::value::{InlineAsm, Value};
 
 #[derive(Serialize, Deserialize)]
 pub enum Inst {
     // memory
     Alloca {
         allocated_type: Type,
-        size: Value,
+        size: Option<Value>,
     },
     Load {
         pointee_type: Type,
@@ -21,6 +21,28 @@ pub enum Inst {
         value: Value,
         address_space: usize,
     },
+    // call
+    Intrinsic {
+        callee: Value,
+        args: Vec<Value>,
+    },
+    CallIndirect {
+        callee: Value,
+        args: Vec<Value>,
+    },
+    CallDirect {
+        callee: Value,
+        args: Vec<Value>,
+    },
+    Asm {
+        asm: InlineAsm,
+        args: Vec<Value>,
+    },
+    // terminator
+    Return {
+        value: Option<Value>,
+    },
+    Unreachable,
 }
 
 #[derive(Serialize, Deserialize)]

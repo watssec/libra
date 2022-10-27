@@ -12,3 +12,9 @@ pub enum Value {
     /// reference to an instruction
     Instruction { ty: Type, index: usize },
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct InlineAsm {
+    pub asm: String,
+    pub constraint: String,
+}

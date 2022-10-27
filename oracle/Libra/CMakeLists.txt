@@ -2,7 +2,7 @@
 add_llvm_pass(Libra
               Config.hpp
               Logger.cpp
-              MetadataFunction.cpp
+              Metadata.cpp
               SerializeAsm.cpp
               SerializeConstant.cpp
               SerializeFunction.cpp
