@@ -68,6 +68,8 @@ public:
   json::Object serialize_instruction(const Instruction &inst) const;
   json::Object serialize_inst(const Instruction &inst) const;
   json::Object serialize_inst_alloca(const AllocaInst &inst) const;
+  json::Object serialize_inst_load(const LoadInst &inst) const;
+  json::Object serialize_inst_store(const StoreInst &inst) const;
 
   json::Object serialize_value(const Value &val) const;
   json::Object serialize_value_argument(const Argument &arg) const;
