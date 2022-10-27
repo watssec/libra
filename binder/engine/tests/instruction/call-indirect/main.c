@@ -1,22 +1,9 @@
-void fun_1() {}
+void foo(int a) {}
 
-void fun_2() {
-  fun_1();
-}
+void (*g_fun_ptr_null)(int) = 0;
+void (*g_fun_ptr_foo)(int) = foo;
 
-int fun_3(int a) {
-  return a;
-}
-
-int fun_4() {
-  return fun_3(0);
-}
-
-int fun_5(int a) {
-  return fun_3(a);
-}
-
-int g_int;
-int fun_6() {
-  return fun_3(g_int);
+void bar(int a) {
+  g_fun_ptr_null(0);
+  foo(a);
 }
