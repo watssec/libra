@@ -21,17 +21,21 @@ pub enum Inst {
         value: Value,
         address_space: usize,
     },
-    // call
+    // intrinsics
     Intrinsic {
         callee: Value,
+        target_type: Type,
+        args: Vec<Value>,
+    },
+    // call
+    CallDirect {
+        callee: Value,
+        target_type: Type,
         args: Vec<Value>,
     },
     CallIndirect {
         callee: Value,
-        args: Vec<Value>,
-    },
-    CallDirect {
-        callee: Value,
+        target_type: Type,
         args: Vec<Value>,
     },
     Asm {

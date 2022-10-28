@@ -87,7 +87,6 @@ json::Object serialize_type(const Type &type) {
 json::Object serialize_type_int(const IntegerType &type) {
   json::Object result;
   result["width"] = type.getBitWidth();
-  result["mask"] = type.getBitMask();
   return result;
 }
 

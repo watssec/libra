@@ -13,7 +13,6 @@ enum TypeToken {
     Void,
     Bitvec {
         width: usize,
-        mask: u64,
     },
     // TODO: floating point types
     Array {
@@ -40,10 +39,7 @@ impl TypeToken {
 
         let converted = match ty {
             AdaptedType::Void => Self::Void,
-            AdaptedType::Int { width, mask } => Self::Bitvec {
-                width: *width,
-                mask: *mask,
-            },
+            AdaptedType::Int { width } => Self::Bitvec { width: *width },
             AdaptedType::Float { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint));
             }
@@ -162,7 +158,7 @@ impl TypeToken {
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Type {
     /// Bit-vector
-    Bitvec { bits: usize, mask: u64 },
+    Bitvec { bits: usize },
     /// An array with elements being the same type
     Array { element: Box<Type>, length: usize },
     /// A struct type, named or anonymous
@@ -187,10 +183,7 @@ impl Type {
                     "unexpected void type".into(),
                 ));
             }
-            TypeToken::Bitvec { width, mask } => Self::Bitvec {
-                bits: *width,
-                mask: *mask,
-            },
+            TypeToken::Bitvec { width } => Self::Bitvec { bits: *width },
             TypeToken::Array { element, length } => {
                 let converted = Self::convert_token(element)?;
                 Self::Array {
@@ -235,8 +228,8 @@ impl Type {
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Bitvec { bits, mask } => {
-                write!(f, "int{}/{}", bits, mask)
+            Self::Bitvec { bits } => {
+                write!(f, "int{}", bits)
             }
             Self::Array { element, length } => {
                 write!(f, "{}[{}]", element, length)

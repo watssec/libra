@@ -107,6 +107,7 @@ FunctionSerializationContext::serialize_inst_call_direct(
     const CallInst &inst) const {
   json::Object result;
   result["callee"] = serialize_value(*inst.getCalledOperand());
+  result["target_type"] = serialize_type(*inst.getFunctionType());
 
   json::Array args;
   for (const auto &arg : inst.args()) {
@@ -121,6 +122,7 @@ FunctionSerializationContext::serialize_inst_call_indirect(
     const CallInst &inst) const {
   json::Object result;
   result["callee"] = serialize_value(*inst.getCalledOperand());
+  result["target_type"] = serialize_type(*inst.getFunctionType());
 
   json::Array args;
   for (const auto &arg : inst.args()) {
@@ -135,6 +137,7 @@ FunctionSerializationContext::serialize_inst_call_intrinsic(
     const IntrinsicInst &inst) const {
   json::Object result;
   result["callee"] = serialize_value(*inst.getCalledOperand());
+  result["target_type"] = serialize_type(*inst.getFunctionType());
 
   json::Array args;
   for (const auto &arg : inst.args()) {

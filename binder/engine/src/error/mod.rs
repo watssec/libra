@@ -5,6 +5,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone)]
 pub enum Unsupported {
     ModuleLevelAssembly,
+    InlineAssembly,
     GlobalAlias,
     FloatingPoint,
     Vectorization,
@@ -25,6 +26,9 @@ impl Display for Unsupported {
         match self {
             Self::ModuleLevelAssembly => {
                 write!(f, "module-level assembly")
+            }
+            Self::InlineAssembly => {
+                write!(f, "inline assembly")
             }
             Self::GlobalAlias => {
                 write!(f, "global alias")

@@ -102,13 +102,15 @@ impl ControlFlowGraph {
                 terminator,
             } = block;
 
-            // parse the terminator
+            let body_new = body
+                .iter()
+                .map(|inst| ctxt.parse_instruction(inst))
+                .collect::<EngineResult<_>>()?;
             let terminator_new = ctxt.parse_terminator(terminator)?;
 
             // construct the new block
             let block_new = Block {
-                // TODO
-                sequence: vec![],
+                sequence: body_new,
                 terminator: terminator_new,
             };
             graph.add_node(block_new);

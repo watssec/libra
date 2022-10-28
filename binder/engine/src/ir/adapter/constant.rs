@@ -18,4 +18,5 @@ pub enum Constant {
     Function { ty: Type, name: Option<String> },
     Alias { ty: Type, name: Option<String> },
     Interface { ty: Type, name: Option<String> },
+    // TODO: constant expr
 }

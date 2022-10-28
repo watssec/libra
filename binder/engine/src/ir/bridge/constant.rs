@@ -8,7 +8,7 @@ use crate::EngineResult;
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Constant {
     /// Integer
-    Bitvec { bits: usize, mask: u64, value: u64 },
+    Bitvec { bits: usize, value: u64 },
     /// Null pointer
     Null,
     /// Array
@@ -27,9 +27,8 @@ pub enum Constant {
 impl Constant {
     fn default_from_type(ty: &Type) -> EngineResult<Self> {
         let value = match ty {
-            Type::Bitvec { bits, mask } => Self::Bitvec {
+            Type::Bitvec { bits } => Self::Bitvec {
                 bits: *bits,
-                mask: *mask,
                 value: 0,
             },
             Type::Array { element, length } => {
@@ -86,9 +85,8 @@ impl Constant {
             AdaptedConstant::Int { ty, value } => {
                 check_type(ty)?;
                 match expected_type {
-                    Type::Bitvec { bits, mask } => Self::Bitvec {
+                    Type::Bitvec { bits } => Self::Bitvec {
                         bits: *bits,
-                        mask: *mask,
                         value: *value,
                     },
                     _ => {

@@ -6,7 +6,7 @@ pub enum Type {
     /// Void type
     Void,
     /// Integer type represented as bitvector
-    Int { width: usize, mask: u64 },
+    Int { width: usize },
     /// Floating point
     Float { width: usize, name: String },
     /// Array type
