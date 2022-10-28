@@ -54,17 +54,21 @@ pub enum Instruction {
         bits_from: usize,
         bits_into: usize,
         operand: Value,
+        result: usize,
     },
     CastPtrToBitvec {
         bits_into: usize,
         operand: Value,
+        result: usize,
     },
     CastBitvecToPtr {
         bits_from: usize,
         operand: Value,
+        result: usize,
     },
     CastPtr {
         operand: Value,
+        result: usize,
     },
 }
 
@@ -472,6 +476,7 @@ impl<'a> Context<'a> {
                                 bits_from,
                                 bits_into,
                                 operand: operand_new,
+                                result: *index,
                             }
                         }
                         _ => {
@@ -485,6 +490,7 @@ impl<'a> Context<'a> {
                             Instruction::CastPtrToBitvec {
                                 bits_into,
                                 operand: operand_new,
+                                result: *index,
                             }
                         }
                         _ => {
@@ -498,6 +504,7 @@ impl<'a> Context<'a> {
                             Instruction::CastBitvecToPtr {
                                 bits_from,
                                 operand: operand_new,
+                                result: *index,
                             }
                         }
                         _ => {
@@ -509,6 +516,7 @@ impl<'a> Context<'a> {
                     "bitcast" => match (src_ty_new, dst_ty_new) {
                         (Type::Pointer, Type::Pointer) => Instruction::CastPtr {
                             operand: operand_new,
+                            result: *index,
                         },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
