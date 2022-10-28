@@ -71,7 +71,7 @@ json::Object FunctionSerializationContext::serialize_inst_alloca(
 json::Object
 FunctionSerializationContext::serialize_inst_load(const LoadInst &inst) const {
   json::Object result;
-  result["pointee_type"] = serialize_type(*inst.getPointerOperandType());
+  result["pointee_type"] = serialize_type(*inst.getType());
   result["pointer"] = this->serialize_value(*inst.getPointerOperand());
   result["address_space"] = inst.getPointerAddressSpace();
   return result;
@@ -80,7 +80,7 @@ FunctionSerializationContext::serialize_inst_load(const LoadInst &inst) const {
 json::Object FunctionSerializationContext::serialize_inst_store(
     const StoreInst &inst) const {
   json::Object result;
-  result["pointee_type"] = serialize_type(*inst.getPointerOperandType());
+  result["pointee_type"] = serialize_type(*inst.getValueOperand()->getType());
   result["pointer"] = this->serialize_value(*inst.getPointerOperand());
   result["value"] = this->serialize_value(*inst.getValueOperand());
   result["address_space"] = inst.getPointerAddressSpace();
