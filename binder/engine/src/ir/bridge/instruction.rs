@@ -49,6 +49,23 @@ pub enum Instruction {
         rhs: Value,
         result: usize,
     },
+    // cast
+    CastBitvec {
+        bits_from: usize,
+        bits_into: usize,
+        operand: Value,
+    },
+    CastPtrToBitvec {
+        bits_into: usize,
+        operand: Value,
+    },
+    CastBitvecToPtr {
+        bits_from: usize,
+        operand: Value,
+    },
+    CastPtr {
+        operand: Value,
+    },
 }
 
 #[derive(Eq, PartialEq)]
@@ -432,6 +449,86 @@ impl<'a> Context<'a> {
                     result: *index,
                 }
             }
+            // casts
+            AdaptedInst::Cast {
+                opcode,
+                src_ty,
+                dst_ty,
+                operand,
+            } => {
+                let inst_ty = self.typing.convert(ty)?;
+                let src_ty_new = self.typing.convert(src_ty)?;
+                let dst_ty_new = self.typing.convert(dst_ty)?;
+                if dst_ty_new != inst_ty {
+                    return Err(EngineError::InvariantViolation(
+                        "type mismatch between dst type and inst type for cast".into(),
+                    ));
+                }
+                let operand_new = self.parse_value(operand, &src_ty_new)?;
+                match opcode.as_str() {
+                    "trunc" | "zext" | "sext" => match (src_ty_new, dst_ty_new) {
+                        (Type::Bitvec { bits: bits_from }, Type::Bitvec { bits: bits_into }) => {
+                            Instruction::CastBitvec {
+                                bits_from,
+                                bits_into,
+                                operand: operand_new,
+                            }
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect bitvec type for bitvec cast".into(),
+                            ));
+                        }
+                    },
+                    "ptr_to_int" => match (src_ty_new, dst_ty_new) {
+                        (Type::Pointer, Type::Bitvec { bits: bits_into }) => {
+                            Instruction::CastPtrToBitvec {
+                                bits_into,
+                                operand: operand_new,
+                            }
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect (ptr, bitvec) for ptr_to_int cast".into(),
+                            ));
+                        }
+                    },
+                    "int_to_ptr" => match (src_ty_new, dst_ty_new) {
+                        (Type::Bitvec { bits: bits_from }, Type::Pointer) => {
+                            Instruction::CastBitvecToPtr {
+                                bits_from,
+                                operand: operand_new,
+                            }
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect (bitvec, ptr) for int_to_ptr cast".into(),
+                            ));
+                        }
+                    },
+                    "bitcast" => match (src_ty_new, dst_ty_new) {
+                        (Type::Pointer, Type::Pointer) => Instruction::CastPtr {
+                            operand: operand_new,
+                        },
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect ptr type for bitcast".into(),
+                            ));
+                        }
+                    },
+                    "address_space_cast" => {
+                        return Err(EngineError::NotSupportedYet(
+                            Unsupported::PointerAddressSpace,
+                        ));
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(format!(
+                            "unexpected cast opcode: {}",
+                            opcode
+                        )));
+                    }
+                }
+            }
             // terminators should never appear here
             AdaptedInst::Return { .. } | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
@@ -483,7 +580,8 @@ impl<'a> Context<'a> {
             | AdaptedInst::Asm { .. }
             | AdaptedInst::Unary { .. }
             | AdaptedInst::Binary { .. }
-            | AdaptedInst::Compare { .. } => {
+            | AdaptedInst::Compare { .. }
+            | AdaptedInst::Cast { .. } => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

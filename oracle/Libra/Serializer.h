@@ -89,8 +89,8 @@ public:
   serialize_inst_unary_operator(const UnaryOperator &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_binary_operator(const BinaryOperator &inst) const;
-  [[nodiscard]] json::Object
-  serialize_inst_compare(const CmpInst &inst) const;
+  [[nodiscard]] json::Object serialize_inst_compare(const CmpInst &inst) const;
+  [[nodiscard]] json::Object serialize_inst_cast(const CastInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_return(const ReturnInst &inst) const;
 

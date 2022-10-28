@@ -60,6 +60,13 @@ pub enum Inst {
         lhs: Value,
         rhs: Value,
     },
+    // cast
+    Cast {
+        opcode: String,
+        src_ty: Type,
+        dst_ty: Type,
+        operand: Value,
+    },
     // terminator
     Return {
         value: Option<Value>,

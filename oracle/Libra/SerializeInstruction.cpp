@@ -42,7 +42,7 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     }
   }
 
-  // unary, binary, comparison
+  // unary, binary, comparison, and cast
   else if (isa<UnaryOperator>(inst)) {
     result["Unary"] = serialize_inst_unary_operator(cast<UnaryOperator>(inst));
   } else if (isa<BinaryOperator>(inst)) {
@@ -50,6 +50,8 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
         serialize_inst_binary_operator(cast<BinaryOperator>(inst));
   } else if (isa<CmpInst>(inst)) {
     result["Compare"] = serialize_inst_compare(cast<CmpInst>(inst));
+  } else if (isa<CastInst>(inst)) {
+    result["Cast"] = serialize_inst_cast(cast<CastInst>(inst));
   }
 
   // terminators
@@ -378,9 +380,77 @@ FunctionSerializationContext::serialize_inst_binary_operator(
   }
   }
 
-  result["operand_ty"] = serialize_type(*inst.getOperand(0)->getType());
+  result["operand_type"] = serialize_type(*inst.getOperand(0)->getType());
   result["lhs"] = serialize_value(*inst.getOperand(0));
   result["rhs"] = serialize_value(*inst.getOperand(1));
+  return result;
+}
+
+[[nodiscard]] json::Object
+FunctionSerializationContext::serialize_inst_cast(const CastInst &inst) const {
+  json::Object result;
+
+  switch (inst.getOpcode()) {
+  case Instruction::CastOps::Trunc: {
+    result["opcode"] = "trunc";
+    break;
+  }
+  case Instruction::CastOps::ZExt: {
+    result["opcode"] = "zext";
+    break;
+  }
+  case Instruction::CastOps::SExt: {
+    result["opcode"] = "sext";
+    break;
+  }
+  case Instruction::CastOps::FPToUI: {
+    result["opcode"] = "fp_to_ui";
+    break;
+  }
+  case Instruction::CastOps::FPToSI: {
+    result["opcode"] = "fp_to_si";
+    break;
+  }
+  case Instruction::CastOps::UIToFP: {
+    result["opcode"] = "ui_to_fp";
+    break;
+  }
+  case Instruction::CastOps::SIToFP: {
+    result["opcode"] = "si_to_fp";
+    break;
+  }
+  case Instruction::CastOps::FPTrunc: {
+    result["opcode"] = "fp_trunc";
+    break;
+  }
+  case Instruction::CastOps::FPExt: {
+    result["opcode"] = "fp_ext";
+    break;
+  }
+  case Instruction::CastOps::PtrToInt: {
+    result["opcode"] = "ptr_to_int";
+    break;
+  }
+  case Instruction::CastOps::IntToPtr: {
+    result["opcode"] = "int_to_ptr";
+    break;
+  }
+  case Instruction::CastOps::BitCast: {
+    result["opcode"] = "bitcast";
+    break;
+  }
+  case Instruction::CastOps::AddrSpaceCast: {
+    result["opcode"] = "address_space_cast";
+    break;
+  }
+  case Instruction::CastOpsEnd: {
+    LOG->fatal("unexpected end of cast ops");
+  }
+  }
+
+  result["src_ty"] = serialize_type(*inst.getSrcTy());
+  result["dst_ty"] = serialize_type(*inst.getDestTy());
+  result["operand"] = serialize_value(*inst.getOperand(0));
   return result;
 }
 
