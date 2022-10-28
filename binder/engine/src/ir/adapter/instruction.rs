@@ -53,6 +53,13 @@ pub enum Inst {
         lhs: Value,
         rhs: Value,
     },
+    // comparison
+    Compare {
+        predicate: String,
+        operand_type: Type,
+        lhs: Value,
+        rhs: Value,
+    },
     // terminator
     Return {
         value: Option<Value>,

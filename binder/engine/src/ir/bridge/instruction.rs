@@ -41,6 +41,14 @@ pub enum Instruction {
         rhs: Value,
         result: usize,
     },
+    // compare
+    Compare {
+        bits: usize,
+        predicate: ComparePredicate,
+        lhs: Value,
+        rhs: Value,
+        result: usize,
+    },
 }
 
 #[derive(Eq, PartialEq)]
@@ -51,8 +59,7 @@ pub enum BinaryOperator {
     Div,
     Mod,
     Shl,
-    LShr,
-    AShr,
+    Shr,
     And,
     Or,
     Xor,
@@ -67,8 +74,7 @@ impl BinaryOperator {
             "udiv" | "sdiv" => Self::Div,
             "urem" | "srem" => Self::Mod,
             "shl" => Self::Shl,
-            "lshr" => Self::LShr,
-            "ashr" => Self::AShr,
+            "lshr" | "ashr" => Self::Shr,
             "and" => Self::And,
             "or" => Self::Or,
             "xor" => Self::Xor,
@@ -78,6 +84,40 @@ impl BinaryOperator {
             _ => {
                 return Err(EngineError::InvalidAssumption(format!(
                     "unexpected binary opcode: {}",
+                    opcode
+                )));
+            }
+        };
+        Ok(parsed)
+    }
+}
+
+#[derive(Eq, PartialEq)]
+pub enum ComparePredicate {
+    EQ,
+    NE,
+    GT,
+    GE,
+    LT,
+    LE,
+}
+
+impl ComparePredicate {
+    pub fn parse(opcode: &str) -> EngineResult<Self> {
+        let parsed = match opcode {
+            "i_eq" => Self::EQ,
+            "i_ne" => Self::NE,
+            "i_ugt" | "i_sgt" => Self::GT,
+            "i_uge" | "i_sge" => Self::GE,
+            "i_ult" | "i_slt" => Self::LT,
+            "i_ule" | "i_sle" => Self::LE,
+            "f_f" | "f_oeq" | "f_ogt" | "f_oge" | "f_olt" | "f_ole" | "f_one" | "f_ord"
+            | "f_uno" | "f_ueq" | "f_ugt" | "f_uge" | "f_ult" | "f_ule" | "f_une" | "f_t" => {
+                return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint))
+            }
+            _ => {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "unexpected compare predicate: {}",
                     opcode
                 )));
             }
@@ -350,6 +390,48 @@ impl<'a> Context<'a> {
                     result: *index,
                 }
             }
+            // comparison
+            AdaptedInst::Compare {
+                predicate,
+                operand_type,
+                lhs,
+                rhs,
+            } => {
+                let inst_ty = self.typing.convert(ty)?;
+                match &inst_ty {
+                    Type::Bitvec { bits } => {
+                        if *bits != 1 {
+                            return Err(EngineError::InvalidAssumption(
+                                "compare inst has non-bool instruction type".into(),
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "compare inst has non-bitvec instruction type".into(),
+                        ));
+                    }
+                };
+                let operand_ty = self.typing.convert(operand_type)?;
+                let bits = match &operand_ty {
+                    Type::Bitvec { bits } => *bits,
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "compare inst has non-bitvec instruction type".into(),
+                        ));
+                    }
+                };
+                let predicate_parsed = ComparePredicate::parse(predicate)?;
+                let lhs_new = self.parse_value(lhs, &operand_ty)?;
+                let rhs_new = self.parse_value(rhs, &operand_ty)?;
+                Instruction::Compare {
+                    bits,
+                    predicate: predicate_parsed,
+                    lhs: lhs_new,
+                    rhs: rhs_new,
+                    result: *index,
+                }
+            }
             // terminators should never appear here
             AdaptedInst::Return { .. } | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
@@ -400,7 +482,8 @@ impl<'a> Context<'a> {
             | AdaptedInst::CallIndirect { .. }
             | AdaptedInst::Asm { .. }
             | AdaptedInst::Unary { .. }
-            | AdaptedInst::Binary { .. } => {
+            | AdaptedInst::Binary { .. }
+            | AdaptedInst::Compare { .. } => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

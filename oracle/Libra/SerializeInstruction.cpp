@@ -48,6 +48,8 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   } else if (isa<BinaryOperator>(inst)) {
     result["Binary"] =
         serialize_inst_binary_operator(cast<BinaryOperator>(inst));
+  } else if (isa<CmpInst>(inst)) {
+    result["Compare"] = serialize_inst_compare(cast<CmpInst>(inst));
   }
 
   // terminators
@@ -164,8 +166,9 @@ FunctionSerializationContext::serialize_inst_unary_operator(
     result["opcode"] = "fneg";
     break;
   }
-  case Instruction::UnaryOpsEnd:
+  case Instruction::UnaryOpsEnd: {
     LOG->fatal("unexpected end of unary ops");
+  }
   }
 
   result["operand"] = serialize_value(*inst.getOperand(0));
@@ -250,10 +253,132 @@ FunctionSerializationContext::serialize_inst_binary_operator(
     result["opcode"] = "xor";
     break;
   }
-  case Instruction::BinaryOpsEnd:
+  case Instruction::BinaryOpsEnd: {
     LOG->fatal("unexpected end of binary ops");
   }
+  }
   // TODO: flags (NSW, NUW, Exact)? Maybe not needed?
+  result["lhs"] = serialize_value(*inst.getOperand(0));
+  result["rhs"] = serialize_value(*inst.getOperand(1));
+  return result;
+}
+
+[[nodiscard]] json::Object FunctionSerializationContext::serialize_inst_compare(
+    const CmpInst &inst) const {
+  json::Object result;
+
+  switch (inst.getPredicate()) {
+  case CmpInst::Predicate::FCMP_FALSE: {
+    result["predicate"] = "f_false";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_OEQ: {
+    result["predicate"] = "f_oeq";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_OGT: {
+    result["predicate"] = "f_ogt";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_OGE: {
+    result["predicate"] = "f_oge";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_OLT: {
+    result["predicate"] = "f_olt";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_OLE: {
+    result["predicate"] = "f_ole";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_ONE: {
+    result["predicate"] = "f_one";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_ORD: {
+    result["predicate"] = "f_ord";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_UNO: {
+    result["predicate"] = "f_uno";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_UEQ: {
+    result["predicate"] = "f_ueq";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_UGT: {
+    result["predicate"] = "f_ugt";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_UGE: {
+    result["predicate"] = "f_uge";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_ULT: {
+    result["predicate"] = "f_ult";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_ULE: {
+    result["predicate"] = "f_ule";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_UNE: {
+    result["predicate"] = "f_une";
+    break;
+  }
+  case CmpInst::Predicate::FCMP_TRUE: {
+    result["predicate"] = "f_true";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_EQ: {
+    result["predicate"] = "i_eq";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_NE: {
+    result["predicate"] = "i_ne";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_UGT: {
+    result["predicate"] = "i_ugt";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_UGE: {
+    result["predicate"] = "i_uge";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_ULT: {
+    result["predicate"] = "i_ult";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_ULE: {
+    result["predicate"] = "i_ule";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_SGT: {
+    result["predicate"] = "i_sgt";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_SGE: {
+    result["predicate"] = "i_sge";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_SLT: {
+    result["predicate"] = "i_slt";
+    break;
+  }
+  case CmpInst::Predicate::ICMP_SLE: {
+    result["predicate"] = "i_sle";
+    break;
+  }
+  case CmpInst::Predicate::BAD_FCMP_PREDICATE:
+  case CmpInst::Predicate::BAD_ICMP_PREDICATE: {
+    LOG->fatal("unexpected bad compare predicate");
+  }
+  }
+
+  result["operand_ty"] = serialize_type(*inst.getOperand(0)->getType());
   result["lhs"] = serialize_value(*inst.getOperand(0));
   result["rhs"] = serialize_value(*inst.getOperand(1));
   return result;
