@@ -54,6 +54,11 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["Cast"] = serialize_inst_cast(cast<CastInst>(inst));
   }
 
+  // pointer arithmetic
+  else if (isa<GetElementPtrInst>(inst)) {
+    result["GEP"] = serialize_inst_gep(cast<GetElementPtrInst>(inst));
+  }
+
   // terminators
   else if (isa<ReturnInst>(inst)) {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
@@ -451,6 +456,23 @@ FunctionSerializationContext::serialize_inst_cast(const CastInst &inst) const {
   result["src_ty"] = serialize_type(*inst.getSrcTy());
   result["dst_ty"] = serialize_type(*inst.getDestTy());
   result["operand"] = serialize_value(*inst.getOperand(0));
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_gep(
+    const GetElementPtrInst &inst) const {
+  json::Object result;
+  result["src_pointee_ty"] = serialize_type(*inst.getSourceElementType());
+  result["dst_pointee_ty"] = serialize_type(*inst.getResultElementType());
+
+  result["pointer"] = serialize_value(*inst.getPointerOperand());
+  json::Array indices;
+  for (const auto &idx : inst.indices()) {
+    indices.push_back(serialize_value(*idx.get()));
+  }
+  result["indices"] = std::move(indices);
+
+  result["address_space"] = inst.getAddressSpace();
   return result;
 }
 

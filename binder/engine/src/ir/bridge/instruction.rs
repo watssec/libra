@@ -70,6 +70,14 @@ pub enum Instruction {
         operand: Value,
         result: usize,
     },
+    // GEP
+    GEP {
+        src_pointee_type: Type,
+        dst_pointee_type: Type,
+        pointer: Value,
+        indices: Vec<Value>,
+        result: usize,
+    },
 }
 
 #[derive(Eq, PartialEq)]
@@ -537,6 +545,84 @@ impl<'a> Context<'a> {
                     }
                 }
             }
+            // GEP
+            AdaptedInst::GEP {
+                src_pointee_ty,
+                dst_pointee_ty,
+                pointer,
+                indices,
+                address_space,
+            } => {
+                if *address_space != 0 {
+                    return Err(EngineError::NotSupportedYet(
+                        Unsupported::PointerAddressSpace,
+                    ));
+                }
+
+                let inst_ty = self.typing.convert(ty)?;
+                if !matches!(inst_ty, Type::Pointer) {
+                    return Err(EngineError::InvalidAssumption(
+                        "GEP should return a pointer type".into(),
+                    ));
+                }
+
+                let src_ty = self.typing.convert(src_pointee_ty)?;
+                let dst_ty = self.typing.convert(dst_pointee_ty)?;
+
+                // walk-down the tree
+                let mut indices_new = vec![];
+                let mut cur_ty = &src_ty;
+                for idx in indices {
+                    let next_cur_ty = match cur_ty {
+                        Type::Struct { name: _, fields } => {
+                            let idx_new = self.parse_value(idx, &Type::Bitvec { bits: 32 })?;
+                            let field_offset = match &idx_new {
+                                Value::Constant(Constant::Bitvec {
+                                    bits: _,
+                                    value: field_offset,
+                                }) => *field_offset as usize,
+                                _ => {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "field number must be bv32".into(),
+                                    ));
+                                }
+                            };
+                            if field_offset >= fields.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "field number out of range".into(),
+                                ));
+                            }
+                            indices_new.push(idx_new);
+                            fields.get(field_offset).unwrap()
+                        }
+                        Type::Array { element, length: _ } => {
+                            let idx_new = self.parse_value(idx, &Type::Bitvec { bits: 64 })?;
+                            indices_new.push(idx_new);
+                            element.as_ref()
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "GEP only applies to array and struct".into(),
+                            ));
+                        }
+                    };
+                    cur_ty = next_cur_ty;
+                }
+                if cur_ty != &dst_ty {
+                    return Err(EngineError::InvalidAssumption(
+                        "GEP destination type mismatch".into(),
+                    ));
+                }
+
+                let pointer_new = self.parse_value(pointer, &Type::Pointer)?;
+                Instruction::GEP {
+                    src_pointee_type: src_ty,
+                    dst_pointee_type: dst_ty,
+                    indices: indices_new,
+                    pointer: pointer_new,
+                    result: *index,
+                }
+            }
             // terminators should never appear here
             AdaptedInst::Return { .. } | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
@@ -589,7 +675,8 @@ impl<'a> Context<'a> {
             | AdaptedInst::Unary { .. }
             | AdaptedInst::Binary { .. }
             | AdaptedInst::Compare { .. }
-            | AdaptedInst::Cast { .. } => {
+            | AdaptedInst::Cast { .. }
+            | AdaptedInst::GEP { .. } => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

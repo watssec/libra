@@ -67,6 +67,14 @@ pub enum Inst {
         dst_ty: Type,
         operand: Value,
     },
+    // GEP
+    GEP {
+        src_pointee_ty: Type,
+        dst_pointee_ty: Type,
+        pointer: Value,
+        indices: Vec<Value>,
+        address_space: usize,
+    },
     // terminator
     Return {
         value: Option<Value>,
