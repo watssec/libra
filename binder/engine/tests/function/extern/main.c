@@ -1,4 +1,4 @@
-extern void fun_extern();
-void foo() {
-  fun_extern();
+extern void fun_extern(int);
+void foo(int a) {
+  fun_extern(a);
 }
