@@ -42,6 +42,17 @@ pub enum Inst {
         asm: InlineAsm,
         args: Vec<Value>,
     },
+    // unary
+    Unary {
+        opcode: String,
+        operand: Value,
+    },
+    // binary
+    Binary {
+        opcode: String,
+        lhs: Value,
+        rhs: Value,
+    },
     // terminator
     Return {
         value: Option<Value>,

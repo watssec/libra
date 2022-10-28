@@ -14,10 +14,12 @@ pub enum Instruction {
     Alloca {
         base_type: Type,
         size: Option<Value>,
+        result: usize,
     },
     Load {
         pointee_type: Type,
         pointer: Value,
+        result: usize,
     },
     Store {
         pointee_type: Type,
@@ -29,7 +31,59 @@ pub enum Instruction {
         callee: Value,
         args: Vec<Value>,
         ret_ty: Option<Type>,
+        result: Option<usize>,
     },
+    // binary
+    Binary {
+        bits: usize,
+        opcode: BinaryOperator,
+        lhs: Value,
+        rhs: Value,
+        result: usize,
+    },
+}
+
+#[derive(Eq, PartialEq)]
+pub enum BinaryOperator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Shl,
+    LShr,
+    AShr,
+    And,
+    Or,
+    Xor,
+}
+
+impl BinaryOperator {
+    pub fn parse(opcode: &str) -> EngineResult<Self> {
+        let parsed = match opcode {
+            "add" => Self::Add,
+            "sub" => Self::Sub,
+            "mul" => Self::Mul,
+            "udiv" | "sdiv" => Self::Div,
+            "urem" | "srem" => Self::Mod,
+            "shl" => Self::Shl,
+            "lshr" => Self::LShr,
+            "ashr" => Self::AShr,
+            "and" => Self::And,
+            "or" => Self::Or,
+            "xor" => Self::Xor,
+            "fadd" | "fsub" | "fmul" | "fdiv" | "frem" => {
+                return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint))
+            }
+            _ => {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "unexpected binary opcode: {}",
+                    opcode
+                )));
+            }
+        };
+        Ok(parsed)
+    }
 }
 
 /// An naive translation of an LLVM terminator instruction
@@ -120,13 +174,15 @@ impl<'a> Context<'a> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
 
-        let item = match &inst.repr {
+        let adapter::instruction::Instruction { ty, index, repr } = inst;
+
+        let item = match repr {
             // memory access
             AdaptedInst::Alloca {
                 allocated_type,
                 size,
             } => {
-                let inst_ty = self.typing.convert(&inst.ty)?;
+                let inst_ty = self.typing.convert(ty)?;
                 if !matches!(inst_ty, Type::Pointer) {
                     return Err(EngineError::InvalidAssumption(
                         "AllocaInst should return a pointer type".into(),
@@ -140,6 +196,7 @@ impl<'a> Context<'a> {
                 Instruction::Alloca {
                     base_type,
                     size: size_new,
+                    result: *index,
                 }
             }
             AdaptedInst::Load {
@@ -153,7 +210,7 @@ impl<'a> Context<'a> {
                     ));
                 }
 
-                let inst_ty = self.typing.convert(&inst.ty)?;
+                let inst_ty = self.typing.convert(ty)?;
                 let pointee_type_new = self.typing.convert(pointee_type)?;
                 if inst_ty != pointee_type_new {
                     return Err(EngineError::InvalidAssumption(
@@ -164,6 +221,7 @@ impl<'a> Context<'a> {
                 Instruction::Load {
                     pointee_type: pointee_type_new,
                     pointer: pointer_new,
+                    result: *index,
                 }
             }
             AdaptedInst::Store {
@@ -177,7 +235,7 @@ impl<'a> Context<'a> {
                         Unsupported::PointerAddressSpace,
                     ));
                 }
-                if !matches!(inst.ty, AdaptedType::Void) {
+                if !matches!(ty, AdaptedType::Void) {
                     return Err(EngineError::InvalidAssumption(
                         "StoreInst should have void type".into(),
                     ));
@@ -223,7 +281,7 @@ impl<'a> Context<'a> {
                             .collect::<EngineResult<_>>()?;
                         let ret_ty = match ret {
                             None => {
-                                if !matches!(inst.ty, AdaptedType::Void) {
+                                if !matches!(ty, AdaptedType::Void) {
                                     return Err(EngineError::InvalidAssumption(
                                         "CallInst return type mismatch".into(),
                                     ));
@@ -231,7 +289,7 @@ impl<'a> Context<'a> {
                                 None
                             }
                             Some(t) => {
-                                let inst_ty = self.typing.convert(&inst.ty)?;
+                                let inst_ty = self.typing.convert(ty)?;
                                 if t.as_ref() != &inst_ty {
                                     return Err(EngineError::InvalidAssumption(
                                         "CallInst return type mismatch".into(),
@@ -245,6 +303,7 @@ impl<'a> Context<'a> {
                             callee: callee_new,
                             args: args_new,
                             ret_ty,
+                            result: ret.as_ref().map(|_| *index),
                         }
                     }
                     _ => {
@@ -256,6 +315,40 @@ impl<'a> Context<'a> {
             }
             AdaptedInst::Asm { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::InlineAssembly));
+            }
+            // unary
+            AdaptedInst::Unary { opcode, operand: _ } => match opcode.as_str() {
+                "fneg" => {
+                    return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint));
+                }
+                _ => {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "unexpected unary opcode: {}",
+                        opcode
+                    )));
+                }
+            },
+            // binary
+            AdaptedInst::Binary { opcode, lhs, rhs } => {
+                let inst_ty = self.typing.convert(ty)?;
+                let bits = match &inst_ty {
+                    Type::Bitvec { bits } => *bits,
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "binary operator has non-bitvec instruction type".into(),
+                        ));
+                    }
+                };
+                let opcode_parsed = BinaryOperator::parse(opcode)?;
+                let lhs_new = self.parse_value(lhs, &inst_ty)?;
+                let rhs_new = self.parse_value(rhs, &inst_ty)?;
+                Instruction::Binary {
+                    bits,
+                    opcode: opcode_parsed,
+                    lhs: lhs_new,
+                    rhs: rhs_new,
+                    result: *index,
+                }
             }
             // terminators should never appear here
             AdaptedInst::Return { .. } | AdaptedInst::Unreachable => {
@@ -305,7 +398,9 @@ impl<'a> Context<'a> {
             | AdaptedInst::Intrinsic { .. }
             | AdaptedInst::CallDirect { .. }
             | AdaptedInst::CallIndirect { .. }
-            | AdaptedInst::Asm { .. } => {
+            | AdaptedInst::Asm { .. }
+            | AdaptedInst::Unary { .. }
+            | AdaptedInst::Binary { .. } => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

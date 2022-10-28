@@ -42,9 +42,12 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     }
   }
 
-  // unary
+  // unary, binary, comparison
   else if (isa<UnaryOperator>(inst)) {
     result["Unary"] = serialize_inst_unary_operator(cast<UnaryOperator>(inst));
+  } else if (isa<BinaryOperator>(inst)) {
+    result["Binary"] =
+        serialize_inst_binary_operator(cast<BinaryOperator>(inst));
   }
 
   // terminators
@@ -154,16 +157,106 @@ FunctionSerializationContext::serialize_inst_call_intrinsic(
 [[nodiscard]] json::Object
 FunctionSerializationContext::serialize_inst_unary_operator(
     const UnaryOperator &inst) const {
+  json::Object result;
+
   switch (inst.getOpcode()) {
   case Instruction::UnaryOps::FNeg: {
-    json::Object result;
-    result["operand"] = serialize_value(*inst.getOperand(0));
-    return result;
+    result["opcode"] = "fneg";
+    break;
   }
   case Instruction::UnaryOpsEnd:
     LOG->fatal("unexpected end of unary ops");
   }
-  llvm_unreachable("x");
+
+  result["operand"] = serialize_value(*inst.getOperand(0));
+  return result;
+}
+
+[[nodiscard]] json::Object
+FunctionSerializationContext::serialize_inst_binary_operator(
+    const BinaryOperator &inst) const {
+  json::Object result;
+
+  switch (inst.getOpcode()) {
+  case Instruction::BinaryOps::Add: {
+    result["opcode"] = "add";
+    break;
+  }
+  case Instruction::BinaryOps::FAdd: {
+    result["opcode"] = "fadd";
+    break;
+  }
+  case Instruction::BinaryOps::Sub: {
+    result["opcode"] = "sub";
+    break;
+  }
+  case Instruction::BinaryOps::FSub: {
+    result["opcode"] = "fsub";
+    break;
+  }
+  case Instruction::BinaryOps::Mul: {
+    result["opcode"] = "mul";
+    break;
+  }
+  case Instruction::BinaryOps::FMul: {
+    result["opcode"] = "fmul";
+    break;
+  }
+  case Instruction::BinaryOps::UDiv: {
+    result["opcode"] = "udiv";
+    break;
+  }
+  case Instruction::BinaryOps::SDiv: {
+    result["opcode"] = "sdiv";
+    break;
+  }
+  case Instruction::BinaryOps::FDiv: {
+    result["opcode"] = "fdiv";
+    break;
+  }
+  case Instruction::BinaryOps::URem: {
+    result["opcode"] = "urem";
+    break;
+  }
+  case Instruction::BinaryOps::SRem: {
+    result["opcode"] = "srem";
+    break;
+  }
+  case Instruction::BinaryOps::FRem: {
+    result["opcode"] = "frem";
+    break;
+  }
+  case Instruction::BinaryOps::Shl: {
+    result["opcode"] = "shl";
+    break;
+  }
+  case Instruction::BinaryOps::LShr: {
+    result["opcode"] = "lshr";
+    break;
+  }
+  case Instruction::BinaryOps::AShr: {
+    result["opcode"] = "ashr";
+    break;
+  }
+  case Instruction::BinaryOps::And: {
+    result["opcode"] = "and";
+    break;
+  }
+  case Instruction::BinaryOps::Or: {
+    result["opcode"] = "or";
+    break;
+  }
+  case Instruction::BinaryOps::Xor: {
+    result["opcode"] = "xor";
+    break;
+  }
+  case Instruction::BinaryOpsEnd:
+    LOG->fatal("unexpected end of binary ops");
+  }
+  // TODO: flags (NSW, NUW, Exact)? Maybe not needed?
+  result["lhs"] = serialize_value(*inst.getOperand(0));
+  result["rhs"] = serialize_value(*inst.getOperand(1));
+  return result;
 }
 
 json::Object FunctionSerializationContext::serialize_inst_return(
