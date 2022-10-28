@@ -64,8 +64,8 @@ impl<'a> Context<'a> {
             AdaptedValue::Constant(constant) => Value::Constant(Constant::convert(
                 constant,
                 expected_type,
-                &self.typing,
-                &self.symbols,
+                self.typing,
+                self.symbols,
             )?),
             AdaptedValue::Argument { ty, index } => match self.args.get(index) {
                 None => {
@@ -81,7 +81,9 @@ impl<'a> Context<'a> {
                     }
                     let actual_ty = self.typing.convert(ty)?;
                     if expected_type != &actual_ty {
-                        return Err(EngineError::InvariantViolation("arg type mismatch".into()));
+                        return Err(EngineError::InvariantViolation(
+                            "argument type mismatch".into(),
+                        ));
                     }
                     Value::Argument {
                         index: *index,
@@ -97,7 +99,9 @@ impl<'a> Context<'a> {
                 }
                 let actual_ty = self.typing.convert(ty)?;
                 if expected_type != &actual_ty {
-                    return Err(EngineError::InvariantViolation("arg type mismatch".into()));
+                    return Err(EngineError::InvariantViolation(
+                        "instruction type mismatch".into(),
+                    ));
                 }
                 Value::Register {
                     index: *index,
@@ -113,10 +117,8 @@ impl<'a> Context<'a> {
         &self,
         inst: &adapter::instruction::Instruction,
     ) -> EngineResult<Instruction> {
-        use adapter::constant::Constant as AdaptedConstant;
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
-        use adapter::value::Value as AdaptedValue;
 
         let item = match &inst.repr {
             // memory access
@@ -133,7 +135,7 @@ impl<'a> Context<'a> {
                 let base_type = self.typing.convert(allocated_type)?;
                 let size_new = match size.as_ref() {
                     None => None,
-                    Some(val) => Some(self.parse_value(val, &Type::Bitvec { bits: 32 })?),
+                    Some(val) => Some(self.parse_value(val, &Type::Bitvec { bits: 64 })?),
                 };
                 Instruction::Alloca {
                     base_type,
@@ -200,6 +202,11 @@ impl<'a> Context<'a> {
                 callee,
                 target_type,
                 args,
+            }
+            | AdaptedInst::Intrinsic {
+                callee,
+                target_type,
+                args,
             } => {
                 let func_ty = self.typing.convert(target_type)?;
                 match &func_ty {
@@ -249,10 +256,6 @@ impl<'a> Context<'a> {
             }
             AdaptedInst::Asm { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::InlineAssembly));
-            }
-            // intrinsics
-            AdaptedInst::Intrinsic { .. } => {
-                todo!("implement it");
             }
             // terminators should never appear here
             AdaptedInst::Return { .. } | AdaptedInst::Unreachable => {
