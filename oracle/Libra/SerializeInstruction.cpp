@@ -43,6 +43,11 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     }
   }
 
+  // unary
+  else if (isa<UnaryOperator>(inst)) {
+    result["Unary"] = serialize_inst_unary_operator(cast<UnaryOperator>(inst));
+  }
+
   // terminators
   else if (isa<ReturnInst>(inst)) {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
@@ -145,6 +150,20 @@ FunctionSerializationContext::serialize_inst_call_intrinsic(
   }
   result["args"] = std::move(args);
   return result;
+}
+
+[[nodiscard]] json::Object
+FunctionSerializationContext::serialize_inst_unary_operator(
+    const UnaryOperator &inst) const {
+  switch (inst.getOpcode()) {
+  case Instruction::UnaryOps::FNeg: {
+    json::Object result;
+    result["operand"] = serialize_value(*inst.getOperand(0));
+    return result;
+  }
+  case Instruction::UnaryOpsEnd:
+    LOG->fatal("unexpected end of unary ops");
+  }
 }
 
 json::Object FunctionSerializationContext::serialize_inst_return(
