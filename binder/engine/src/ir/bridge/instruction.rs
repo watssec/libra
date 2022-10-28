@@ -75,6 +75,7 @@ pub enum Instruction {
         src_pointee_type: Type,
         dst_pointee_type: Type,
         pointer: Value,
+        offset: Value,
         indices: Vec<Value>,
         result: usize,
     },
@@ -570,9 +571,26 @@ impl<'a> Context<'a> {
                 let dst_ty = self.typing.convert(dst_pointee_ty)?;
 
                 // walk-down the tree
-                let mut indices_new = vec![];
+                if indices.is_empty() {
+                    return Err(EngineError::InvalidAssumption(
+                        "GEP contains no index".into(),
+                    ));
+                }
+
+                let offset = indices.first().unwrap();
+                let offset_new = match &src_ty {
+                    Type::Struct { .. } => self.parse_value(offset, &Type::Bitvec { bits: 32 })?,
+                    Type::Array { .. } => self.parse_value(offset, &Type::Bitvec { bits: 64 })?,
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "GEP only applies to array and struct".into(),
+                        ));
+                    }
+                };
+
                 let mut cur_ty = &src_ty;
-                for idx in indices {
+                let mut indices_new = vec![];
+                for idx in indices.iter().skip(1) {
                     let next_cur_ty = match cur_ty {
                         Type::Struct { name: _, fields } => {
                             let idx_new = self.parse_value(idx, &Type::Bitvec { bits: 32 })?;
@@ -608,6 +626,7 @@ impl<'a> Context<'a> {
                     };
                     cur_ty = next_cur_ty;
                 }
+
                 if cur_ty != &dst_ty {
                     return Err(EngineError::InvalidAssumption(
                         "GEP destination type mismatch".into(),
@@ -618,8 +637,9 @@ impl<'a> Context<'a> {
                 Instruction::GEP {
                     src_pointee_type: src_ty,
                     dst_pointee_type: dst_ty,
-                    indices: indices_new,
                     pointer: pointer_new,
+                    offset: offset_new,
+                    indices: indices_new,
                     result: *index,
                 }
             }
