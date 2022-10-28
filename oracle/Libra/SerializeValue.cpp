@@ -8,7 +8,7 @@ FunctionSerializationContext::serialize_value(const Value &val) const {
   if (isa<Argument>(val)) {
     result["Argument"] = this->serialize_value_argument(cast<Argument>(val));
   } else if (isa<Constant>(val)) {
-    result["Constant"] = serialize_const(cast<Constant>(val));
+    result["Constant"] = serialize_constant(cast<Constant>(val));
   } else if (isa<Instruction>(val)) {
     result["Instruction"] =
         this->serialize_value_instruction(cast<Instruction>(val));

@@ -3,34 +3,28 @@
 namespace {
 using namespace libra;
 
-json::Object populate(const Constant &val) {
-  json::Object result;
-  result["ty"] = serialize_type(*val.getType());
-  return result;
-}
-
 json::Object serialize_const_data_sequence(const ConstantDataSequential &val) {
-  auto result = populate(val);
+  json::Object result;
   json::Array elements;
   for (unsigned i = 0; i < val.getNumElements(); i++) {
-    elements.push_back(serialize_const(*val.getElementAsConstant(i)));
+    elements.push_back(serialize_constant(*val.getElementAsConstant(i)));
   }
   result["elements"] = std::move(elements);
   return result;
 }
 
 json::Object serialize_const_pack_aggregate(const ConstantAggregate &val) {
-  auto result = populate(val);
+  json::Object result;
   json::Array elements;
   for (unsigned i = 0; i < val.getNumOperands(); i++) {
-    elements.push_back(serialize_const(*val.getOperand(i)));
+    elements.push_back(serialize_constant(*val.getOperand(i)));
   }
   result["elements"] = std::move(elements);
   return result;
 }
 
 json::Object serialize_const_ref_global(const GlobalValue &val) {
-  auto result = populate(val);
+  json::Object result;
   if (val.hasName()) {
     result["name"] = val.getName();
   }
@@ -40,6 +34,13 @@ json::Object serialize_const_ref_global(const GlobalValue &val) {
 } // namespace
 
 namespace libra {
+
+json::Object serialize_constant(const Constant &val) {
+  json::Object result;
+  result["ty"] = serialize_type(*val.getType());
+  result["repr"] = serialize_const(val);
+  return result;
+}
 
 json::Object serialize_const(const Constant &val) {
   json::Object result;
@@ -60,16 +61,13 @@ json::Object serialize_const(const Constant &val) {
     } else if (isa<ConstantFP>(val)) {
       result["Float"] = serialize_const_data_float(cast<ConstantFP>(val));
     } else if (isa<ConstantPointerNull>(val)) {
-      result["Null"] =
-          serialize_const_data_ptr_null(cast<ConstantPointerNull>(val));
+      result["Null"] = json::Value(nullptr);
     } else if (isa<ConstantTokenNone>(val)) {
-      result["None"] =
-          serialize_const_data_token_none(cast<ConstantTokenNone>(val));
+      result["None"] = json::Value(nullptr);
     } else if (isa<UndefValue>(val)) {
-      result["Undef"] = serialize_const_data_undef(cast<UndefValue>(val));
+      result["Undef"] = json::Value(nullptr);
     } else if (isa<ConstantAggregateZero>(val)) {
-      result["Default"] =
-          serialize_const_data_all_zero(cast<ConstantAggregateZero>(val));
+      result["Default"] = json::Value(nullptr);
     } else if (isa<ConstantDataArray>(val)) {
       result["Array"] =
           serialize_const_data_array(cast<ConstantDataArray>(val));
@@ -126,7 +124,7 @@ json::Object serialize_const(const Constant &val) {
 }
 
 json::Object serialize_const_data_int(const ConstantInt &val) {
-  auto result = populate(val);
+  json::Object result;
   if (val.getBitWidth() > OPT_MAX_BITS_FOR_INT) {
     LOG->fatal("constant integer width exceeds limited");
   }
@@ -135,27 +133,11 @@ json::Object serialize_const_data_int(const ConstantInt &val) {
 }
 
 json::Object serialize_const_data_float(const ConstantFP &val) {
-  auto result = populate(val);
+  json::Object result;
   SmallString<64> dump;
   val.getValue().toString(dump);
   result["value"] = dump;
   return result;
-}
-
-json::Object serialize_const_data_ptr_null(const ConstantPointerNull &val) {
-  return populate(val);
-}
-
-json::Object serialize_const_data_token_none(const ConstantTokenNone &val) {
-  return populate(val);
-}
-
-json::Object serialize_const_data_undef(const UndefValue &val) {
-  return populate(val);
-}
-
-json::Object serialize_const_data_all_zero(const ConstantAggregateZero &val) {
-  return populate(val);
 }
 
 json::Object serialize_const_data_array(const ConstantDataArray &val) {
@@ -195,7 +177,7 @@ json::Object serialize_const_ref_interface(const GlobalIFunc &val) {
 }
 
 json::Object serialize_const_expr(const ConstantExpr &expr) {
-  auto result = populate(expr);
+  json::Object result;
   const auto *inst = expr.getAsInstruction();
   FunctionSerializationContext ctxt;
   result["repr"] = ctxt.serialize_inst(*inst);

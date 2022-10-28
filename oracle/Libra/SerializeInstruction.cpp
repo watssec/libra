@@ -4,7 +4,6 @@ namespace libra {
 
 json::Object FunctionSerializationContext::serialize_instruction(
     const Instruction &inst) const {
-
   json::Object result;
   result["ty"] = serialize_type(*inst.getType());
   result["index"] = this->get_instruction(inst);
@@ -164,6 +163,7 @@ FunctionSerializationContext::serialize_inst_unary_operator(
   case Instruction::UnaryOpsEnd:
     LOG->fatal("unexpected end of unary ops");
   }
+  llvm_unreachable("x");
 }
 
 json::Object FunctionSerializationContext::serialize_inst_return(

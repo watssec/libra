@@ -18,16 +18,10 @@ namespace libra {
 [[nodiscard]] json::Object serialize_type_pointer(const PointerType &type);
 [[nodiscard]] json::Object serialize_type_vector(const VectorType &type);
 
+[[nodiscard]] json::Object serialize_constant(const Constant &val);
 [[nodiscard]] json::Object serialize_const(const Constant &val);
 [[nodiscard]] json::Object serialize_const_data_int(const ConstantInt &val);
 [[nodiscard]] json::Object serialize_const_data_float(const ConstantFP &val);
-[[nodiscard]] json::Object
-serialize_const_data_ptr_null(const ConstantPointerNull &val);
-[[nodiscard]] json::Object
-serialize_const_data_token_none(const ConstantTokenNone &val);
-[[nodiscard]] json::Object serialize_const_data_undef(const UndefValue &val);
-[[nodiscard]] json::Object
-serialize_const_data_all_zero(const ConstantAggregateZero &val);
 [[nodiscard]] json::Object
 serialize_const_data_array(const ConstantDataArray &val);
 [[nodiscard]] json::Object

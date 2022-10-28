@@ -65,7 +65,7 @@ impl Constant {
         typing: &TypeRegistry,
         symbols: &SymbolRegistry,
     ) -> EngineResult<Self> {
-        use adapter::constant::Constant as AdaptedConstant;
+        use adapter::constant::Const as AdaptedConst;
 
         // utility
         let check_type = |ty: &adapter::typing::Type| {
@@ -81,8 +81,10 @@ impl Constant {
             })
         };
 
-        let result = match constant {
-            AdaptedConstant::Int { ty, value } => {
+        let adapter::constant::Constant { ty, repr } = constant;
+
+        let result = match repr {
+            AdaptedConst::Int { value } => {
                 check_type(ty)?;
                 match expected_type {
                     Type::Bitvec { bits } => Self::Bitvec {
@@ -97,10 +99,10 @@ impl Constant {
                     }
                 }
             }
-            AdaptedConstant::Float { .. } => {
+            AdaptedConst::Float { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint));
             }
-            AdaptedConstant::Null { ty } => {
+            AdaptedConst::Null => {
                 check_type(ty)?;
                 if !matches!(expected_type, Type::Pointer) {
                     return Err(EngineError::InvalidAssumption(format!(
@@ -110,23 +112,23 @@ impl Constant {
                 }
                 Self::Null
             }
-            AdaptedConstant::None { .. } => {
+            AdaptedConst::None => {
                 return Err(EngineError::InvalidAssumption(format!(
                     "unexpected constant none for type: {}",
                     expected_type
                 )));
             }
-            AdaptedConstant::Undef { .. } => {
+            AdaptedConst::Undef => {
                 return Err(EngineError::InvalidAssumption(format!(
                     "unexpected constant undef for type: {}",
                     expected_type
                 )));
             }
-            AdaptedConstant::Default { ty } => {
+            AdaptedConst::Default => {
                 check_type(ty)?;
                 Self::default_from_type(expected_type)?
             }
-            AdaptedConstant::Array { ty, elements } => {
+            AdaptedConst::Array { elements } => {
                 check_type(ty)?;
                 match expected_type {
                     Type::Array { element, length } => {
@@ -155,10 +157,10 @@ impl Constant {
                     }
                 }
             }
-            AdaptedConstant::Vector { .. } => {
+            AdaptedConst::Vector { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
             }
-            AdaptedConstant::Struct { ty, elements } => {
+            AdaptedConst::Struct { elements } => {
                 check_type(ty)?;
                 match expected_type {
                     Type::Struct { name, fields } => {
@@ -188,7 +190,7 @@ impl Constant {
                     }
                 }
             }
-            AdaptedConstant::Variable { ty, name } => {
+            AdaptedConst::Variable { name } => {
                 check_type(ty)?;
                 if !matches!(expected_type, Type::Pointer) {
                     return Err(EngineError::InvalidAssumption(format!(
@@ -214,7 +216,7 @@ impl Constant {
                     }
                 }
             }
-            AdaptedConstant::Function { ty, name } => {
+            AdaptedConst::Function { name } => {
                 check_type(ty)?;
                 if !matches!(expected_type, Type::Pointer) {
                     return Err(EngineError::InvalidAssumption(format!(
@@ -240,10 +242,10 @@ impl Constant {
                     }
                 }
             }
-            AdaptedConstant::Alias { .. } => {
+            AdaptedConst::Alias { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::GlobalAlias));
             }
-            AdaptedConstant::Interface { .. } => {
+            AdaptedConst::Interface { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::InterfaceResolver));
             }
         };

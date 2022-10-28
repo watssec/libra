@@ -24,7 +24,7 @@ json::Object serialize_global_variable(const GlobalVariable &gvar) {
 
   // initializer
   if (gvar.hasInitializer()) {
-    result["initializer"] = serialize_const(*gvar.getInitializer());
+    result["initializer"] = serialize_constant(*gvar.getInitializer());
   }
 
   return result;
