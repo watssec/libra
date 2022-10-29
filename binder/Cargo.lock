@@ -320,6 +320,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "libra-testsuite"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fs_extra",
+ "libra-engine",
+ "libra-shared",
+ "log",
+ "structopt",
+ "tempfile",
+ "walkdir",
+]
+
+[[package]]
 name = "libtest-mimic"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

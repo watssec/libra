@@ -3,4 +3,5 @@ members = [
     "builder",
     "engine",
     "shared",
+    "testsuite",
 ]

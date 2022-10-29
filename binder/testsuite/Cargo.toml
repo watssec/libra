@@ -1,0 +1,17 @@
+[package]
+name = "libra-testsuite"
+description = "Testsuite for LIBRA components"
+version = "0.1.0"
+authors = ["Meng Xu <meng.xu.cs@uwaterloo.ca>"]
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "*"
+fs_extra = "*"
+log = "*"
+structopt = "*"
+tempfile = "*"
+walkdir = "*"
+libra-shared = { path = "../shared" }
+libra-engine = { path = "../engine" }
