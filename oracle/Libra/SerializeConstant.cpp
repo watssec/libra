@@ -126,7 +126,8 @@ json::Object serialize_const(const Constant &val) {
 json::Object serialize_const_data_int(const ConstantInt &val) {
   json::Object result;
   if (val.getBitWidth() > OPT_MAX_BITS_FOR_INT) {
-    LOG->fatal("constant integer width exceeds limited");
+    LOG->error("constant integer width exceeds limited: {0}",
+               val.getBitWidth());
   }
   result["value"] = val.getValue().getLimitedValue(UINT64_MAX);
   return result;

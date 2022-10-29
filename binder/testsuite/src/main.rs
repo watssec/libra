@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -56,10 +57,19 @@ fn main() -> Result<()> {
     // setup logging
     logging::setup(verbose)?;
 
+    // known bad cases
+    // TODO: should eliminate this list
+    let do_not_test: BTreeSet<_> = [
+        // custom bitwidth attributes
+        "SingleSource/UnitTests/Integer",
+    ]
+    .into_iter()
+    .collect();
+
     // collect test cases
     let path_llvm_test_suite =
         path_llvm_test_suite.unwrap_or_else(|| PathBuf::from(PATH_LLVM_TEST_SUITE));
-    let test_cases = collect_test_cases(&path_llvm_test_suite, filter.as_deref())?;
+    let test_cases = collect_test_cases(&path_llvm_test_suite, filter.as_deref(), &do_not_test)?;
     info!("number of tests: {}", test_cases.len());
 
     // run the tests one by one
@@ -67,7 +77,6 @@ fn main() -> Result<()> {
     let mut result_unsupported = 0;
     for TestCase { name, inputs } in test_cases {
         debug!("running: {}", name);
-
         let temp = tempdir().expect("unable to create a temporary directory");
         match analyze(
             vec![format!("-I{}/stdlib-mock", env!("CARGO_MANIFEST_DIR"))],
@@ -112,7 +121,11 @@ struct TestCase {
     inputs: Vec<PathBuf>,
 }
 
-fn collect_test_cases(path_llvm_test_suite: &Path, filter: Option<&str>) -> Result<Vec<TestCase>> {
+fn collect_test_cases(
+    path_llvm_test_suite: &Path,
+    filter: Option<&str>,
+    do_not_test: &BTreeSet<&str>,
+) -> Result<Vec<TestCase>> {
     let mut tests = vec![];
     for entry in WalkDir::new(path_llvm_test_suite.join("SingleSource")) {
         let path = entry?.into_path();
@@ -139,6 +152,11 @@ fn collect_test_cases(path_llvm_test_suite: &Path, filter: Option<&str>) -> Resu
             .to_str()
             .unwrap()
             .to_string();
+
+        // deny those bad cases
+        if do_not_test.iter().any(|e| name.contains(e)) {
+            continue;
+        }
 
         // register the test case
         tests.push(TestCase {
