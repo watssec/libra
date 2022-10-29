@@ -1,11 +1,14 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
+use crate::ir::bridge::instruction::{BinaryOperator, ComparePredicate, Context, Instruction};
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::EngineResult;
 
 /// A naive translation from an LLVM constant
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone)]
 pub enum Constant {
     /// Integer
     Bitvec { bits: usize, value: u64 },
@@ -22,6 +25,8 @@ pub enum Constant {
     Variable { name: Identifier },
     /// Function
     Function { name: Identifier },
+    /// Expression
+    Expr(Box<Expression>),
 }
 
 impl Constant {
@@ -32,10 +37,12 @@ impl Constant {
                 value: 0,
             },
             Type::Array { element, length } => {
-                let default = Self::default_from_type(element)?;
+                let elements = (0..*length)
+                    .map(|_| Self::default_from_type(element))
+                    .collect::<EngineResult<_>>()?;
                 Self::Array {
                     sub: element.as_ref().clone(),
-                    elements: vec![default; *length],
+                    elements,
                 }
             }
             Type::Struct { name, fields } => {
@@ -248,7 +255,247 @@ impl Constant {
             AdaptedConst::Interface { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::InterfaceResolver));
             }
+            AdaptedConst::Expr { inst } => {
+                check_type(ty)?;
+                let ctxt = Context {
+                    typing,
+                    symbols,
+                    // simulate an environment where there is no function body
+                    blocks: BTreeSet::new(),
+                    insts: BTreeSet::new(),
+                    args: BTreeMap::new(),
+                    ret: None,
+                };
+
+                // create a dummy instruction
+                let fake_inst = adapter::instruction::Instruction {
+                    ty: ty.clone(),
+                    index: usize::MAX,
+                    repr: inst.as_ref().clone(),
+                };
+                let inst_parsed = ctxt.parse_instruction(&fake_inst)?;
+                let expr_parsed = Expression::from_instruction(inst_parsed)?;
+                Self::Expr(Box::new(expr_parsed))
+            }
         };
         Ok(result)
+    }
+}
+
+#[derive(Eq, PartialEq, Clone)]
+#[allow(clippy::upper_case_acronyms)]
+pub enum Expression {
+    // binary
+    Binary {
+        bits: usize,
+        opcode: BinaryOperator,
+        lhs: Constant,
+        rhs: Constant,
+    },
+    // comparison
+    Compare {
+        bits: usize,
+        predicate: ComparePredicate,
+        lhs: Constant,
+        rhs: Constant,
+    },
+    // casts
+    CastBitvec {
+        bits_from: usize,
+        bits_into: usize,
+        operand: Constant,
+    },
+    CastPtrToBitvec {
+        bits_into: usize,
+        operand: Constant,
+    },
+    CastBitvecToPtr {
+        bits_from: usize,
+        operand: Constant,
+    },
+    CastPtr {
+        operand: Constant,
+    },
+    // GEP
+    GEP {
+        src_pointee_type: Type,
+        dst_pointee_type: Type,
+        pointer: Constant,
+        offset: Constant,
+        indices: Vec<Constant>,
+    },
+    // choice
+    ITE {
+        cond: Constant,
+        then_value: Constant,
+        else_value: Constant,
+    },
+    // aggregation
+    GetValue {
+        src_ty: Type,
+        dst_ty: Type,
+        aggregate: Constant,
+        indices: Vec<usize>,
+    },
+    SetValue {
+        src_ty: Type,
+        dst_ty: Type,
+        aggregate: Constant,
+        value: Constant,
+        indices: Vec<usize>,
+    },
+}
+
+impl Expression {
+    pub fn from_instruction(inst: Instruction) -> EngineResult<Self> {
+        let expr = match inst {
+            Instruction::Binary {
+                bits,
+                opcode,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::Binary {
+                    bits,
+                    opcode,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::Compare {
+                bits,
+                predicate,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::Compare {
+                    bits,
+                    predicate,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::CastBitvec {
+                bits_from,
+                bits_into,
+                operand,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CastBitvec {
+                    bits_from,
+                    bits_into,
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::CastPtrToBitvec {
+                bits_into,
+                operand,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CastPtrToBitvec {
+                    bits_into,
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::CastBitvecToPtr {
+                bits_from,
+                operand,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CastBitvecToPtr {
+                    bits_from,
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::CastPtr { operand, result } => {
+                assert!(result == usize::MAX.into());
+                Self::CastPtr {
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::GEP {
+                src_pointee_type,
+                dst_pointee_type,
+                pointer,
+                offset,
+                indices,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::GEP {
+                    src_pointee_type,
+                    dst_pointee_type,
+                    pointer: pointer.expect_constant()?,
+                    offset: offset.expect_constant()?,
+                    indices: indices
+                        .into_iter()
+                        .map(|i| i.expect_constant())
+                        .collect::<EngineResult<_>>()?,
+                }
+            }
+            Instruction::ITE {
+                cond,
+                then_value,
+                else_value,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::ITE {
+                    cond: cond.expect_constant()?,
+                    then_value: then_value.expect_constant()?,
+                    else_value: else_value.expect_constant()?,
+                }
+            }
+            Instruction::GetValue {
+                src_ty,
+                dst_ty,
+                aggregate,
+                indices,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::GetValue {
+                    src_ty,
+                    dst_ty,
+                    aggregate: aggregate.expect_constant()?,
+                    indices,
+                }
+            }
+            Instruction::SetValue {
+                src_ty,
+                dst_ty,
+                aggregate,
+                value,
+                indices,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::SetValue {
+                    src_ty,
+                    dst_ty,
+                    aggregate: aggregate.expect_constant()?,
+                    value: value.expect_constant()?,
+                    indices,
+                }
+            }
+            // impossible cases
+            Instruction::Alloca { .. }
+            | Instruction::Load { .. }
+            | Instruction::Store { .. }
+            | Instruction::Call { .. }
+            | Instruction::Phi { .. } => {
+                return Err(EngineError::InvalidAssumption(
+                    "unexpected instruction type for const expr".into(),
+                ))
+            }
+        };
+        Ok(expr)
     }
 }

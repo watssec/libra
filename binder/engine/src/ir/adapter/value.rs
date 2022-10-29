@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::ir::adapter::constant::Constant;
 use crate::ir::adapter::typing::Type;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Value {
     /// constant
     Constant(Constant),
@@ -13,7 +13,7 @@ pub enum Value {
     Instruction { ty: Type, index: usize },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct InlineAsm {
     pub asm: String,
     pub constraint: String,

@@ -4,7 +4,7 @@ use crate::ir::adapter::constant::Constant;
 use crate::ir::adapter::typing::Type;
 use crate::ir::adapter::value::{InlineAsm, Value};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Inst {
     // memory
@@ -137,7 +137,7 @@ pub enum Inst {
     Unreachable,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Instruction {
     /// type of the instruction
     pub ty: Type,
@@ -147,7 +147,7 @@ pub struct Instruction {
     pub repr: Inst,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PhiOption {
     /// label for an incoming block
     pub block: usize,
@@ -155,7 +155,7 @@ pub struct PhiOption {
     pub value: Value,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SwitchCase {
     /// label for an incoming block
     pub block: usize,

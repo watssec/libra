@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ir::adapter::instruction::Inst;
 use crate::ir::adapter::typing::Type;
 
 /// A representation of an LLVM constant
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Const {
     Int { value: u64 },
     Float { value: String },
@@ -18,11 +19,11 @@ pub enum Const {
     Function { name: Option<String> },
     Alias { name: Option<String> },
     Interface { name: Option<String> },
-    // TODO: constant expr
+    Expr { inst: Box<Inst> },
 }
 
 /// A representation of an LLVM constant
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Constant {
     /// type of the constant
     pub ty: Type,

@@ -6,7 +6,7 @@ use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::EngineResult;
 
 /// An adapted representation of an LLVM global variable
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct GlobalVariable {
     /// variable name
     pub name: Identifier,

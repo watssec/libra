@@ -110,7 +110,7 @@ pub enum Instruction {
     },
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Clone)]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -151,7 +151,7 @@ impl BinaryOperator {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Clone)]
 pub enum ComparePredicate {
     EQ,
     NE,

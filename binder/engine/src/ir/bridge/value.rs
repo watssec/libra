@@ -1,3 +1,4 @@
+use crate::error::{EngineError, EngineResult};
 use crate::ir::bridge::constant::Constant;
 use crate::ir::bridge::typing::Type;
 
@@ -52,4 +53,15 @@ pub enum Value {
     Argument { index: ArgumentSlot, ty: Type },
     /// intermediate state
     Register { index: RegisterSlot, ty: Type },
+}
+
+impl Value {
+    pub fn expect_constant(self) -> EngineResult<Constant> {
+        match self {
+            Self::Constant(constant) => Ok(constant),
+            Self::Argument { .. } | Self::Register { .. } => Err(EngineError::InvariantViolation(
+                "expect value to be a constant".into(),
+            )),
+        }
+    }
 }

@@ -180,7 +180,7 @@ json::Object serialize_const_expr(const ConstantExpr &expr) {
   json::Object result;
   const auto *inst = expr.getAsInstruction();
   FunctionSerializationContext ctxt;
-  result["repr"] = ctxt.serialize_inst(*inst);
+  result["inst"] = ctxt.serialize_inst(*inst);
   return result;
 }
 
