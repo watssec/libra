@@ -75,6 +75,15 @@ pub enum Inst {
         indices: Vec<Value>,
         address_space: usize,
     },
+    // choice
+    ITE {
+        cond: Value,
+        then_value: Value,
+        else_value: Value,
+    },
+    Phi {
+        options: Vec<PhiOption>,
+    },
     // terminator
     Return {
         value: Option<Value>,
@@ -90,4 +99,12 @@ pub struct Instruction {
     pub index: usize,
     /// the actual representation of an instruction
     pub repr: Inst,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PhiOption {
+    /// label for an incoming block
+    pub block: usize,
+    /// value
+    pub value: Value,
 }

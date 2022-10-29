@@ -93,6 +93,8 @@ public:
   [[nodiscard]] json::Object serialize_inst_cast(const CastInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_gep(const GetElementPtrInst &inst) const;
+  [[nodiscard]] json::Object serialize_inst_phi(const PHINode &inst) const;
+  [[nodiscard]] json::Object serialize_inst_ite(const SelectInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_return(const ReturnInst &inst) const;
 

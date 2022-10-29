@@ -59,6 +59,13 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["GEP"] = serialize_inst_gep(cast<GetElementPtrInst>(inst));
   }
 
+  // choice
+  else if (isa<PHINode>(inst)) {
+    result["Phi"] = serialize_inst_phi(cast<PHINode>(inst));
+  } else if (isa<SelectInst>(inst)) {
+    result["ITE"] = serialize_inst_ite(cast<SelectInst>(inst));
+  }
+
   // terminators
   else if (isa<ReturnInst>(inst)) {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
@@ -473,6 +480,31 @@ json::Object FunctionSerializationContext::serialize_inst_gep(
   result["indices"] = std::move(indices);
 
   result["address_space"] = inst.getAddressSpace();
+  return result;
+}
+
+json::Object
+FunctionSerializationContext::serialize_inst_phi(const PHINode &inst) const {
+  json::Object result;
+
+  json::Array blocks;
+  for (const auto *block : inst.blocks()) {
+    json::Object item;
+    item["block"] = get_block(*block);
+    item["value"] = serialize_value(*inst.getIncomingValueForBlock(block));
+    blocks.push_back(std::move(item));
+  }
+  result["options"] = std::move(blocks);
+
+  return result;
+}
+
+json::Object
+FunctionSerializationContext::serialize_inst_ite(const SelectInst &inst) const {
+  json::Object result;
+  result["cond"] = serialize_value(*inst.getCondition());
+  result["then_value"] = serialize_value(*inst.getTrueValue());
+  result["else_value"] = serialize_value(*inst.getFalseValue());
   return result;
 }
 

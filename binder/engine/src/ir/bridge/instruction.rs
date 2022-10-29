@@ -79,6 +79,18 @@ pub enum Instruction {
         indices: Vec<Value>,
         result: usize,
     },
+    // selection
+    ITE {
+        cond: Value,
+        then_value: Value,
+        else_value: Value,
+        result: usize,
+    },
+    Phi {
+        ty: Type,
+        options: BTreeMap<usize, Value>,
+        result: usize,
+    },
 }
 
 #[derive(Eq, PartialEq)]
@@ -643,6 +655,45 @@ impl<'a> Context<'a> {
                     result: *index,
                 }
             }
+            // choice
+            AdaptedInst::ITE {
+                cond,
+                then_value,
+                else_value,
+            } => {
+                let cond_new = self.parse_value(cond, &Type::Bitvec { bits: 1 })?;
+                let inst_ty = self.typing.convert(ty)?;
+                let then_value_new = self.parse_value(then_value, &inst_ty)?;
+                let else_value_new = self.parse_value(else_value, &inst_ty)?;
+                Instruction::ITE {
+                    cond: cond_new,
+                    then_value: then_value_new,
+                    else_value: else_value_new,
+                    result: *index,
+                }
+            }
+            AdaptedInst::Phi { options } => {
+                let inst_ty = self.typing.convert(ty)?;
+                let mut options_new = BTreeMap::new();
+                for opt in options {
+                    if !self.blocks.contains(&opt.block) {
+                        return Err(EngineError::InvariantViolation(
+                            "unknown incoming edge into phi node".into(),
+                        ));
+                    }
+                    options_new.insert(opt.block, self.parse_value(&opt.value, &inst_ty)?);
+                }
+                if options_new.len() != options.len() {
+                    return Err(EngineError::InvariantViolation(
+                        "duplicated edges into phi node".into(),
+                    ));
+                }
+                Instruction::Phi {
+                    ty: inst_ty,
+                    options: options_new,
+                    result: *index,
+                }
+            }
             // terminators should never appear here
             AdaptedInst::Return { .. } | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
@@ -696,7 +747,9 @@ impl<'a> Context<'a> {
             | AdaptedInst::Binary { .. }
             | AdaptedInst::Compare { .. }
             | AdaptedInst::Cast { .. }
-            | AdaptedInst::GEP { .. } => {
+            | AdaptedInst::GEP { .. }
+            | AdaptedInst::ITE { .. }
+            | AdaptedInst::Phi { .. } => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

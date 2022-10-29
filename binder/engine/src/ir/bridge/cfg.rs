@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use petgraph::algo::is_isomorphic_matching;
-use petgraph::graph::DiGraph;
+use petgraph::graph::{DiGraph, NodeIndex};
 
 use crate::error::EngineError;
 use crate::ir::adapter;
@@ -30,6 +30,8 @@ pub enum Edge {
 /// An adapted representation of an LLVM control-flow graph
 pub struct ControlFlowGraph {
     graph: DiGraph<Block, Edge>,
+    /// block label to index in the graph
+    block_label_to_index: BTreeMap<usize, NodeIndex>,
 }
 
 impl PartialEq for ControlFlowGraph {
@@ -94,9 +96,10 @@ impl ControlFlowGraph {
 
         // convert block by block
         let mut graph = DiGraph::new();
+        let mut block_label_to_index = BTreeMap::new();
         for block in blocks {
             let AdaptedBlock {
-                label: _,
+                label,
                 name: _,
                 body,
                 terminator,
@@ -113,10 +116,14 @@ impl ControlFlowGraph {
                 sequence: body_new,
                 terminator: terminator_new,
             };
-            graph.add_node(block_new);
+            let node_index = graph.add_node(block_new);
+            block_label_to_index.insert(*label, node_index);
         }
 
-        // TODO: implement
-        Ok(Self { graph })
+        // done with the construction
+        Ok(Self {
+            graph,
+            block_label_to_index,
+        })
     }
 }
