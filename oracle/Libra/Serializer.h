@@ -77,6 +77,7 @@ public:
   serialize_inst_alloca(const AllocaInst &inst) const;
   [[nodiscard]] json::Object serialize_inst_load(const LoadInst &inst) const;
   [[nodiscard]] json::Object serialize_inst_store(const StoreInst &inst) const;
+  [[nodiscard]] json::Object serialize_inst_va_arg(const VAArgInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_call_asm(const CallInst &inst) const;
   [[nodiscard]] json::Object
@@ -95,6 +96,12 @@ public:
   serialize_inst_gep(const GetElementPtrInst &inst) const;
   [[nodiscard]] json::Object serialize_inst_phi(const PHINode &inst) const;
   [[nodiscard]] json::Object serialize_inst_ite(const SelectInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_get_element(const ExtractElementInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_set_element(const InsertElementInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_shuffle_vector(const ShuffleVectorInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_return(const ReturnInst &inst) const;
   [[nodiscard]] json::Object

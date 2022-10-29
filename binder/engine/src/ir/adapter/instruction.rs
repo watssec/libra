@@ -23,6 +23,9 @@ pub enum Inst {
         value: Value,
         address_space: usize,
     },
+    VAArg {
+        pointer: Value,
+    },
     // intrinsics
     Intrinsic {
         callee: Value,
@@ -85,6 +88,22 @@ pub enum Inst {
     },
     Phi {
         options: Vec<PhiOption>,
+    },
+    // aggregates
+    GetElement {
+        vec_ty: Type,
+        vector: Value,
+        index: Value,
+    },
+    SetElement {
+        vector: Value,
+        value: Value,
+        index: Value,
+    },
+    ShuffleVector {
+        lhs: Value,
+        rhs: Value,
+        mask: Value,
     },
     // concurrency (TODO: need to support them)
     Fence,

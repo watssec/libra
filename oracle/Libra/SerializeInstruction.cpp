@@ -6,11 +6,11 @@ json::Object FunctionSerializationContext::serialize_instruction(
     const Instruction &inst) const {
   json::Object result;
   result["ty"] = serialize_type(*inst.getType());
-  result["index"] = this->get_instruction(inst);
+  result["index"] = get_instruction(inst);
   if (inst.hasName()) {
     result["name"] = inst.getName();
   }
-  result["repr"] = this->serialize_inst(inst);
+  result["repr"] = serialize_inst(inst);
   return result;
 }
 
@@ -25,6 +25,8 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["Load"] = serialize_inst_load(cast<LoadInst>(inst));
   } else if (isa<StoreInst>(inst)) {
     result["Store"] = serialize_inst_store(cast<StoreInst>(inst));
+  } else if (isa<VAArgInst>(inst)) {
+    result["VAArg"] = serialize_inst_va_arg(cast<VAArgInst>(inst));
   }
 
   // call
@@ -66,6 +68,18 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["ITE"] = serialize_inst_ite(cast<SelectInst>(inst));
   }
 
+  // aggregates
+  else if (isa<ExtractElementInst>(inst)) {
+    result["GetElement"] =
+        serialize_inst_get_element(cast<ExtractElementInst>(inst));
+  } else if (isa<InsertElementInst>(inst)) {
+    result["SetElement"] =
+        serialize_inst_set_element(cast<InsertElementInst>(inst));
+  } else if (isa<ShuffleVectorInst>(inst)) {
+    result["ShuffleVector"] =
+        serialize_inst_shuffle_vector(cast<ShuffleVectorInst>(inst));
+  }
+
   // TODO: concurrency instructions
   else if (isa<FenceInst>(inst)) {
     result["Fence"] = json::Value(nullptr);
@@ -104,7 +118,7 @@ json::Object FunctionSerializationContext::serialize_inst_alloca(
   json::Object result;
   result["allocated_type"] = serialize_type(*inst.getAllocatedType());
   if (inst.isArrayAllocation()) {
-    result["size"] = this->serialize_value(*inst.getArraySize());
+    result["size"] = serialize_value(*inst.getArraySize());
   }
   return result;
 }
@@ -113,7 +127,7 @@ json::Object
 FunctionSerializationContext::serialize_inst_load(const LoadInst &inst) const {
   json::Object result;
   result["pointee_type"] = serialize_type(*inst.getType());
-  result["pointer"] = this->serialize_value(*inst.getPointerOperand());
+  result["pointer"] = serialize_value(*inst.getPointerOperand());
   result["address_space"] = inst.getPointerAddressSpace();
   return result;
 }
@@ -122,9 +136,16 @@ json::Object FunctionSerializationContext::serialize_inst_store(
     const StoreInst &inst) const {
   json::Object result;
   result["pointee_type"] = serialize_type(*inst.getValueOperand()->getType());
-  result["pointer"] = this->serialize_value(*inst.getPointerOperand());
-  result["value"] = this->serialize_value(*inst.getValueOperand());
+  result["pointer"] = serialize_value(*inst.getPointerOperand());
+  result["value"] = serialize_value(*inst.getValueOperand());
   result["address_space"] = inst.getPointerAddressSpace();
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_va_arg(
+    const VAArgInst &inst) const {
+  json::Object result;
+  result["pointer"] = serialize_value(*inst.getPointerOperand());
   return result;
 }
 
@@ -523,6 +544,33 @@ FunctionSerializationContext::serialize_inst_ite(const SelectInst &inst) const {
   result["cond"] = serialize_value(*inst.getCondition());
   result["then_value"] = serialize_value(*inst.getTrueValue());
   result["else_value"] = serialize_value(*inst.getFalseValue());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_get_element(
+    const ExtractElementInst &inst) const {
+  json::Object result;
+  result["vec_ty"] = serialize_type(*inst.getVectorOperandType());
+  result["vector"] = serialize_value(*inst.getVectorOperand());
+  result["index"] = serialize_value(*inst.getIndexOperand());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_set_element(
+    const InsertElementInst &inst) const {
+  json::Object result;
+  result["vector"] = serialize_value(*inst.getOperand(0));
+  result["value"] = serialize_value(*inst.getOperand(1));
+  result["index"] = serialize_value(*inst.getOperand(2));
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_shuffle_vector(
+    const ShuffleVectorInst &inst) const {
+  json::Object result;
+  result["lhs"] = serialize_value(*inst.getOperand(0));
+  result["rhs"] = serialize_value(*inst.getOperand(1));
+  result["mask"] = serialize_value(*inst.getOperand(2));
   return result;
 }
 

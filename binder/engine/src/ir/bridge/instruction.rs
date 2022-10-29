@@ -347,6 +347,9 @@ impl<'a> Context<'a> {
                     value: value_new,
                 }
             }
+            AdaptedInst::VAArg { .. } => {
+                return Err(EngineError::NotSupportedYet(Unsupported::VariadicArguments));
+            }
             // calls
             AdaptedInst::CallDirect {
                 callee,
@@ -709,6 +712,12 @@ impl<'a> Context<'a> {
                     result: index.into(),
                 }
             }
+            // aggregates
+            AdaptedInst::GetElement { .. }
+            | AdaptedInst::SetElement { .. }
+            | AdaptedInst::ShuffleVector { .. } => {
+                return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
+            }
             // concurrency
             AdaptedInst::Fence | AdaptedInst::AtomicCmpXchg | AdaptedInst::AtomicRMW => {
                 return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
@@ -865,6 +874,7 @@ impl<'a> Context<'a> {
             AdaptedInst::Alloca { .. }
             | AdaptedInst::Load { .. }
             | AdaptedInst::Store { .. }
+            | AdaptedInst::VAArg { .. }
             | AdaptedInst::Intrinsic { .. }
             | AdaptedInst::CallDirect { .. }
             | AdaptedInst::CallIndirect { .. }
@@ -878,7 +888,10 @@ impl<'a> Context<'a> {
             | AdaptedInst::Phi { .. }
             | AdaptedInst::Fence
             | AdaptedInst::AtomicCmpXchg
-            | AdaptedInst::AtomicRMW => {
+            | AdaptedInst::AtomicRMW
+            | AdaptedInst::GetElement { .. }
+            | AdaptedInst::SetElement { .. }
+            | AdaptedInst::ShuffleVector { .. } => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));
