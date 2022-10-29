@@ -1,12 +1,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
-use log::info;
+use anyhow::{bail, Result};
+use fs_extra::dir::CopyOptions;
+use log::{debug, error, info};
 use structopt::StructOpt;
 use tempfile::tempdir;
 use walkdir::WalkDir;
 
+use libra_engine::{analyze, EngineError};
 use libra_shared::config::PATH_STUDIO;
 use libra_shared::logging;
 
@@ -54,33 +56,40 @@ fn main() -> Result<()> {
     // setup logging
     logging::setup(verbose)?;
 
-    // decide on the workspace
-    let (temp, output) = if keep {
-        let path = studio.join("testing");
-        if path.exists() {
-            fs::remove_dir_all(&path)?;
-        }
-        fs::create_dir_all(&path)?;
-        (None, path)
-    } else {
-        let dir = tempdir()?;
-        let path = dir.path().to_path_buf();
-        (Some(dir), path)
-    };
-
     // collect test cases
     let path_llvm_test_suite =
         path_llvm_test_suite.unwrap_or_else(|| PathBuf::from(PATH_LLVM_TEST_SUITE));
     let test_cases = collect_test_cases(&path_llvm_test_suite, filter.as_deref())?;
     info!("number of tests: {}", test_cases.len());
 
-    // drop temp dir explicitly
-    match temp {
-        None => (),
-        Some(dir) => {
-            dir.close()?;
-        }
-    };
+    // run the tests one by one
+    for (name, inputs) in test_cases {
+        debug!("running: {}", name);
+
+        let temp = tempdir().expect("unable to create a temporary directory");
+        match analyze(inputs, temp.path().to_path_buf()) {
+            Ok(_) | Err(EngineError::NotSupportedYet(_)) => (),
+            Err(err) => {
+                error!("{}", err);
+                // save the result if requested
+                if keep {
+                    let path_artifact = studio.join("testing");
+                    if path_artifact.exists() {
+                        fs::remove_dir_all(&path_artifact)?;
+                    }
+                    fs::create_dir(&path_artifact)?;
+                    let options = CopyOptions {
+                        content_only: true,
+                        ..Default::default()
+                    };
+                    fs_extra::dir::copy(temp.path(), &path_artifact, &options)?;
+                }
+
+                // shortcut the tests
+                bail!("unexpected analysis error");
+            }
+        };
+    }
 
     // done with everything
     Ok(())
@@ -89,7 +98,7 @@ fn main() -> Result<()> {
 fn collect_test_cases(
     path_llvm_test_suite: &Path,
     filter: Option<&str>,
-) -> Result<Vec<Vec<PathBuf>>> {
+) -> Result<Vec<(String, Vec<PathBuf>)>> {
     let mut tests = vec![];
     for entry in WalkDir::new(path_llvm_test_suite.join("SingleSource")) {
         let path = entry?.into_path();
@@ -109,8 +118,16 @@ fn collect_test_cases(
             continue;
         }
 
+        // grab the name
+        let name = path
+            .strip_prefix(path_llvm_test_suite)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+
         // register the test case
-        tests.push(vec![path]);
+        tests.push((name, vec![path]));
     }
 
     // TODO: collect multi-sources

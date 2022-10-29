@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+pub use error::EngineError;
+
 use crate::error::EngineResult;
 use crate::flow::Workflow;
 
