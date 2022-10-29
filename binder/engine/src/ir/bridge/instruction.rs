@@ -9,6 +9,7 @@ use crate::ir::bridge::value::{BlockLabel, RegisterSlot, Value};
 
 /// An naive translation of an LLVM instruction
 #[derive(Eq, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Instruction {
     // memory access
     Alloca {
@@ -775,6 +776,7 @@ impl<'a> Context<'a> {
                             "conditinal branch should have exactly two targets".into(),
                         ));
                     }
+                    #[allow(clippy::get_first)] // for symmetry
                     let target_then = targets.get(0).unwrap();
                     if !self.blocks.contains(target_then) {
                         return Err(EngineError::InvalidAssumption(
@@ -817,7 +819,7 @@ impl<'a> Context<'a> {
                     }
 
                     let case_val =
-                        Constant::convert(&case.value, &cond_ty_new, &self.typing, &self.symbols)?;
+                        Constant::convert(&case.value, &cond_ty_new, self.typing, self.symbols)?;
                     let label_val = match case_val {
                         Constant::Bitvec {
                             bits: _,

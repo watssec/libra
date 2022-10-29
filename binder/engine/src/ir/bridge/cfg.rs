@@ -198,4 +198,11 @@ impl ControlFlowGraph {
             block_label_to_index,
         })
     }
+
+    #[allow(dead_code)] // TODO: this will be used in next stage construction
+    pub fn get_block_by_label(&self, label: &BlockLabel) -> Option<&Block> {
+        self.block_label_to_index
+            .get(label)
+            .and_then(|idx| self.graph.node_weight(*idx))
+    }
 }

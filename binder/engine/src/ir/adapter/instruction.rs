@@ -5,6 +5,7 @@ use crate::ir::adapter::typing::Type;
 use crate::ir::adapter::value::{InlineAsm, Value};
 
 #[derive(Serialize, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Inst {
     // memory
     Alloca {

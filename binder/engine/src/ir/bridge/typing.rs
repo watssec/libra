@@ -194,7 +194,7 @@ impl Type {
             TypeToken::Struct { name, fields } => {
                 let converted = fields
                     .iter()
-                    .map(|e| Self::convert_token(e))
+                    .map(Self::convert_token)
                     .collect::<EngineResult<_>>()?;
                 Self::Struct {
                     name: name.as_ref().cloned(),
@@ -204,7 +204,7 @@ impl Type {
             TypeToken::Function { params, ret } => {
                 let converted = params
                     .iter()
-                    .map(|e| Self::convert_token(e))
+                    .map(Self::convert_token)
                     .collect::<EngineResult<_>>()?;
 
                 let new_ret = match ret.as_ref() {
