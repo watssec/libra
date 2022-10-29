@@ -578,14 +578,14 @@ impl<'a> Context<'a> {
                 }
 
                 let offset = indices.first().unwrap();
-                let offset_new = match &src_ty {
-                    Type::Struct { .. } => self.parse_value(offset, &Type::Bitvec { bits: 32 })?,
-                    Type::Array { .. } => self.parse_value(offset, &Type::Bitvec { bits: 64 })?,
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "GEP only applies to array and struct".into(),
-                        ));
-                    }
+                let offset_new = match offset {
+                    // TODO: very hacky treatment, as the first index of a GEP
+                    // might be an `i32 0` instead of an `i64 0`.
+                    adapter::value::Value::Constant(adapter::constant::Constant {
+                        ty: AdaptedType::Int { width: 32 },
+                        repr: adapter::constant::Const::Int { value: 0 },
+                    }) => Value::Constant(Constant::Bitvec { bits: 64, value: 0 }),
+                    _ => self.parse_value(offset, &Type::Bitvec { bits: 64 })?,
                 };
 
                 let mut cur_ty = &src_ty;
