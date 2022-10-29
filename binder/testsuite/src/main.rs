@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     // run the tests one by one
     let mut result_pass = 0;
     let mut result_unsupported = 0;
-    for (name, inputs) in test_cases {
+    for TestCase { name, inputs } in test_cases {
         debug!("running: {}", name);
 
         let temp = tempdir().expect("unable to create a temporary directory");
@@ -103,10 +103,12 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn collect_test_cases(
-    path_llvm_test_suite: &Path,
-    filter: Option<&str>,
-) -> Result<Vec<(String, Vec<PathBuf>)>> {
+struct TestCase {
+    name: String,
+    inputs: Vec<PathBuf>,
+}
+
+fn collect_test_cases(path_llvm_test_suite: &Path, filter: Option<&str>) -> Result<Vec<TestCase>> {
     let mut tests = vec![];
     for entry in WalkDir::new(path_llvm_test_suite.join("SingleSource")) {
         let path = entry?.into_path();
@@ -135,7 +137,10 @@ fn collect_test_cases(
             .to_string();
 
         // register the test case
-        tests.push((name, vec![path]));
+        tests.push(TestCase {
+            name,
+            inputs: vec![path],
+        });
     }
 
     // TODO: collect multi-sources
