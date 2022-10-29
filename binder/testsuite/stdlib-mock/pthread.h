@@ -32,11 +32,6 @@ typedef struct pthread_spinlock *pthread_spinlock_t;
 typedef void *pthread_addr_t;
 typedef void *(*pthread_startroutine_t)(void *);
 
-struct pthread_once {
-  int state;
-  pthread_mutex_t mutex;
-};
-
 /*
  * Run-time invariant values:
  */

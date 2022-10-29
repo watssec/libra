@@ -70,7 +70,8 @@ fn main() -> Result<()> {
     let path_llvm_test_suite =
         path_llvm_test_suite.unwrap_or_else(|| PathBuf::from(PATH_LLVM_TEST_SUITE));
     let test_cases = collect_test_cases(&path_llvm_test_suite, filter.as_deref(), &do_not_test)?;
-    info!("number of tests: {}", test_cases.len());
+    let total_num = test_cases.len();
+    info!("number of tests: {}", total_num);
 
     // run the tests one by one
     let mut result_pass = 0;
@@ -103,16 +104,17 @@ fn main() -> Result<()> {
                         ..Default::default()
                     };
                     fs_extra::dir::copy(temp.path(), &path_artifact, &options)?;
-                }
 
-                // shortcut the tests
-                bail!("unexpected analysis error");
+                    // shortcut the testing in debugging mode
+                    bail!("unexpected analysis error");
+                }
             }
         };
     }
 
     info!("passed: {}", result_pass);
     info!("unsupported: {}", result_unsupported);
+    info!("error: {}", total_num - result_pass - result_unsupported);
     Ok(())
 }
 
