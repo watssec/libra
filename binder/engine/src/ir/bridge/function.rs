@@ -34,9 +34,6 @@ impl Function {
         } = func;
 
         // filter out unsupported cases
-        if !*is_defined && !*is_intrinsic {
-            return Err(EngineError::NotSupportedYet(Unsupported::ExternFunction));
-        }
         if !*is_exact {
             return Err(EngineError::NotSupportedYet(Unsupported::WeakFunction));
         }
@@ -110,7 +107,6 @@ impl Function {
                 blocks,
             )?)
         } else {
-            assert!(*is_intrinsic);
             None
         };
 

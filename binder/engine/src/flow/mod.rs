@@ -63,9 +63,6 @@ impl Workflow {
             // targeting the C language
             "--language",
             "c",
-            // do not include standard items
-            "-nostdinc",
-            "-nostdlib",
             // feature selection
             "-std=c17",
             "-Wno-c2x-extensions",

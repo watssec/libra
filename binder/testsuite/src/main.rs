@@ -62,6 +62,8 @@ fn main() -> Result<()> {
     let do_not_test: BTreeSet<_> = [
         // custom bitwidth attributes
         "SingleSource/UnitTests/Integer",
+        // vector support is poor anyway
+        "SingleSource/UnitTests/Vector",
     ]
     .into_iter()
     .collect();
@@ -76,19 +78,19 @@ fn main() -> Result<()> {
     // run the tests one by one
     let mut result_pass = 0;
     let mut result_unsupported = 0;
+    let mut result_uncompilable = 0;
     for TestCase { name, inputs } in test_cases {
         debug!("running: {}", name);
         let temp = tempdir().expect("unable to create a temporary directory");
-        match analyze(
-            vec![format!("-I{}/stdlib-mock", env!("CARGO_MANIFEST_DIR"))],
-            inputs,
-            temp.path().to_path_buf(),
-        ) {
+        match analyze(vec![], inputs, temp.path().to_path_buf()) {
             Ok(_) => {
                 result_pass += 1;
             }
             Err(EngineError::NotSupportedYet(_)) => {
                 result_unsupported += 1;
+            }
+            Err(EngineError::CompilationError(_)) => {
+                result_uncompilable += 1;
             }
             Err(err) => {
                 error!("{}", err);
@@ -114,7 +116,11 @@ fn main() -> Result<()> {
 
     info!("passed: {}", result_pass);
     info!("unsupported: {}", result_unsupported);
-    info!("error: {}", total_num - result_pass - result_unsupported);
+    info!("uncompilable: {}", result_uncompilable);
+    info!(
+        "error: {}",
+        total_num - result_pass - result_unsupported - result_uncompilable
+    );
     Ok(())
 }
 
