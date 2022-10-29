@@ -26,6 +26,8 @@ struct LibraPass : PassInfoMixin<LibraPass> {
     if (auto e = module.materializeAll()) {
       LOG->fatal("unable to materialize module: {0}", e);
     }
+
+    prepare_for_serialization(module);
     auto data = serialize_module(module);
     std::error_code ec;
     raw_fd_ostream stm(OptOutput, ec,

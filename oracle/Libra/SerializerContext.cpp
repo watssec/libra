@@ -2,6 +2,19 @@
 
 namespace libra {
 
+BasicBlock *dummy_block = nullptr;
+Function *dummy_function = nullptr;
+Instruction *dummy_instruction = nullptr;
+
+void prepare_for_serialization(Module &module) {
+  auto &ctxt = module.getContext();
+  dummy_function =
+      Function::Create(FunctionType::get(Type::getVoidTy(ctxt), false),
+                       GlobalValue::LinkageTypes::InternalLinkage, "", &module);
+  dummy_block = BasicBlock::Create(ctxt, "", dummy_function);
+  dummy_instruction = new UnreachableInst(ctxt, dummy_block);
+}
+
 void FunctionSerializationContext::add_block(const llvm::BasicBlock &block) {
   auto index = this->block_labels_.size();
   auto res = this->block_labels_.emplace(&block, index);
