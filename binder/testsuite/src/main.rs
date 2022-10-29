@@ -63,12 +63,19 @@ fn main() -> Result<()> {
     info!("number of tests: {}", test_cases.len());
 
     // run the tests one by one
+    let mut result_pass = 0;
+    let mut result_unsupported = 0;
     for (name, inputs) in test_cases {
         debug!("running: {}", name);
 
         let temp = tempdir().expect("unable to create a temporary directory");
         match analyze(inputs, temp.path().to_path_buf()) {
-            Ok(_) | Err(EngineError::NotSupportedYet(_)) => (),
+            Ok(_) => {
+                result_pass += 1;
+            }
+            Err(EngineError::NotSupportedYet(_)) => {
+                result_unsupported += 1;
+            }
             Err(err) => {
                 error!("{}", err);
                 // save the result if requested
@@ -91,7 +98,8 @@ fn main() -> Result<()> {
         };
     }
 
-    // done with everything
+    info!("passed: {}", result_pass);
+    info!("unsupported: {}", result_unsupported);
     Ok(())
 }
 
