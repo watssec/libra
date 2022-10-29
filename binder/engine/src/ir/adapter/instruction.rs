@@ -88,6 +88,10 @@ pub enum Inst {
     Return {
         value: Option<Value>,
     },
+    Branch {
+        cond: Option<Value>,
+        targets: Vec<usize>,
+    },
     Unreachable,
 }
 

@@ -5,7 +5,7 @@ use crate::ir::adapter;
 use crate::ir::bridge::constant::Constant;
 use crate::ir::bridge::shared::SymbolRegistry;
 use crate::ir::bridge::typing::{Type, TypeRegistry};
-use crate::ir::bridge::value::Value;
+use crate::ir::bridge::value::{BlockLabel, RegisterSlot, Value};
 
 /// An naive translation of an LLVM instruction
 #[derive(Eq, PartialEq)]
@@ -14,12 +14,12 @@ pub enum Instruction {
     Alloca {
         base_type: Type,
         size: Option<Value>,
-        result: usize,
+        result: RegisterSlot,
     },
     Load {
         pointee_type: Type,
         pointer: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     Store {
         pointee_type: Type,
@@ -31,7 +31,7 @@ pub enum Instruction {
         callee: Value,
         args: Vec<Value>,
         ret_ty: Option<Type>,
-        result: Option<usize>,
+        result: Option<RegisterSlot>,
     },
     // binary
     Binary {
@@ -39,7 +39,7 @@ pub enum Instruction {
         opcode: BinaryOperator,
         lhs: Value,
         rhs: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     // compare
     Compare {
@@ -47,28 +47,28 @@ pub enum Instruction {
         predicate: ComparePredicate,
         lhs: Value,
         rhs: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     // cast
     CastBitvec {
         bits_from: usize,
         bits_into: usize,
         operand: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     CastPtrToBitvec {
         bits_into: usize,
         operand: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     CastBitvecToPtr {
         bits_from: usize,
         operand: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     CastPtr {
         operand: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     // GEP
     GEP {
@@ -77,19 +77,19 @@ pub enum Instruction {
         pointer: Value,
         offset: Value,
         indices: Vec<Value>,
-        result: usize,
+        result: RegisterSlot,
     },
     // selection
     ITE {
         cond: Value,
         then_value: Value,
         else_value: Value,
-        result: usize,
+        result: RegisterSlot,
     },
     Phi {
         ty: Type,
-        options: BTreeMap<usize, Value>,
-        result: usize,
+        options: BTreeMap<BlockLabel, Value>,
+        result: RegisterSlot,
     },
 }
 
@@ -171,10 +171,18 @@ impl ComparePredicate {
 /// An naive translation of an LLVM terminator instruction
 #[derive(Eq, PartialEq)]
 pub enum Terminator {
-    /// enters an unreachable state
-    Unreachable,
     /// function return
     Return { val: Option<Value> },
+    /// unconditional branch
+    Goto { target: BlockLabel },
+    /// conditional branch
+    Branch {
+        cond: Value,
+        then_case: BlockLabel,
+        else_case: BlockLabel,
+    },
+    /// enters an unreachable state
+    Unreachable,
 }
 
 /// A context manager for converting instructions
@@ -222,7 +230,7 @@ impl<'a> Context<'a> {
                         ));
                     }
                     Value::Argument {
-                        index: *index,
+                        index: index.into(),
                         ty: actual_ty,
                     }
                 }
@@ -240,7 +248,7 @@ impl<'a> Context<'a> {
                     ));
                 }
                 Value::Register {
-                    index: *index,
+                    index: index.into(),
                     ty: actual_ty,
                 }
             }
@@ -278,7 +286,7 @@ impl<'a> Context<'a> {
                 Instruction::Alloca {
                     base_type,
                     size: size_new,
-                    result: *index,
+                    result: index.into(),
                 }
             }
             AdaptedInst::Load {
@@ -303,7 +311,7 @@ impl<'a> Context<'a> {
                 Instruction::Load {
                     pointee_type: pointee_type_new,
                     pointer: pointer_new,
-                    result: *index,
+                    result: index.into(),
                 }
             }
             AdaptedInst::Store {
@@ -385,7 +393,7 @@ impl<'a> Context<'a> {
                             callee: callee_new,
                             args: args_new,
                             ret_ty,
-                            result: ret.as_ref().map(|_| *index),
+                            result: ret.as_ref().map(|_| index.into()),
                         }
                     }
                     _ => {
@@ -429,7 +437,7 @@ impl<'a> Context<'a> {
                     opcode: opcode_parsed,
                     lhs: lhs_new,
                     rhs: rhs_new,
-                    result: *index,
+                    result: index.into(),
                 }
             }
             // comparison
@@ -471,7 +479,7 @@ impl<'a> Context<'a> {
                     predicate: predicate_parsed,
                     lhs: lhs_new,
                     rhs: rhs_new,
-                    result: *index,
+                    result: index.into(),
                 }
             }
             // casts
@@ -497,7 +505,7 @@ impl<'a> Context<'a> {
                                 bits_from,
                                 bits_into,
                                 operand: operand_new,
-                                result: *index,
+                                result: index.into(),
                             }
                         }
                         _ => {
@@ -511,7 +519,7 @@ impl<'a> Context<'a> {
                             Instruction::CastPtrToBitvec {
                                 bits_into,
                                 operand: operand_new,
-                                result: *index,
+                                result: index.into(),
                             }
                         }
                         _ => {
@@ -525,7 +533,7 @@ impl<'a> Context<'a> {
                             Instruction::CastBitvecToPtr {
                                 bits_from,
                                 operand: operand_new,
-                                result: *index,
+                                result: index.into(),
                             }
                         }
                         _ => {
@@ -537,7 +545,7 @@ impl<'a> Context<'a> {
                     "bitcast" => match (src_ty_new, dst_ty_new) {
                         (Type::Pointer, Type::Pointer) => Instruction::CastPtr {
                             operand: operand_new,
-                            result: *index,
+                            result: index.into(),
                         },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
@@ -652,7 +660,7 @@ impl<'a> Context<'a> {
                     pointer: pointer_new,
                     offset: offset_new,
                     indices: indices_new,
-                    result: *index,
+                    result: index.into(),
                 }
             }
             // choice
@@ -669,7 +677,7 @@ impl<'a> Context<'a> {
                     cond: cond_new,
                     then_value: then_value_new,
                     else_value: else_value_new,
-                    result: *index,
+                    result: index.into(),
                 }
             }
             AdaptedInst::Phi { options } => {
@@ -681,7 +689,7 @@ impl<'a> Context<'a> {
                             "unknown incoming edge into phi node".into(),
                         ));
                     }
-                    options_new.insert(opt.block, self.parse_value(&opt.value, &inst_ty)?);
+                    options_new.insert(opt.block.into(), self.parse_value(&opt.value, &inst_ty)?);
                 }
                 if options_new.len() != options.len() {
                     return Err(EngineError::InvariantViolation(
@@ -691,11 +699,11 @@ impl<'a> Context<'a> {
                 Instruction::Phi {
                     ty: inst_ty,
                     options: options_new,
-                    result: *index,
+                    result: index.into(),
                 }
             }
             // terminators should never appear here
-            AdaptedInst::Return { .. } | AdaptedInst::Unreachable => {
+            AdaptedInst::Return { .. } | AdaptedInst::Branch { .. } | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with terminator instruction in the body".into(),
                 ));
@@ -731,6 +739,49 @@ impl<'a> Context<'a> {
                     let converted = self.parse_value(val, ty)?;
                     Terminator::Return {
                         val: Some(converted),
+                    }
+                }
+            },
+            AdaptedInst::Branch { cond, targets } => match cond {
+                None => {
+                    if targets.len() != 1 {
+                        return Err(EngineError::InvalidAssumption(
+                            "unconditional branch should have exactly one target".into(),
+                        ));
+                    }
+                    let target = targets.first().unwrap();
+                    if !self.blocks.contains(target) {
+                        return Err(EngineError::InvalidAssumption(
+                            "unconditional branch to unknown target".into(),
+                        ));
+                    }
+                    Terminator::Goto {
+                        target: target.into(),
+                    }
+                }
+                Some(val) => {
+                    let cond_new = self.parse_value(val, &Type::Bitvec { bits: 1 })?;
+                    if targets.len() != 2 {
+                        return Err(EngineError::InvalidAssumption(
+                            "conditinal branch should have exactly two targets".into(),
+                        ));
+                    }
+                    let target_then = targets.get(0).unwrap();
+                    if !self.blocks.contains(target_then) {
+                        return Err(EngineError::InvalidAssumption(
+                            "conditional branch to unknown then target".into(),
+                        ));
+                    }
+                    let target_else = targets.get(1).unwrap();
+                    if !self.blocks.contains(target_else) {
+                        return Err(EngineError::InvalidAssumption(
+                            "conditional branch to unknown else target".into(),
+                        ));
+                    }
+                    Terminator::Branch {
+                        cond: cond_new,
+                        then_case: target_then.into(),
+                        else_case: target_else.into(),
                     }
                 }
             },

@@ -8,6 +8,7 @@ use crate::ir::adapter;
 use crate::ir::bridge::instruction::{Context, Instruction, Terminator};
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
+use crate::ir::bridge::value::BlockLabel;
 use crate::EngineResult;
 
 /// An adapted representation of an LLVM basic block
@@ -31,7 +32,7 @@ pub enum Edge {
 pub struct ControlFlowGraph {
     graph: DiGraph<Block, Edge>,
     /// block label to index in the graph
-    block_label_to_index: BTreeMap<usize, NodeIndex>,
+    block_label_to_index: BTreeMap<BlockLabel, NodeIndex>,
 }
 
 impl PartialEq for ControlFlowGraph {
@@ -117,7 +118,7 @@ impl ControlFlowGraph {
                 terminator: terminator_new,
             };
             let node_index = graph.add_node(block_new);
-            block_label_to_index.insert(*label, node_index);
+            block_label_to_index.insert(label.into(), node_index);
         }
 
         // done with the construction

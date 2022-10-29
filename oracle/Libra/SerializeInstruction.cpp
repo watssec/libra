@@ -69,6 +69,8 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   // terminators
   else if (isa<ReturnInst>(inst)) {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
+  } else if (isa<BranchInst>(inst)) {
+    result["Branch"] = serialize_inst_branch(cast<BranchInst>(inst));
   } else if (isa<UnreachableInst>(inst)) {
     result["Unreachable"] = json::Value(nullptr);
   }
@@ -513,8 +515,22 @@ json::Object FunctionSerializationContext::serialize_inst_return(
   json::Object result;
   const auto *rv = inst.getReturnValue();
   if (rv != nullptr) {
-    result["value"] = this->serialize_value(*inst.getReturnValue());
+    result["value"] = serialize_value(*inst.getReturnValue());
   }
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_branch(
+    const BranchInst &inst) const {
+  json::Object result;
+  if (inst.isConditional()) {
+    result["cond"] = serialize_value(*inst.getCondition());
+  }
+  json::Array targets;
+  for (const auto *succ : inst.successors()) {
+    targets.push_back(get_block(*succ));
+  }
+  result["targets"] = std::move(targets);
   return result;
 }
 

@@ -97,6 +97,8 @@ public:
   [[nodiscard]] json::Object serialize_inst_ite(const SelectInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_return(const ReturnInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_branch(const BranchInst &inst) const;
 
   [[nodiscard]] json::Object serialize_value(const Value &val) const;
   [[nodiscard]] json::Object
