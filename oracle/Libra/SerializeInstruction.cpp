@@ -66,6 +66,15 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["ITE"] = serialize_inst_ite(cast<SelectInst>(inst));
   }
 
+  // TODO: concurrency instructions
+  else if (isa<FenceInst>(inst)) {
+    result["Fence"] = json::Value(nullptr);
+  } else if (isa<AtomicCmpXchgInst>(inst)) {
+    result["AtomicCmpXchg"] = json::Value(nullptr);
+  } else if (isa<AtomicRMWInst>(inst)) {
+    result["AtomicRMW"] = json::Value(nullptr);
+  }
+
   // terminators
   else if (isa<ReturnInst>(inst)) {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
@@ -75,6 +84,11 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["Switch"] = serialize_inst_switch(cast<SwitchInst>(inst));
   } else if (isa<UnreachableInst>(inst)) {
     result["Unreachable"] = json::Value(nullptr);
+  }
+
+  // TODO: indirect branch
+  else if (isa<IndirectBrInst>(inst)) {
+    result["IndirectJump"] = json::Value(nullptr);
   }
 
   // should have exhausted all valid cases

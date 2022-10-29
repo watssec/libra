@@ -709,10 +709,15 @@ impl<'a> Context<'a> {
                     result: index.into(),
                 }
             }
+            // concurrency
+            AdaptedInst::Fence | AdaptedInst::AtomicCmpXchg | AdaptedInst::AtomicRMW => {
+                return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
+            }
             // terminators should never appear here
             AdaptedInst::Return { .. }
             | AdaptedInst::Branch { .. }
             | AdaptedInst::Switch { .. }
+            | AdaptedInst::IndirectJump
             | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with terminator instruction in the body".into(),
@@ -852,6 +857,9 @@ impl<'a> Context<'a> {
                     default: default_new,
                 }
             }
+            AdaptedInst::IndirectJump => {
+                return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
+            }
             AdaptedInst::Unreachable => Terminator::Unreachable,
             // explicitly list the rest of the instructions
             AdaptedInst::Alloca { .. }
@@ -867,7 +875,10 @@ impl<'a> Context<'a> {
             | AdaptedInst::Cast { .. }
             | AdaptedInst::GEP { .. }
             | AdaptedInst::ITE { .. }
-            | AdaptedInst::Phi { .. } => {
+            | AdaptedInst::Phi { .. }
+            | AdaptedInst::Fence
+            | AdaptedInst::AtomicCmpXchg
+            | AdaptedInst::AtomicRMW => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

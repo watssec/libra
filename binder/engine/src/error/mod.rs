@@ -19,6 +19,8 @@ pub enum Unsupported {
     PointerAddressSpace,
     OutOfBoundConstantGEP,
     InterfaceResolver,
+    IndirectJump,
+    AtomicInstruction,
 }
 
 impl Display for Unsupported {
@@ -68,6 +70,12 @@ impl Display for Unsupported {
             }
             Self::InterfaceResolver => {
                 write!(f, "load-time interface resolving")
+            }
+            Self::IndirectJump => {
+                write!(f, "indirect jump (e.g., through register)")
+            }
+            Self::AtomicInstruction => {
+                write!(f, "atomic instruction")
             }
         }
     }

@@ -86,6 +86,10 @@ pub enum Inst {
     Phi {
         options: Vec<PhiOption>,
     },
+    // concurrency (TODO: need to support them)
+    Fence,
+    AtomicCmpXchg,
+    AtomicRMW,
     // terminator
     Return {
         value: Option<Value>,
@@ -100,6 +104,7 @@ pub enum Inst {
         cases: Vec<SwitchCase>,
         default: Option<usize>,
     },
+    IndirectJump, // TODO: need to support this
     Unreachable,
 }
 
