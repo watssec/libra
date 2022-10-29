@@ -92,6 +92,22 @@ pub enum Instruction {
         options: BTreeMap<BlockLabel, Value>,
         result: RegisterSlot,
     },
+    // aggregation
+    GetValue {
+        src_ty: Type,
+        dst_ty: Type,
+        aggregate: Value,
+        indices: Vec<usize>,
+        result: RegisterSlot,
+    },
+    SetValue {
+        src_ty: Type,
+        dst_ty: Type,
+        aggregate: Value,
+        value: Value,
+        indices: Vec<usize>,
+        result: RegisterSlot,
+    },
 }
 
 #[derive(Eq, PartialEq)]
@@ -713,6 +729,103 @@ impl<'a> Context<'a> {
                 }
             }
             // aggregates
+            AdaptedInst::GetValue {
+                from_ty,
+                aggregate,
+                indices,
+            } => {
+                let src_ty = self.typing.convert(from_ty)?;
+                let dst_ty = self.typing.convert(ty)?;
+
+                let mut cur_ty = &src_ty;
+                for idx in indices {
+                    let next_cur_ty = match cur_ty {
+                        Type::Struct { name: _, fields } => {
+                            if *idx >= fields.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "field number out of range".into(),
+                                ));
+                            }
+                            fields.get(*idx).unwrap()
+                        }
+                        Type::Array { element, length } => {
+                            if *idx >= *length {
+                                return Err(EngineError::InvalidAssumption(
+                                    "array index out of range".into(),
+                                ));
+                            }
+                            element.as_ref()
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "Aggregate getter only applies to array and struct".into(),
+                            ));
+                        }
+                    };
+                    cur_ty = next_cur_ty;
+                }
+
+                if cur_ty != &dst_ty {
+                    return Err(EngineError::InvalidAssumption(
+                        "GetValue destination type mismatch".into(),
+                    ));
+                }
+
+                let aggregate_new = self.parse_value(aggregate, &src_ty)?;
+                Instruction::GetValue {
+                    src_ty,
+                    dst_ty,
+                    aggregate: aggregate_new,
+                    indices: indices.clone(),
+                    result: index.into(),
+                }
+            }
+            AdaptedInst::SetValue {
+                aggregate,
+                value,
+                indices,
+            } => {
+                let src_ty = self.typing.convert(ty)?;
+                let mut cur_ty = &src_ty;
+                for idx in indices {
+                    let next_cur_ty = match cur_ty {
+                        Type::Struct { name: _, fields } => {
+                            if *idx >= fields.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "field number out of range".into(),
+                                ));
+                            }
+                            fields.get(*idx).unwrap()
+                        }
+                        Type::Array { element, length } => {
+                            if *idx >= *length {
+                                return Err(EngineError::InvalidAssumption(
+                                    "array index out of range".into(),
+                                ));
+                            }
+                            element.as_ref()
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "Aggregate getter only applies to array and struct".into(),
+                            ));
+                        }
+                    };
+                    cur_ty = next_cur_ty;
+                }
+                let dst_ty = cur_ty.clone();
+
+                let aggregate_new = self.parse_value(aggregate, &src_ty)?;
+                let value_new = self.parse_value(value, &dst_ty)?;
+                Instruction::SetValue {
+                    src_ty,
+                    dst_ty,
+                    aggregate: aggregate_new,
+                    value: value_new,
+                    indices: indices.clone(),
+                    result: index.into(),
+                }
+            }
             AdaptedInst::GetElement { .. }
             | AdaptedInst::SetElement { .. }
             | AdaptedInst::ShuffleVector { .. } => {
@@ -886,12 +999,14 @@ impl<'a> Context<'a> {
             | AdaptedInst::GEP { .. }
             | AdaptedInst::ITE { .. }
             | AdaptedInst::Phi { .. }
-            | AdaptedInst::Fence
-            | AdaptedInst::AtomicCmpXchg
-            | AdaptedInst::AtomicRMW
+            | AdaptedInst::GetValue { .. }
+            | AdaptedInst::SetValue { .. }
             | AdaptedInst::GetElement { .. }
             | AdaptedInst::SetElement { .. }
-            | AdaptedInst::ShuffleVector { .. } => {
+            | AdaptedInst::ShuffleVector { .. }
+            | AdaptedInst::Fence
+            | AdaptedInst::AtomicCmpXchg
+            | AdaptedInst::AtomicRMW => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

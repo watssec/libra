@@ -90,6 +90,16 @@ pub enum Inst {
         options: Vec<PhiOption>,
     },
     // aggregates
+    GetValue {
+        from_ty: Type,
+        aggregate: Value,
+        indices: Vec<usize>,
+    },
+    SetValue {
+        aggregate: Value,
+        value: Value,
+        indices: Vec<usize>,
+    },
     GetElement {
         vec_ty: Type,
         vector: Value,

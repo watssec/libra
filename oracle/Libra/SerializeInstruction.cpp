@@ -69,7 +69,11 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   }
 
   // aggregates
-  else if (isa<ExtractElementInst>(inst)) {
+  else if (isa<ExtractValueInst>(inst)) {
+    result["GetValue"] = serialize_inst_get_value(cast<ExtractValueInst>(inst));
+  } else if (isa<InsertValueInst>(inst)) {
+    result["SetValue"] = serialize_inst_set_value(cast<InsertValueInst>(inst));
+  } else if (isa<ExtractElementInst>(inst)) {
     result["GetElement"] =
         serialize_inst_get_element(cast<ExtractElementInst>(inst));
   } else if (isa<InsertElementInst>(inst)) {
@@ -544,6 +548,32 @@ FunctionSerializationContext::serialize_inst_ite(const SelectInst &inst) const {
   result["cond"] = serialize_value(*inst.getCondition());
   result["then_value"] = serialize_value(*inst.getTrueValue());
   result["else_value"] = serialize_value(*inst.getFalseValue());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_get_value(
+    const ExtractValueInst &inst) const {
+  json::Object result;
+  result["from_ty"] = serialize_type(*inst.getAggregateOperand()->getType());
+  result["aggregate"] = serialize_value(*inst.getAggregateOperand());
+  json::Array indices;
+  for (const auto idx : inst.indices()) {
+    indices.push_back(idx);
+  }
+  result["indices"] = std::move(indices);
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_set_value(
+    const InsertValueInst &inst) const {
+  json::Object result;
+  result["aggregate"] = serialize_value(*inst.getAggregateOperand());
+  result["value"] = serialize_value(*inst.getInsertedValueOperand());
+  json::Array indices;
+  for (const auto idx : inst.indices()) {
+    indices.push_back(idx);
+  }
+  result["indices"] = std::move(indices);
   return result;
 }
 

@@ -97,6 +97,10 @@ public:
   [[nodiscard]] json::Object serialize_inst_phi(const PHINode &inst) const;
   [[nodiscard]] json::Object serialize_inst_ite(const SelectInst &inst) const;
   [[nodiscard]] json::Object
+  serialize_inst_get_value(const ExtractValueInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_set_value(const InsertValueInst &inst) const;
+  [[nodiscard]] json::Object
   serialize_inst_get_element(const ExtractElementInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_set_element(const InsertElementInst &inst) const;
