@@ -23,9 +23,9 @@ pub struct Block {
 /// A representation of CFG edges
 #[derive(Eq, PartialEq)]
 pub enum Edge {
-    Unconditional,
-    BranchTrue,
-    BranchFalse,
+    Goto,
+    Branch(bool),
+    Switch(Option<u64>),
 }
 
 /// An adapted representation of an LLVM control-flow graph
@@ -98,6 +98,7 @@ impl ControlFlowGraph {
         // convert block by block
         let mut graph = DiGraph::new();
         let mut block_label_to_index = BTreeMap::new();
+        let mut edges: BTreeMap<(BlockLabel, BlockLabel), _> = BTreeMap::new();
         for block in blocks {
             let AdaptedBlock {
                 label,
@@ -112,6 +113,69 @@ impl ControlFlowGraph {
                 .collect::<EngineResult<_>>()?;
             let terminator_new = ctxt.parse_terminator(terminator)?;
 
+            // collect the edges
+            match &terminator_new {
+                Terminator::Goto { target } => {
+                    if edges.insert((label.into(), *target), Edge::Goto).is_some() {
+                        return Err(EngineError::InvariantViolation(
+                            "duplicated edge in CFG".into(),
+                        ));
+                    }
+                }
+                Terminator::Branch {
+                    cond: _,
+                    then_case,
+                    else_case,
+                } => {
+                    if edges
+                        .insert((label.into(), *then_case), Edge::Branch(true))
+                        .is_some()
+                    {
+                        return Err(EngineError::InvariantViolation(
+                            "duplicated edge in CFG".into(),
+                        ));
+                    }
+                    if edges
+                        .insert((label.into(), *else_case), Edge::Branch(false))
+                        .is_some()
+                    {
+                        return Err(EngineError::InvariantViolation(
+                            "duplicated edge in CFG".into(),
+                        ));
+                    }
+                }
+                Terminator::Switch {
+                    cond: _,
+                    cases,
+                    default,
+                } => {
+                    for (case_id, case_block) in cases {
+                        if edges
+                            .insert((label.into(), *case_block), Edge::Switch(Some(*case_id)))
+                            .is_some()
+                        {
+                            return Err(EngineError::InvariantViolation(
+                                "duplicated edge in CFG".into(),
+                            ));
+                        }
+                    }
+                    match default {
+                        None => (),
+                        Some(default_block) => {
+                            if edges
+                                .insert((label.into(), *default_block), Edge::Switch(None))
+                                .is_some()
+                            {
+                                return Err(EngineError::InvariantViolation(
+                                    "duplicated edge in CFG".into(),
+                                ));
+                            }
+                        }
+                    }
+                }
+                Terminator::Return { .. } | Terminator::Unreachable => (),
+            }
+
             // construct the new block
             let block_new = Block {
                 sequence: body_new,
@@ -119,6 +183,13 @@ impl ControlFlowGraph {
             };
             let node_index = graph.add_node(block_new);
             block_label_to_index.insert(label.into(), node_index);
+        }
+
+        // add the edges
+        for ((src, dst), edge) in edges {
+            let src_index = block_label_to_index.get(&src).unwrap();
+            let dst_index = block_label_to_index.get(&dst).unwrap();
+            graph.add_edge(*src_index, *dst_index, edge);
         }
 
         // done with the construction

@@ -71,6 +71,8 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
   } else if (isa<BranchInst>(inst)) {
     result["Branch"] = serialize_inst_branch(cast<BranchInst>(inst));
+  } else if (isa<SwitchInst>(inst)) {
+    result["Switch"] = serialize_inst_switch(cast<SwitchInst>(inst));
   } else if (isa<UnreachableInst>(inst)) {
     result["Unreachable"] = json::Value(nullptr);
   }
@@ -531,6 +533,31 @@ json::Object FunctionSerializationContext::serialize_inst_branch(
     targets.push_back(get_block(*succ));
   }
   result["targets"] = std::move(targets);
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_switch(
+    const SwitchInst &inst) const {
+  json::Object result;
+  result["cond_ty"] = serialize_type(*inst.getCondition()->getType());
+  result["cond"] = serialize_value(*inst.getCondition());
+
+  const auto &default_case = inst.case_default();
+  json::Array targets;
+  for (const auto &succ : inst.cases()) {
+    if (default_case != inst.case_end() &&
+        succ.getCaseIndex() == default_case->getCaseIndex()) {
+      continue;
+    }
+    json::Object item;
+    item["block"] = get_block(*succ.getCaseSuccessor());
+    item["value"] = serialize_constant(*succ.getCaseValue());
+    targets.push_back(std::move(item));
+  }
+  result["cases"] = std::move(targets);
+  if (default_case != inst.case_end()) {
+    result["default"] = get_block(*default_case->getCaseSuccessor());
+  }
   return result;
 }
 

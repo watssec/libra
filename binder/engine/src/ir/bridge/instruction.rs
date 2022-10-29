@@ -181,6 +181,12 @@ pub enum Terminator {
         then_case: BlockLabel,
         else_case: BlockLabel,
     },
+    /// switch
+    Switch {
+        cond: Value,
+        cases: BTreeMap<u64, BlockLabel>,
+        default: Option<BlockLabel>,
+    },
     /// enters an unreachable state
     Unreachable,
 }
@@ -703,7 +709,10 @@ impl<'a> Context<'a> {
                 }
             }
             // terminators should never appear here
-            AdaptedInst::Return { .. } | AdaptedInst::Branch { .. } | AdaptedInst::Unreachable => {
+            AdaptedInst::Return { .. }
+            | AdaptedInst::Branch { .. }
+            | AdaptedInst::Switch { .. }
+            | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with terminator instruction in the body".into(),
                 ));
@@ -785,6 +794,62 @@ impl<'a> Context<'a> {
                     }
                 }
             },
+            AdaptedInst::Switch {
+                cond,
+                cond_ty,
+                cases,
+                default,
+            } => {
+                let cond_ty_new = self.typing.convert(cond_ty)?;
+                if !matches!(cond_ty_new, Type::Bitvec { .. }) {
+                    return Err(EngineError::InvalidAssumption(
+                        "switch condition must be bitvec".into(),
+                    ));
+                }
+                let cond_new = self.parse_value(cond, &cond_ty_new)?;
+
+                let mut mapping = BTreeMap::new();
+                for case in cases {
+                    if !self.blocks.contains(&case.block) {
+                        return Err(EngineError::InvalidAssumption(
+                            "switch casing into an invalid block".into(),
+                        ));
+                    }
+
+                    let case_val =
+                        Constant::convert(&case.value, &cond_ty_new, &self.typing, &self.symbols)?;
+                    let label_val = match case_val {
+                        Constant::Bitvec {
+                            bits: _,
+                            value: label_val,
+                        } => label_val,
+                        _ => {
+                            return Err(EngineError::InvariantViolation(
+                                "switch case is not a constant bitvec".into(),
+                            ));
+                        }
+                    };
+                    mapping.insert(label_val, case.block.into());
+                }
+
+                let default_new = match default {
+                    None => None,
+                    Some(label) => {
+                        if !self.blocks.contains(label) {
+                            return Err(EngineError::InvalidAssumption(
+                                "switch default casing into an invalid block".into(),
+                            ));
+                        }
+                        Some(label.into())
+                    }
+                };
+
+                Terminator::Switch {
+                    cond: cond_new,
+                    cases: mapping,
+                    default: default_new,
+                }
+            }
             AdaptedInst::Unreachable => Terminator::Unreachable,
             // explicitly list the rest of the instructions
             AdaptedInst::Alloca { .. }

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ir::adapter::constant::Constant;
 use crate::ir::adapter::typing::Type;
 use crate::ir::adapter::value::{InlineAsm, Value};
 
@@ -92,6 +93,12 @@ pub enum Inst {
         cond: Option<Value>,
         targets: Vec<usize>,
     },
+    Switch {
+        cond: Value,
+        cond_ty: Type,
+        cases: Vec<SwitchCase>,
+        default: Option<usize>,
+    },
     Unreachable,
 }
 
@@ -111,4 +118,12 @@ pub struct PhiOption {
     pub block: usize,
     /// value
     pub value: Value,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SwitchCase {
+    /// label for an incoming block
+    pub block: usize,
+    /// value
+    pub value: Constant,
 }
