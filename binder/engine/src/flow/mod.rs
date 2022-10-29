@@ -17,6 +17,8 @@ pub struct Workflow {
     bin_llvm_dis: PathBuf,
     // llvm passes
     lib_pass: PathBuf,
+    /// Flags (to be sent to Clang)
+    flags: Vec<String>,
     /// Source file
     inputs: Vec<PathBuf>,
     /// Workspace for the analysis
@@ -24,7 +26,7 @@ pub struct Workflow {
 }
 
 impl Workflow {
-    pub fn new(inputs: Vec<PathBuf>, output: PathBuf) -> Self {
+    pub fn new(flags: Vec<String>, inputs: Vec<PathBuf>, output: PathBuf) -> Self {
         let pkg_llvm = Path::new(env!("LIBRA_CONST_LLVM_ARTIFACT"));
         let lib_pass = Path::new(env!("LIBRA_CONST_PASS_ARTIFACT"));
         Self {
@@ -33,6 +35,7 @@ impl Workflow {
             bin_llvm_link: pkg_llvm.join("bin").join("llvm-link"),
             bin_llvm_dis: pkg_llvm.join("bin").join("llvm-dis"),
             lib_pass: lib_pass.to_path_buf(),
+            flags,
             inputs,
             output,
         }
@@ -50,32 +53,34 @@ impl Workflow {
         self.output.join(format!("bitcode-{}.json", step))
     }
 
+    fn get_clang_flags(&self) -> Vec<&str> {
+        let mut result = vec![
+            // output llvm bitcode
+            "-c",
+            "-emit-llvm",
+            // attack debug symbol
+            "-g",
+            // targeting the C language
+            "--language",
+            "c",
+            // do not include standard items
+            "-nostdinc",
+            "-nostdlib",
+            // feature selection
+            "-std=c17",
+            "-Wno-c2x-extensions",
+        ];
+        result.extend(self.flags.iter().map(|flag| flag.as_str()));
+        result
+    }
+
     pub fn execute(&self) -> EngineResult<()> {
         // compilation
         let mut init_bc_files = vec![];
         for (i, src) in self.inputs.iter().enumerate() {
             let bc_path = self.get_init_bc_path(i);
-            self.run_clang(
-                src,
-                &bc_path,
-                [
-                    // output llvm bitcode
-                    "-c",
-                    "-emit-llvm",
-                    // attack debug symbol
-                    "-g",
-                    // targeting the C language
-                    "--language",
-                    "c",
-                    // do not include standard items
-                    "-nostdinc",
-                    "-nostdlib",
-                    // feature selection
-                    "-std=c17",
-                    "-Wno-c2x-extensions",
-                ],
-            )
-            .map_err(|e| EngineError::CompilationError(format!("Error during clang: {}", e)))?;
+            self.run_clang(src, &bc_path, self.get_clang_flags())
+                .map_err(|e| EngineError::CompilationError(format!("Error during clang: {}", e)))?;
             self.disassemble(&bc_path)
                 .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
             init_bc_files.push(bc_path);

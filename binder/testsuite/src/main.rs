@@ -69,7 +69,11 @@ fn main() -> Result<()> {
         debug!("running: {}", name);
 
         let temp = tempdir().expect("unable to create a temporary directory");
-        match analyze(inputs, temp.path().to_path_buf()) {
+        match analyze(
+            vec![format!("-I{}/stdlib-mock", env!("CARGO_MANIFEST_DIR"))],
+            inputs,
+            temp.path().to_path_buf(),
+        ) {
             Ok(_) => {
                 result_pass += 1;
             }

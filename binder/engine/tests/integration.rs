@@ -65,7 +65,7 @@ fn run_test(path_output: &Path) -> Result<()> {
 
     // create output dir
     let temp = tempdir().expect("unable to create a temporary directory");
-    let success = match analyze(inputs, temp.path().to_path_buf()) {
+    let success = match analyze(vec![], inputs, temp.path().to_path_buf()) {
         Ok(_) => {
             if expected.is_empty() {
                 true
