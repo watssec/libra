@@ -4,7 +4,6 @@ use std::process::Command;
 use std::{env, fs};
 
 use anyhow::{bail, Result};
-use log::debug;
 
 use crate::error::{EngineError, EngineResult};
 use crate::ir::{adapter, bridge};
@@ -48,6 +47,9 @@ impl Workflow {
     }
     fn get_merged_bc_path(&self) -> PathBuf {
         self.output.join("merged.bc")
+    }
+    fn get_stepwise_bc_path(&self, step: usize) -> PathBuf {
+        self.output.join(format!("step-{}.bc", step))
     }
     fn get_serialized_path(&self, step: usize) -> PathBuf {
         self.output.join(format!("bitcode-{}.json", step))
@@ -96,16 +98,45 @@ impl Workflow {
             .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
 
         // baseline loading
-        let mut step = 0;
-        self.serialize(&merged_bc_path, step).map_err(|e| {
-            EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
-        })?;
+        let mut history = vec![];
+        self.serialize(&merged_bc_path, history.len())
+            .map_err(|e| {
+                EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
+            })?;
+        let baseline = self.deserialize(history.len())?;
+        history.push((merged_bc_path, baseline));
 
-        let _ = self.deserialize(step)?;
-        step += 1;
+        // optimization until a fixedpoint
+        loop {
+            let (last_path, last_ir) = history.last().unwrap();
+            let step = history.len();
 
-        // TODO: optimization until a fixedpoint
-        debug!("number of steps to reach fixedpoint: {}", step);
+            // optimization
+            let this_path = self.get_stepwise_bc_path(step);
+            self.run_opt(last_path, Some(&this_path), ["-O2"])
+                .map_err(|e| {
+                    EngineError::CompilationError(format!("Error during opt -O2: {}", e))
+                })?;
+            self.disassemble(&this_path)
+                .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+
+            // loading
+            self.serialize(&this_path, step).map_err(|e| {
+                EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
+            })?;
+            let optimized = self.deserialize(step)?;
+
+            // check for fixedpoint
+            if last_ir == &optimized {
+                break;
+            }
+            history.push((this_path, optimized));
+        }
+
+        // TODO: remove it
+        if !history.is_empty() {
+            return Err(EngineError::Fixedpoint(history.len()));
+        }
 
         // TODO: analysis
         Ok(())

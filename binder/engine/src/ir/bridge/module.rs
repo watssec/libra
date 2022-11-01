@@ -11,8 +11,6 @@ use crate::EngineResult;
 /// An adapted representation of an LLVM module
 #[derive(Eq, PartialEq)]
 pub struct Module {
-    /// module name
-    name: Identifier,
     /// type registry
     typing: TypeRegistry,
     /// symbol registry
@@ -34,7 +32,8 @@ impl Module {
         } = module_adapted;
 
         // check name
-        let ident = match name.strip_prefix(prefix) {
+        // TODO: use name
+        let _ident: Identifier = match name.strip_prefix(prefix) {
             None => {
                 return Err(EngineError::InvariantViolation(format!(
                     "module name `{}` does not start with prefix `{}`",
@@ -97,7 +96,6 @@ impl Module {
 
         // done
         Ok(Self {
-            name: ident,
             typing,
             symbols,
             globals: gvar_table,
