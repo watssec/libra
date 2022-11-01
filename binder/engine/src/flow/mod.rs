@@ -99,11 +99,10 @@ impl Workflow {
 
         // baseline loading
         let mut history = vec![];
-        self.serialize(&merged_bc_path, history.len())
-            .map_err(|e| {
-                EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
-            })?;
-        let baseline = self.deserialize(history.len())?;
+        self.serialize(&merged_bc_path, 0).map_err(|e| {
+            EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
+        })?;
+        let baseline = self.deserialize(0)?;
         history.push((merged_bc_path, baseline));
 
         // optimization until a fixedpoint
