@@ -12,5 +12,5 @@ mod ir;
 /// Main entrypoint
 pub fn analyze(flags: Vec<String>, inputs: Vec<PathBuf>, output: PathBuf) -> EngineResult<()> {
     let flow = Workflow::new(flags, inputs, output);
-    flow.execute()
+    flow.execute(Some(0))
 }

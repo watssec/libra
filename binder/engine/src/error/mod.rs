@@ -94,8 +94,6 @@ pub enum EngineError {
     NotSupportedYet(Unsupported),
     /// Invariant violation
     InvariantViolation(String),
-    // TODO: remove it
-    Fixedpoint(usize),
 }
 
 pub type EngineResult<T> = Result<T, EngineError>;
@@ -117,9 +115,6 @@ impl Display for EngineError {
             }
             Self::InvariantViolation(msg) => {
                 write!(f, "[libra::invariant] {}", msg)
-            }
-            Self::Fixedpoint(step) => {
-                write!(f, "[libra::fixedpoint] {}", step)
             }
         }
     }

@@ -73,7 +73,7 @@ impl Workflow {
         result
     }
 
-    pub fn execute(&self) -> EngineResult<()> {
+    pub fn execute(&self, depth: Option<usize>) -> EngineResult<()> {
         // compilation
         let mut init_bc_files = vec![];
         for (i, src) in self.inputs.iter().enumerate() {
@@ -107,6 +107,11 @@ impl Workflow {
 
         // optimization until a fixedpoint
         loop {
+            // limit the number of iterations if requested
+            if depth.map_or(false, |limit| history.len() > limit) {
+                break;
+            }
+
             let (last_path, last_ir) = history.last().unwrap();
             let step = history.len();
 
@@ -130,11 +135,6 @@ impl Workflow {
                 break;
             }
             history.push((this_path, optimized));
-        }
-
-        // TODO: remove it
-        if !history.is_empty() {
-            return Err(EngineError::Fixedpoint(history.len()));
         }
 
         // TODO: analysis
