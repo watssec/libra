@@ -41,6 +41,10 @@ struct Args {
     /// Keep the workflow artifacts in the studio
     #[structopt(short, long)]
     keep: bool,
+
+    /// Output the results
+    #[structopt(short, long)]
+    output: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -51,6 +55,7 @@ fn main() -> Result<()> {
         path_llvm_test_suite,
         filter,
         keep,
+        output,
     } = args;
     let studio = studio.as_ref().unwrap_or(&PATH_STUDIO);
 
@@ -76,24 +81,27 @@ fn main() -> Result<()> {
     info!("number of tests: {}", total_num);
 
     // run the tests one by one
-    let mut result_pass = 0;
-    let mut result_unsupported = 0;
-    let mut result_uncompilable = 0;
+    let mut result_pass = vec![];
+    let mut result_fail = vec![];
+    let mut result_unsupported = vec![];
+    let mut result_uncompilable = vec![];
     for TestCase { name, inputs } in test_cases {
         debug!("running: {}", name);
         let temp = tempdir().expect("unable to create a temporary directory");
         match analyze(vec![], inputs, temp.path().to_path_buf()) {
             Ok(_) => {
-                result_pass += 1;
+                result_pass.push(name);
             }
             Err(EngineError::NotSupportedYet(_)) => {
-                result_unsupported += 1;
+                result_unsupported.push(name);
             }
             Err(EngineError::CompilationError(_)) => {
-                result_uncompilable += 1;
+                result_uncompilable.push(name);
             }
             Err(err) => {
                 error!("{}", err);
+                result_fail.push(name);
+
                 // save the result if requested
                 if keep {
                     let path_artifact = studio.join("testing");
@@ -114,13 +122,23 @@ fn main() -> Result<()> {
         };
     }
 
-    info!("passed: {}", result_pass);
-    info!("unsupported: {}", result_unsupported);
-    info!("uncompilable: {}", result_uncompilable);
-    info!(
-        "error: {}",
-        total_num - result_pass - result_unsupported - result_uncompilable
-    );
+    info!("Total: {}", total_num);
+    info!("passed: {}", result_pass.len());
+    info!("failed: {}", result_fail.len());
+    info!("unsupported: {}", result_unsupported.len());
+    info!("uncompilable: {}", result_uncompilable.len());
+
+    match output {
+        None => (),
+        Some(path) => {
+            let mut content = vec![];
+            for name in result_pass {
+                content.push(name);
+            }
+            fs::write(&path, content.join("\n"))?;
+        }
+    }
+
     Ok(())
 }
 

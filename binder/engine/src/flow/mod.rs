@@ -66,7 +66,7 @@ impl Workflow {
             "--language",
             "c",
             // feature selection
-            "-std=c17",
+            "-std=gnu17",
             "-Wno-c2x-extensions",
         ];
         result.extend(self.flags.iter().map(|flag| flag.as_str()));
