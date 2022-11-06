@@ -44,7 +44,7 @@ pub enum Instruction {
     },
     // compare
     Compare {
-        bits: usize,
+        bits: Option<usize>, // some for bitvec and none for pointer
         predicate: ComparePredicate,
         lhs: Value,
         rhs: Value,
@@ -490,10 +490,11 @@ impl<'a> Context<'a> {
                 };
                 let operand_ty = self.typing.convert(operand_type)?;
                 let bits = match &operand_ty {
-                    Type::Bitvec { bits } => *bits,
+                    Type::Bitvec { bits } => Some(*bits),
+                    Type::Pointer => None,
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "compare inst has non-bitvec instruction type".into(),
+                            "compare inst has operand type that is neither bitvec or ptr".into(),
                         ));
                     }
                 };

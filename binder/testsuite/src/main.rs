@@ -36,7 +36,12 @@ struct Args {
     path_llvm_test_suite: Option<PathBuf>,
 
     /// Partial identifier of the test
-    filter: Option<String>,
+    #[structopt(short, long)]
+    include: Option<String>,
+
+    /// Partial identifier of the test
+    #[structopt(short, long)]
+    exclude: Option<String>,
 
     /// Keep the workflow artifacts in the studio
     #[structopt(short, long)]
@@ -53,7 +58,8 @@ fn main() -> Result<()> {
         studio,
         verbose,
         path_llvm_test_suite,
-        filter,
+        include,
+        exclude,
         keep,
         output,
     } = args;
@@ -76,7 +82,12 @@ fn main() -> Result<()> {
     // collect test cases
     let path_llvm_test_suite =
         path_llvm_test_suite.unwrap_or_else(|| PathBuf::from(PATH_LLVM_TEST_SUITE));
-    let test_cases = collect_test_cases(&path_llvm_test_suite, filter.as_deref(), &do_not_test)?;
+    let test_cases = collect_test_cases(
+        &path_llvm_test_suite,
+        include.as_deref(),
+        exclude.as_deref(),
+        &do_not_test,
+    )?;
     let total_num = test_cases.len();
     info!("number of tests: {}", total_num);
 
@@ -149,7 +160,8 @@ struct TestCase {
 
 fn collect_test_cases(
     path_llvm_test_suite: &Path,
-    filter: Option<&str>,
+    include: Option<&str>,
+    exclude: Option<&str>,
     do_not_test: &BTreeSet<&str>,
 ) -> Result<Vec<TestCase>> {
     let mut tests = vec![];
@@ -164,10 +176,16 @@ fn collect_test_cases(
         // TODO: handle C++ cases
 
         // filter the test
-        let ignored = filter.map_or(false, |pattern| {
+        let should_include = include.map_or(true, |pattern| {
             path.as_os_str().to_string_lossy().contains(pattern)
         });
-        if ignored {
+        if !should_include {
+            continue;
+        }
+        let should_exclude = exclude.map_or(false, |pattern| {
+            path.as_os_str().to_string_lossy().contains(pattern)
+        });
+        if should_exclude {
             continue;
         }
 

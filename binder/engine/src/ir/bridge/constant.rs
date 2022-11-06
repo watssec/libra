@@ -294,7 +294,7 @@ pub enum Expression {
     },
     // comparison
     Compare {
-        bits: usize,
+        bits: Option<usize>, // some for bitvec and none for pointer
         predicate: ComparePredicate,
         lhs: Constant,
         rhs: Constant,

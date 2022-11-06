@@ -9,3 +9,11 @@ void test(void) {
   _Bool i_s_eq = i_s == 5;
   _Bool i_s_ne = i_s != 6;
 }
+
+void cmp_ptr(void) {
+  int i = 2;
+  void *ptr_i = &i;
+  if (ptr_i) {
+    i = 3;
+  }
+}
