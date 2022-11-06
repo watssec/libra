@@ -25,7 +25,7 @@ pub struct Block {
 pub enum Edge {
     Goto,
     Branch(bool),
-    Switch(Option<u64>),
+    Switch(BTreeSet<Option<u64>>),
 }
 
 /// An adapted representation of an LLVM control-flow graph
@@ -150,25 +150,43 @@ impl ControlFlowGraph {
                     default,
                 } => {
                     for (case_id, case_block) in cases {
-                        if edges
-                            .insert((label.into(), *case_block), Edge::Switch(Some(*case_id)))
-                            .is_some()
-                        {
-                            return Err(EngineError::InvariantViolation(
-                                "duplicated edge in CFG".into(),
-                            ));
+                        let edge_switch = edges
+                            .entry((label.into(), *case_block))
+                            .or_insert_with(|| Edge::Switch(BTreeSet::new()));
+                        match edge_switch {
+                            Edge::Switch(set) => {
+                                if !set.insert(Some(*case_id)) {
+                                    return Err(EngineError::InvariantViolation(
+                                        "duplicated edge in CFG".into(),
+                                    ));
+                                }
+                            }
+                            Edge::Goto | Edge::Branch(..) => {
+                                return Err(EngineError::InvariantViolation(
+                                    "unexpected edge type for switch statement".into(),
+                                ));
+                            }
                         }
                     }
                     match default {
                         None => (),
                         Some(default_block) => {
-                            if edges
-                                .insert((label.into(), *default_block), Edge::Switch(None))
-                                .is_some()
-                            {
-                                return Err(EngineError::InvariantViolation(
-                                    "duplicated edge in CFG".into(),
-                                ));
+                            let edge_switch = edges
+                                .entry((label.into(), *default_block))
+                                .or_insert_with(|| Edge::Switch(BTreeSet::new()));
+                            match edge_switch {
+                                Edge::Switch(set) => {
+                                    if !set.insert(None) {
+                                        return Err(EngineError::InvariantViolation(
+                                            "duplicated edge in CFG".into(),
+                                        ));
+                                    }
+                                }
+                                Edge::Goto | Edge::Branch(..) => {
+                                    return Err(EngineError::InvariantViolation(
+                                        "unexpected edge type for switch statement".into(),
+                                    ));
+                                }
                             }
                         }
                     }

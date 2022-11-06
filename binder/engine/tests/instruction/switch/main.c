@@ -29,3 +29,16 @@ void bar(char v) {
     break;
   }
 }
+
+void baz(char v) {
+  int a;
+  switch (v) {
+  default:
+    a = 0;
+  case 0:
+  case 1:
+  case 2:
+    a = 1;
+    break;
+  }
+}
