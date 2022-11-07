@@ -627,11 +627,14 @@ impl<'a> Context<'a> {
                 let offset = indices.first().unwrap();
                 let offset_new = match offset {
                     // TODO: very hacky treatment, as the first index of a GEP
-                    // might be an `i32 0` instead of an `i64 0`.
+                    // might be an `i32` instead of an `i64`.
                     adapter::value::Value::Constant(adapter::constant::Constant {
                         ty: AdaptedType::Int { width: 32 },
-                        repr: adapter::constant::Const::Int { value: 0 },
-                    }) => Value::Constant(Constant::Bitvec { bits: 64, value: 0 }),
+                        repr: adapter::constant::Const::Int { value: v },
+                    }) => Value::Constant(Constant::Bitvec {
+                        bits: 64,
+                        value: *v,
+                    }),
                     _ => self.parse_value(offset, &Type::Bitvec { bits: 64 })?,
                 };
 
