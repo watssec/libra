@@ -13,6 +13,16 @@ pub enum Value {
     Instruction { ty: Type, index: usize },
 }
 
+impl Value {
+    pub fn get_type(&self) -> &Type {
+        match self {
+            Self::Constant(constant) => &constant.ty,
+            Self::Argument { ty, .. } => ty,
+            Self::Instruction { ty, .. } => ty,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct InlineAsm {
     pub asm: String,
