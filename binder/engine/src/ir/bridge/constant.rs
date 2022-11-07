@@ -25,6 +25,10 @@ pub enum Constant {
     Variable { name: Identifier },
     /// Function
     Function { name: Identifier },
+    /// Undefined bitvec
+    UndefBitvec { bits: usize },
+    /// Undefined pointer
+    UndefPointer,
     /// Expression
     Expr(Box<Expression>),
 }
@@ -62,6 +66,39 @@ impl Constant {
                 )));
             }
             Type::Pointer => Self::Null,
+        };
+        Ok(value)
+    }
+
+    fn undef_from_type(ty: &Type) -> EngineResult<Self> {
+        let value = match ty {
+            Type::Bitvec { bits } => Self::UndefBitvec { bits: *bits },
+            Type::Array { element, length } => {
+                let elements = (0..*length)
+                    .map(|_| Self::undef_from_type(element))
+                    .collect::<EngineResult<_>>()?;
+                Self::Array {
+                    sub: element.as_ref().clone(),
+                    elements,
+                }
+            }
+            Type::Struct { name, fields } => {
+                let defaults = fields
+                    .iter()
+                    .map(Self::undef_from_type)
+                    .collect::<EngineResult<_>>()?;
+                Self::Struct {
+                    name: name.clone(),
+                    fields: defaults,
+                }
+            }
+            Type::Function { .. } => {
+                return Err(EngineError::InvariantViolation(format!(
+                    "trying to create undef-body for a function type: {}",
+                    ty
+                )));
+            }
+            Type::Pointer => Self::UndefPointer,
         };
         Ok(value)
     }
@@ -126,10 +163,8 @@ impl Constant {
                 )));
             }
             AdaptedConst::Undef => {
-                return Err(EngineError::InvalidAssumption(format!(
-                    "unexpected constant undef for type: {}",
-                    expected_type
-                )));
+                check_type(ty)?;
+                Self::undef_from_type(expected_type)?
             }
             AdaptedConst::Default => {
                 check_type(ty)?;
