@@ -10,7 +10,12 @@ mod flow;
 mod ir;
 
 /// Main entrypoint
-pub fn analyze(flags: Vec<String>, inputs: Vec<PathBuf>, output: PathBuf) -> EngineResult<()> {
+pub fn analyze(
+    depth: Option<usize>,
+    flags: Vec<String>,
+    inputs: Vec<PathBuf>,
+    output: PathBuf,
+) -> EngineResult<()> {
     let flow = Workflow::new(flags, inputs, output);
-    flow.execute(Some(0))
+    flow.execute(depth)
 }

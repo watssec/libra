@@ -32,6 +32,10 @@ struct Args {
     #[structopt(short, long)]
     flags: Vec<String>,
 
+    /// Limit the depth of fixedpoint optimization
+    #[structopt(short, long)]
+    depth: Option<usize>,
+
     /// Keep the workflow artifacts in the studio
     #[structopt(short, long)]
     keep: bool,
@@ -44,6 +48,7 @@ fn main() -> Result<()> {
         verbose,
         inputs,
         flags,
+        depth,
         keep,
     } = args;
     let studio = studio.as_ref().unwrap_or(&PATH_STUDIO);
@@ -66,7 +71,7 @@ fn main() -> Result<()> {
     };
 
     // run the analysis
-    match analyze(flags, inputs, output) {
+    match analyze(depth, flags, inputs, output) {
         Ok(_) => (),
         Err(err) => {
             println!("{}", err);

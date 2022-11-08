@@ -99,7 +99,7 @@ fn main() -> Result<()> {
     for TestCase { name, inputs } in test_cases {
         debug!("running: {}", name);
         let temp = tempdir().expect("unable to create a temporary directory");
-        match analyze(vec![], inputs, temp.path().to_path_buf()) {
+        match analyze(None, vec![], inputs, temp.path().to_path_buf()) {
             Ok(_) => {
                 result_pass.push(name);
             }

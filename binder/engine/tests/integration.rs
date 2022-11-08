@@ -66,6 +66,7 @@ fn run_test(path_output: &Path) -> Result<()> {
     // create output dir
     let temp = tempdir().expect("unable to create a temporary directory");
     let success = match analyze(
+        None,
         vec![
             // do not include standard items
             "-nostdinc".into(),
