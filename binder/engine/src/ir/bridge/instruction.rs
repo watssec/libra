@@ -279,6 +279,16 @@ impl<'a> Context<'a> {
         Ok(converted)
     }
 
+    /// convert a value in either bv32 or bv64
+    pub fn parse_value_bv32_or_bv64(&self, val: &adapter::value::Value) -> EngineResult<Value> {
+        match val.get_type() {
+            adapter::typing::Type::Int { width: 32 } => {
+                self.parse_value(val, &Type::Bitvec { bits: 32 })
+            }
+            _ => self.parse_value(val, &Type::Bitvec { bits: 64 }),
+        }
+    }
+
     /// convert an instruction
     pub fn parse_instruction(
         &self,
@@ -625,13 +635,7 @@ impl<'a> Context<'a> {
                 }
 
                 let offset = indices.first().unwrap();
-                // TODO: very hacky treatment, as the first index of a GEP might be either `i32` or `i64`
-                let offset_new = match offset.get_type() {
-                    AdaptedType::Int { width: 32 } => {
-                        self.parse_value(offset, &Type::Bitvec { bits: 32 })?
-                    }
-                    _ => self.parse_value(offset, &Type::Bitvec { bits: 64 })?,
-                };
+                let offset_new = self.parse_value_bv32_or_bv64(offset)?;
 
                 let mut cur_ty = &src_ty;
                 let mut indices_new = vec![];
@@ -659,7 +663,7 @@ impl<'a> Context<'a> {
                             fields.get(field_offset).unwrap()
                         }
                         Type::Array { element, length: _ } => {
-                            let idx_new = self.parse_value(idx, &Type::Bitvec { bits: 64 })?;
+                            let idx_new = self.parse_value_bv32_or_bv64(idx)?;
                             indices_new.push(idx_new);
                             element.as_ref()
                         }
