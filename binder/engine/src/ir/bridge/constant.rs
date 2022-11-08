@@ -117,7 +117,7 @@ impl Constant {
                 if expected_type == &actual_type {
                     Ok(())
                 } else {
-                    Err(EngineError::LLVMLoadingError(format!(
+                    Err(EngineError::InvalidAssumption(format!(
                         "type mismatch: expect {}, found {}",
                         expected_type, actual_type
                     )))

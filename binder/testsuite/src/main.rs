@@ -113,6 +113,11 @@ fn main() -> Result<()> {
                 error!("{}", err);
                 result_fail.push(name);
 
+                // ignore the serialization errors
+                if matches!(err, EngineError::LLVMLoadingError(_)) {
+                    continue;
+                }
+
                 // save the result if requested
                 if keep {
                     let path_artifact = studio.join("testing");
