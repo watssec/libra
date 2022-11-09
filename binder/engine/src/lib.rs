@@ -15,7 +15,7 @@ pub fn analyze(
     flags: Vec<String>,
     inputs: Vec<PathBuf>,
     output: PathBuf,
-) -> EngineResult<()> {
+) -> EngineResult<Vec<ir::bridge::module::Module>> {
     let flow = Workflow::new(flags, inputs, output);
     flow.execute(depth)
 }

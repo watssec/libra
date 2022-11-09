@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -92,7 +92,7 @@ fn main() -> Result<()> {
     info!("number of tests: {}", total_num);
 
     // run the tests one by one
-    let mut result_pass = vec![];
+    let mut result_pass = BTreeMap::new();
     let mut result_fail = vec![];
     let mut result_unsupported = vec![];
     let mut result_uncompilable = vec![];
@@ -100,8 +100,10 @@ fn main() -> Result<()> {
         debug!("running: {}", name);
         let temp = tempdir().expect("unable to create a temporary directory");
         match analyze(None, vec![], inputs, temp.path().to_path_buf()) {
-            Ok(_) => {
-                result_pass.push(name);
+            Ok(trace) => {
+                result_pass
+                    .insert(name, trace.len())
+                    .expect("unique names for each test");
             }
             Err(EngineError::NotSupportedYet(_)) => {
                 result_unsupported.push(name);
@@ -148,8 +150,8 @@ fn main() -> Result<()> {
         None => (),
         Some(path) => {
             let mut content = vec![];
-            for name in result_pass {
-                content.push(name);
+            for (name, rounds) in result_pass {
+                content.push(format!("{}:{}", name, rounds));
             }
             fs::write(&path, content.join("\n"))?;
         }

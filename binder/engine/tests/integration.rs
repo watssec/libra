@@ -8,7 +8,6 @@ use fs_extra::dir::CopyOptions;
 use tempfile::tempdir;
 
 use libra_engine::analyze;
-use libra_shared::logging;
 
 #[derive(Copy, Clone)]
 enum Verbosity {
@@ -28,16 +27,6 @@ fn run_test(path_output: &Path) -> Result<()> {
             2 => Verbosity::Verbose,
             _ => Verbosity::Extensive,
         });
-
-    match verbosity {
-        Verbosity::None => (),
-        Verbosity::Normal => {
-            logging::setup(false)?;
-        }
-        Verbosity::Verbose | Verbosity::Extensive => {
-            logging::setup(true)?;
-        }
-    }
 
     // load the expected result
     let expected = fs::read_to_string(path_output)
@@ -75,8 +64,11 @@ fn run_test(path_output: &Path) -> Result<()> {
         inputs,
         temp.path().to_path_buf(),
     ) {
-        Ok(_) => {
+        Ok(trace) => {
             if expected.is_empty() {
+                if matches!(verbosity, Verbosity::Verbose | Verbosity::Extensive) {
+                    println!("Number of optimization rounds: {}", trace.len());
+                }
                 true
             } else {
                 println!(

@@ -60,7 +60,7 @@ impl Workflow {
             // output llvm bitcode
             "-c",
             "-emit-llvm",
-            // attack debug symbol
+            // attach debug symbol
             "-g",
             // targeting the C language
             "--language",
@@ -68,12 +68,15 @@ impl Workflow {
             // feature selection
             "-std=gnu17",
             "-Wno-c2x-extensions",
+            // allow subsequent optimizations
+            "-Xclang",
+            "-disable-O0-optnone",
         ];
         result.extend(self.flags.iter().map(|flag| flag.as_str()));
         result
     }
 
-    pub fn execute(&self, depth: Option<usize>) -> EngineResult<()> {
+    pub fn execute(&self, depth: Option<usize>) -> EngineResult<Vec<bridge::module::Module>> {
         // compilation
         let mut init_bc_files = vec![];
         for (i, src) in self.inputs.iter().enumerate() {
@@ -137,8 +140,9 @@ impl Workflow {
             history.push((this_path, optimized));
         }
 
-        // TODO: analysis
-        Ok(())
+        // return the full optimization trace
+        let trace = history.into_iter().map(|(_, m)| m).collect();
+        Ok(trace)
     }
 
     fn disassemble(&self, input: &Path) -> Result<()> {

@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
+use log::info;
 use structopt::StructOpt;
 use tempfile::tempdir;
 
@@ -72,7 +73,9 @@ fn main() -> Result<()> {
 
     // run the analysis
     match analyze(depth, flags, inputs, output) {
-        Ok(_) => (),
+        Ok(trace) => {
+            info!("Number of optimization rounds: {}", trace.len());
+        }
         Err(err) => {
             println!("{}", err);
         }
