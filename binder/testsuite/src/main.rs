@@ -100,11 +100,12 @@ fn main() -> Result<()> {
         debug!("running: {}", name);
         let temp = tempdir().expect("unable to create a temporary directory");
         match analyze(None, vec![], inputs, temp.path().to_path_buf()) {
-            Ok(trace) => {
-                result_pass
-                    .insert(name, trace.len())
-                    .expect("unique names for each test");
-            }
+            Ok(trace) => match result_pass.insert(name, trace.len()) {
+                None => (),
+                Some(_) => {
+                    panic!("unique names for each test");
+                }
+            },
             Err(EngineError::NotSupportedYet(_)) => {
                 result_unsupported.push(name);
             }
