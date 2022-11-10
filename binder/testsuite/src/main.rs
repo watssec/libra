@@ -43,6 +43,10 @@ struct Args {
     #[structopt(short, long)]
     exclude: Option<String>,
 
+    /// Depth of fixedpoint optimization
+    #[structopt(short, long, default_value = "4")]
+    depth: usize,
+
     /// Keep the workflow artifacts in the studio
     #[structopt(short, long)]
     keep: bool,
@@ -60,6 +64,7 @@ fn main() -> Result<()> {
         path_llvm_test_suite,
         include,
         exclude,
+        depth,
         keep,
         output,
     } = args;
@@ -99,7 +104,7 @@ fn main() -> Result<()> {
     for TestCase { name, inputs } in test_cases {
         debug!("running: {}", name);
         let temp = tempdir().expect("unable to create a temporary directory");
-        match analyze(None, vec![], inputs, temp.path().to_path_buf()) {
+        match analyze(Some(depth), vec![], inputs, temp.path().to_path_buf()) {
             Ok(trace) => match result_pass.insert(name, trace.len()) {
                 None => (),
                 Some(_) => {

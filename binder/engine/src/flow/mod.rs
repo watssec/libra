@@ -4,6 +4,7 @@ use std::process::Command;
 use std::{env, fs};
 
 use anyhow::{bail, Result};
+use log::debug;
 
 use crate::error::{EngineError, EngineResult};
 use crate::ir::{adapter, bridge};
@@ -99,6 +100,7 @@ impl Workflow {
             })?;
         self.disassemble(&merged_bc_path)
             .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+        debug!("[0] compilation done");
 
         // baseline loading
         let mut history = vec![];
@@ -107,6 +109,7 @@ impl Workflow {
         })?;
         let baseline = self.deserialize(0)?;
         history.push((merged_bc_path, baseline));
+        debug!("[0] baseline recorded");
 
         // optimization until a fixedpoint
         loop {
@@ -126,12 +129,14 @@ impl Workflow {
                 })?;
             self.disassemble(&this_path)
                 .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+            debug!("[{}] optimization done", step);
 
             // loading
             self.serialize(&this_path, step).map_err(|e| {
                 EngineError::LLVMLoadingError(format!("Error during serialization: {}", e))
             })?;
             let optimized = self.deserialize(step)?;
+            debug!("[{}] module recorded", step);
 
             // check for fixedpoint
             if last_ir == &optimized {
@@ -139,6 +144,7 @@ impl Workflow {
             }
             history.push((this_path, optimized));
         }
+        debug!("[{}] fixedpoint optimization done", history.len());
 
         // return the full optimization trace
         let trace = history.into_iter().map(|(_, m)| m).collect();
