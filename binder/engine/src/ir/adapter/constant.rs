@@ -11,6 +11,7 @@ pub enum Const {
     Null,
     None,
     Undef,
+    PC,
     Default,
     Array { elements: Vec<Constant> },
     Vector { elements: Vec<Constant> },

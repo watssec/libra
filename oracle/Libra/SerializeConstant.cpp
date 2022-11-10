@@ -46,9 +46,7 @@ json::Object serialize_const(const Constant &val) {
   json::Object result;
 
   // early filtering
-  if (isa<BlockAddress>(val)) {
-    LOG->fatal("serializing a block address as constant");
-  } else if (isa<DSOLocalEquivalent>(val)) {
+  if (isa<DSOLocalEquivalent>(val)) {
     LOG->fatal("serializing a dso_local marker");
   } else if (isa<NoCFIValue>(val)) {
     LOG->fatal("serializing a no-CFI marker");
@@ -66,6 +64,8 @@ json::Object serialize_const(const Constant &val) {
       result["None"] = json::Value(nullptr);
     } else if (isa<UndefValue>(val)) {
       result["Undef"] = json::Value(nullptr);
+    } else if (isa<BlockAddress>(val)) {
+      result["PC"] = json::Value(nullptr);
     } else if (isa<ConstantAggregateZero>(val)) {
       result["Default"] = json::Value(nullptr);
     } else if (isa<ConstantDataArray>(val)) {

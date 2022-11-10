@@ -166,6 +166,9 @@ impl Constant {
                 check_type(ty)?;
                 Self::undef_from_type(expected_type)?
             }
+            AdaptedConst::PC => {
+                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+            }
             AdaptedConst::Default => {
                 check_type(ty)?;
                 Self::default_from_type(expected_type)?

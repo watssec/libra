@@ -618,9 +618,9 @@ impl<'a> Context<'a> {
                     }
                     Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
                     _ => {
-                        return Err(EngineError::InvalidAssumption(format!(
-                            "freeze instruction only allowed on undef"
-                        )));
+                        return Err(EngineError::InvalidAssumption(
+                            "freeze instruction only allowed on undef".into(),
+                        ));
                     }
                 }
             }
