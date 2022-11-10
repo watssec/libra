@@ -146,7 +146,7 @@ fn main() -> Result<()> {
         };
     }
 
-    info!("Total: {}", total_num);
+    info!("total: {}", total_num);
     info!("passed: {}", result_pass.len());
     info!("failed: {}", result_fail.len());
     info!("unsupported: {}", result_unsupported.len());
