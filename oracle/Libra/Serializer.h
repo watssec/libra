@@ -99,6 +99,8 @@ public:
   [[nodiscard]] json::Object serialize_inst_compare(const CmpInst &inst) const;
   [[nodiscard]] json::Object serialize_inst_cast(const CastInst &inst) const;
   [[nodiscard]] json::Object
+  serialize_inst_freeze(const FreezeInst &inst) const;
+  [[nodiscard]] json::Object
   serialize_inst_gep(const GetElementPtrInst &inst) const;
   [[nodiscard]] json::Object serialize_inst_phi(const PHINode &inst) const;
   [[nodiscard]] json::Object serialize_inst_ite(const SelectInst &inst) const;

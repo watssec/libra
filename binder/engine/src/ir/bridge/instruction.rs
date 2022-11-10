@@ -71,6 +71,11 @@ pub enum Instruction {
         operand: Value,
         result: RegisterSlot,
     },
+    // freeze
+    FreezePtr,
+    FreezeBitvec {
+        bits: usize,
+    },
     // GEP
     GEP {
         src_pointee_type: Type,
@@ -603,6 +608,22 @@ impl<'a> Context<'a> {
                     }
                 }
             }
+            // freeze
+            AdaptedInst::Freeze { operand } => {
+                let inst_ty = self.typing.convert(ty)?;
+                let operand_new = self.parse_value(operand, &inst_ty)?;
+                match operand_new {
+                    Value::Constant(Constant::UndefBitvec { bits }) => {
+                        Instruction::FreezeBitvec { bits }
+                    }
+                    Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(format!(
+                            "freeze instruction only allowed on undef"
+                        )));
+                    }
+                }
+            }
             // GEP
             AdaptedInst::GEP {
                 src_pointee_ty,
@@ -999,6 +1020,7 @@ impl<'a> Context<'a> {
             | AdaptedInst::Binary { .. }
             | AdaptedInst::Compare { .. }
             | AdaptedInst::Cast { .. }
+            | AdaptedInst::Freeze { .. }
             | AdaptedInst::GEP { .. }
             | AdaptedInst::ITE { .. }
             | AdaptedInst::Phi { .. }

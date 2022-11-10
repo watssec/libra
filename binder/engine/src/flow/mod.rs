@@ -69,6 +69,8 @@ impl Workflow {
             // feature selection
             "-std=gnu17",
             "-Wno-c2x-extensions",
+            // disable unsupported features
+            "-fno-vectorize",
             // allow subsequent optimizations
             "-Xclang",
             "-disable-O0-optnone",

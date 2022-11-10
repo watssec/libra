@@ -72,6 +72,10 @@ pub enum Inst {
         dst_ty: Type,
         operand: Value,
     },
+    // freeze
+    Freeze {
+        operand: Value,
+    },
     // GEP
     GEP {
         src_pointee_ty: Type,

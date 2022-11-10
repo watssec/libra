@@ -54,6 +54,8 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["Compare"] = serialize_inst_compare(cast<CmpInst>(inst));
   } else if (isa<CastInst>(inst)) {
     result["Cast"] = serialize_inst_cast(cast<CastInst>(inst));
+  } else if (isa<FreezeInst>(inst)) {
+    result["Freeze"] = serialize_inst_freeze(cast<FreezeInst>(inst));
   }
 
   // pointer arithmetic
@@ -505,6 +507,13 @@ FunctionSerializationContext::serialize_inst_cast(const CastInst &inst) const {
 
   result["src_ty"] = serialize_type(*inst.getSrcTy());
   result["dst_ty"] = serialize_type(*inst.getDestTy());
+  result["operand"] = serialize_value(*inst.getOperand(0));
+  return result;
+}
+
+[[nodiscard]] json::Object FunctionSerializationContext::serialize_inst_freeze(
+    const FreezeInst &inst) const {
+  json::Object result;
   result["operand"] = serialize_value(*inst.getOperand(0));
   return result;
 }
