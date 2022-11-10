@@ -147,6 +147,10 @@ impl Workflow {
             history.push((this_path, optimized));
         }
         debug!("[{}] fixedpoint optimization done", history.len());
+        // TODO: remove it
+        if !history.is_empty() {
+            return Err(EngineError::Fixedpoint(history.len() - 1));
+        }
 
         // return the full optimization trace
         let trace = history.into_iter().map(|(_, m)| m).collect();
