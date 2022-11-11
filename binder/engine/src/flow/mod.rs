@@ -125,10 +125,8 @@ impl Workflow {
 
             // optimization
             let this_path = self.get_stepwise_bc_path(step);
-            self.run_opt(last_path, Some(&this_path), ["-O2"])
-                .map_err(|e| {
-                    EngineError::CompilationError(format!("Error during opt -O2: {}", e))
-                })?;
+            self.run_opt(last_path, Some(&this_path), ["--passes=default<O3>"])
+                .map_err(|e| EngineError::CompilationError(format!("Error during opt: {}", e)))?;
             self.disassemble(&this_path)
                 .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
             debug!("[{}] optimization done", step);
