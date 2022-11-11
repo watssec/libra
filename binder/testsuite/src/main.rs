@@ -10,11 +10,8 @@ use tempfile::tempdir;
 use walkdir::WalkDir;
 
 use libra_engine::{analyze, EngineError};
-use libra_shared::config::PATH_STUDIO;
+use libra_shared::config::{PATH_ROOT, PATH_STUDIO};
 use libra_shared::logging;
-
-// TODO: get this from env!
-static PATH_LLVM_TEST_SUITE: &str = "/home/mengxu/Research/llvm-test-suite";
 
 #[derive(StructOpt)]
 #[structopt(
@@ -86,7 +83,7 @@ fn main() -> Result<()> {
 
     // collect test cases
     let path_llvm_test_suite =
-        path_llvm_test_suite.unwrap_or_else(|| PathBuf::from(PATH_LLVM_TEST_SUITE));
+        path_llvm_test_suite.unwrap_or_else(|| PATH_ROOT.join("deps").join("llvm-test-suite"));
     let test_cases = collect_test_cases(
         &path_llvm_test_suite,
         include.as_deref(),
@@ -120,11 +117,6 @@ fn main() -> Result<()> {
             Err(err) => {
                 error!("{}", err);
                 result_fail.push(name);
-
-                // ignore the serialization errors
-                if matches!(err, EngineError::LLVMLoadingError(_)) {
-                    continue;
-                }
 
                 // save the result if requested
                 if keep {
