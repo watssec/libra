@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Result};
 use fs_extra::dir::CopyOptions;
 use log::{debug, error, info};
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use structopt::StructOpt;
 use tempfile::tempdir;
 use walkdir::WalkDir;
@@ -91,54 +92,55 @@ fn main() -> Result<()> {
         &do_not_test,
     )?;
     let total_num = test_cases.len();
-    info!("number of tests: {}", total_num);
+    info!("total number of tests: {}", total_num);
 
-    // run the tests one by one
-    let mut result_pass = BTreeMap::new();
-    let mut result_fail = vec![];
-    let mut result_unsupported = vec![];
-    let mut result_uncompilable = vec![];
-    for TestCase { name, inputs } in test_cases {
-        debug!("running: {}", name);
-        let temp = tempdir().expect("unable to create a temporary directory");
-        match analyze(Some(depth), vec![], inputs, temp.path().to_path_buf()) {
-            Ok(trace) => match result_pass.insert(name, trace.len()) {
-                None => (),
-                Some(_) => {
-                    panic!("unique names for each test");
-                }
-            },
-            Err(EngineError::NotSupportedYet(_)) => {
-                result_unsupported.push(name);
-            }
-            Err(EngineError::CompilationError(_)) => {
-                result_uncompilable.push(name);
-            }
-            Err(err) => {
-                error!("{}", err);
-                result_fail.push(name);
+    // run the tests sequentially if in keep (i.e., development) mode
+    if keep {
+        // prepare the artifact keeping path
+        let path_artifact = studio.join("testing");
+        if path_artifact.exists() {
+            fs::remove_dir_all(&path_artifact)?;
+        }
 
-                // save the result if requested
-                if keep {
-                    let path_artifact = studio.join("testing");
-                    if path_artifact.exists() {
-                        fs::remove_dir_all(&path_artifact)?;
-                    }
-                    fs::create_dir(&path_artifact)?;
-                    let options = CopyOptions {
-                        content_only: true,
-                        ..Default::default()
-                    };
-                    fs_extra::dir::copy(temp.path(), &path_artifact, &options)?;
+        // run over test cases one by one
+        for TestCase { name, inputs } in test_cases {
+            debug!("running: {}", name);
 
-                    // shortcut the testing in debugging mode
+            match run_test_case(depth, inputs, Some(&path_artifact)) {
+                TestResult::Pass(_) | TestResult::Unsupported | TestResult::Uncompilable => (),
+                TestResult::Fail(err) => {
+                    error!("{}", err);
                     bail!("unexpected analysis error");
                 }
             }
-        };
+        }
+
+        info!("all tests complete gracefully");
+        return Ok(());
     }
 
-    info!("total: {}", total_num);
+    // run the tests in parallel
+    let results: BTreeMap<_, _> = test_cases
+        .into_par_iter()
+        .map(|TestCase { name, inputs }| (name, run_test_case(depth, inputs, None)))
+        .collect();
+    assert_eq!(results.len(), total_num);
+
+    // split the results
+    let mut result_pass = vec![];
+    let mut result_fail = vec![];
+    let mut result_unsupported = vec![];
+    let mut result_uncompilable = vec![];
+
+    for (name, result) in results {
+        match result {
+            TestResult::Pass(length) => result_pass.push((name, length)),
+            TestResult::Unsupported => result_unsupported.push(name),
+            TestResult::Uncompilable => result_uncompilable.push(name),
+            TestResult::Fail(_) => result_fail.push(name),
+        }
+    }
+
     info!("passed: {}", result_pass.len());
     info!("failed: {}", result_fail.len());
     info!("unsupported: {}", result_unsupported.len());
@@ -147,14 +149,25 @@ fn main() -> Result<()> {
     match output {
         None => (),
         Some(path) => {
+            // write passed results
             let mut content = vec![];
             for (name, rounds) in result_pass {
                 content.push(format!("{}:{}", name, rounds));
             }
-            fs::write(&path, content.join("\n"))?;
+            let path_pass = path.with_extension("pass");
+            fs::write(&path_pass, content.join("\n"))?;
+
+            // write failed resultgs
+            content.clear();
+            for name in result_fail {
+                content.push(name);
+            }
+            let path_fail = path.with_extension("fail");
+            fs::write(&path_fail, content.join("\n"))?;
         }
     }
 
+    // done with the testing
     Ok(())
 }
 
@@ -216,4 +229,32 @@ fn collect_test_cases(
 
     // TODO: collect multi-sources
     Ok(tests)
+}
+
+enum TestResult {
+    Pass(usize),
+    Unsupported,
+    Uncompilable,
+    Fail(EngineError),
+}
+
+fn run_test_case(depth: usize, inputs: Vec<PathBuf>, keep: Option<&Path>) -> TestResult {
+    let temp = tempdir().expect("unable to create a temporary directory");
+    match analyze(Some(depth), vec![], inputs, temp.path().to_path_buf()) {
+        Ok(trace) => TestResult::Pass(trace.len()),
+        Err(EngineError::NotSupportedYet(_)) => TestResult::Unsupported,
+        Err(EngineError::CompilationError(_)) => TestResult::Uncompilable,
+        Err(err) => {
+            if let Some(path_artifact) = keep {
+                fs::create_dir(path_artifact).expect("unable to create artifact-keeping directory");
+                let options = CopyOptions {
+                    content_only: true,
+                    ..Default::default()
+                };
+                fs_extra::dir::copy(temp.path(), path_artifact, &options)
+                    .expect("unable to copy artifact");
+            }
+            TestResult::Fail(err)
+        }
+    }
 }

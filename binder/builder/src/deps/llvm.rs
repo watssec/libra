@@ -22,7 +22,7 @@ impl Dependency for DepLLVM {
         cmd.arg("-LAH")
             .arg("-DCMAKE_BUILD_TYPE=Debug")
             .arg(path_src.join("llvm"));
-        cmd.current_dir(&path_build);
+        cmd.current_dir(path_build);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -53,7 +53,7 @@ impl Dependency for DepLLVM {
             .arg("-DBUILD_SHARED_LIBS=On")
             .arg("-DCMAKE_BUILD_TYPE=Debug")
             .arg(path_src.join("llvm"));
-        cmd.current_dir(&path_build);
+        cmd.current_dir(path_build);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -61,7 +61,7 @@ impl Dependency for DepLLVM {
 
         // build
         let mut cmd = Command::new("cmake");
-        cmd.arg("--build").arg(&path_build);
+        cmd.arg("--build").arg(path_build);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Build failed"));
@@ -70,9 +70,9 @@ impl Dependency for DepLLVM {
         // install
         let mut cmd = Command::new("cmake");
         cmd.arg("--install")
-            .arg(&path_build)
+            .arg(path_build)
             .arg("--prefix")
-            .arg(&artifact);
+            .arg(artifact);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Install failed"));

@@ -54,7 +54,7 @@ impl GitRepo {
         let mut cmd = Command::new("git");
         cmd.arg("checkout");
         cmd.arg(&self.commit);
-        cmd.current_dir(&path_src);
+        cmd.current_dir(path_src);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Checkout failed"));
