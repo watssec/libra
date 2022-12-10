@@ -30,6 +30,7 @@ pub enum Edge {
 
 /// An adapted representation of an LLVM control-flow graph
 pub struct ControlFlowGraph {
+    /// the control-flow graph
     graph: DiGraph<Block, Edge>,
     /// block label to index in the graph
     block_label_to_index: BTreeMap<BlockLabel, NodeIndex>,

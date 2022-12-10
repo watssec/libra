@@ -31,8 +31,7 @@ pub enum Instruction {
     Call {
         callee: Value,
         args: Vec<Value>,
-        ret_ty: Option<Type>,
-        result: Option<RegisterSlot>,
+        result: Option<(Type, RegisterSlot)>,
     },
     // binary
     Binary {
@@ -433,8 +432,7 @@ impl<'a> Context<'a> {
                         Instruction::Call {
                             callee: callee_new,
                             args: args_new,
-                            ret_ty,
-                            result: ret.as_ref().map(|_| index.into()),
+                            result: ret_ty.map(|t| (t, index.into())),
                         }
                     }
                     _ => {
