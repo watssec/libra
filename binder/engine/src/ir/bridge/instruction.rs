@@ -231,6 +231,7 @@ impl<'a> Context<'a> {
         &self,
         val: &adapter::value::Value,
         expected_type: &Type,
+        register_types: &mut BTreeMap<RegisterSlot, Type>,
     ) -> EngineResult<Value> {
         use adapter::value::Value as AdaptedValue;
 
@@ -259,8 +260,9 @@ impl<'a> Context<'a> {
                             "argument type mismatch".into(),
                         ));
                     }
+                    let slot = index.into();
                     Value::Argument {
-                        index: index.into(),
+                        index: slot,
                         ty: actual_ty,
                     }
                 }
@@ -277,8 +279,19 @@ impl<'a> Context<'a> {
                         "instruction type mismatch".into(),
                     ));
                 }
+                let slot = index.into();
+                match register_types.insert(slot, actual_ty.clone()) {
+                    None => (),
+                    Some(reg_type) => {
+                        if expected_type != &reg_type {
+                            return Err(EngineError::InvariantViolation(
+                                "register type mismatch".into(),
+                            ));
+                        }
+                    }
+                }
                 Value::Register {
-                    index: index.into(),
+                    index: slot,
                     ty: actual_ty,
                 }
             }
@@ -287,12 +300,16 @@ impl<'a> Context<'a> {
     }
 
     /// convert a value in either bv32 or bv64
-    pub fn parse_value_bv32_or_bv64(&self, val: &adapter::value::Value) -> EngineResult<Value> {
+    pub fn parse_value_bv32_or_bv64(
+        &self,
+        val: &adapter::value::Value,
+        register_types: &mut BTreeMap<RegisterSlot, Type>,
+    ) -> EngineResult<Value> {
         match val.get_type() {
             adapter::typing::Type::Int { width: 32 } => {
-                self.parse_value(val, &Type::Bitvec { bits: 32 })
+                self.parse_value(val, &Type::Bitvec { bits: 32 }, register_types)
             }
-            _ => self.parse_value(val, &Type::Bitvec { bits: 64 }),
+            _ => self.parse_value(val, &Type::Bitvec { bits: 64 }, register_types),
         }
     }
 
@@ -300,6 +317,7 @@ impl<'a> Context<'a> {
     pub fn parse_instruction(
         &self,
         inst: &adapter::instruction::Instruction,
+        register_types: &mut BTreeMap<RegisterSlot, Type>,
     ) -> EngineResult<Instruction> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
@@ -321,7 +339,9 @@ impl<'a> Context<'a> {
                 let base_type = self.typing.convert(allocated_type)?;
                 let size_new = match size.as_ref() {
                     None => None,
-                    Some(val) => Some(self.parse_value(val, &Type::Bitvec { bits: 64 })?),
+                    Some(val) => {
+                        Some(self.parse_value(val, &Type::Bitvec { bits: 64 }, register_types)?)
+                    }
                 };
                 Instruction::Alloca {
                     base_type,
@@ -347,7 +367,7 @@ impl<'a> Context<'a> {
                         "LoadInst mismatch between result type and pointee type".into(),
                     ));
                 }
-                let pointer_new = self.parse_value(pointer, &Type::Pointer)?;
+                let pointer_new = self.parse_value(pointer, &Type::Pointer, register_types)?;
                 Instruction::Load {
                     pointee_type: pointee_type_new,
                     pointer: pointer_new,
@@ -372,8 +392,8 @@ impl<'a> Context<'a> {
                 }
 
                 let pointee_type_new = self.typing.convert(pointee_type)?;
-                let pointer_new = self.parse_value(pointer, &Type::Pointer)?;
-                let value_new = self.parse_value(value, &pointee_type_new)?;
+                let pointer_new = self.parse_value(pointer, &Type::Pointer, register_types)?;
+                let value_new = self.parse_value(value, &pointee_type_new, register_types)?;
                 Instruction::Store {
                     pointee_type: pointee_type_new,
                     pointer: pointer_new,
@@ -410,7 +430,7 @@ impl<'a> Context<'a> {
                         let args_new: Vec<_> = params
                             .iter()
                             .zip(args.iter())
-                            .map(|(t, v)| self.parse_value(v, t))
+                            .map(|(t, v)| self.parse_value(v, t, register_types))
                             .collect::<EngineResult<_>>()?;
                         let ret_ty = match ret {
                             None => {
@@ -431,7 +451,8 @@ impl<'a> Context<'a> {
                                 Some(inst_ty)
                             }
                         };
-                        let callee_new = self.parse_value(callee, &Type::Pointer)?;
+                        let callee_new =
+                            self.parse_value(callee, &Type::Pointer, register_types)?;
                         Instruction::Call {
                             callee: callee_new,
                             args: args_new,
@@ -472,8 +493,8 @@ impl<'a> Context<'a> {
                     }
                 };
                 let opcode_parsed = BinaryOperator::parse(opcode)?;
-                let lhs_new = self.parse_value(lhs, &inst_ty)?;
-                let rhs_new = self.parse_value(rhs, &inst_ty)?;
+                let lhs_new = self.parse_value(lhs, &inst_ty, register_types)?;
+                let rhs_new = self.parse_value(rhs, &inst_ty, register_types)?;
                 Instruction::Binary {
                     bits,
                     opcode: opcode_parsed,
@@ -515,8 +536,8 @@ impl<'a> Context<'a> {
                     }
                 };
                 let predicate_parsed = ComparePredicate::parse(predicate)?;
-                let lhs_new = self.parse_value(lhs, &operand_ty)?;
-                let rhs_new = self.parse_value(rhs, &operand_ty)?;
+                let lhs_new = self.parse_value(lhs, &operand_ty, register_types)?;
+                let rhs_new = self.parse_value(rhs, &operand_ty, register_types)?;
                 Instruction::Compare {
                     bits,
                     predicate: predicate_parsed,
@@ -540,7 +561,7 @@ impl<'a> Context<'a> {
                         "type mismatch between dst type and inst type for cast".into(),
                     ));
                 }
-                let operand_new = self.parse_value(operand, &src_ty_new)?;
+                let operand_new = self.parse_value(operand, &src_ty_new, register_types)?;
                 match opcode.as_str() {
                     "trunc" | "zext" | "sext" => match (src_ty_new, dst_ty_new) {
                         (Type::Bitvec { bits: bits_from }, Type::Bitvec { bits: bits_into }) => {
@@ -612,7 +633,7 @@ impl<'a> Context<'a> {
             // freeze
             AdaptedInst::Freeze { operand } => {
                 let inst_ty = self.typing.convert(ty)?;
-                let operand_new = self.parse_value(operand, &inst_ty)?;
+                let operand_new = self.parse_value(operand, &inst_ty, register_types)?;
                 match operand_new {
                     Value::Constant(Constant::UndefBitvec { bits }) => {
                         Instruction::FreezeBitvec { bits }
@@ -654,14 +675,15 @@ impl<'a> Context<'a> {
                 }
 
                 let offset = indices.first().unwrap();
-                let offset_new = self.parse_value_bv32_or_bv64(offset)?;
+                let offset_new = self.parse_value_bv32_or_bv64(offset, register_types)?;
 
                 let mut cur_ty = &src_ty;
                 let mut indices_new = vec![];
                 for idx in indices.iter().skip(1) {
                     let next_cur_ty = match cur_ty {
                         Type::Struct { name: _, fields } => {
-                            let idx_new = self.parse_value(idx, &Type::Bitvec { bits: 32 })?;
+                            let idx_new =
+                                self.parse_value(idx, &Type::Bitvec { bits: 32 }, register_types)?;
                             let field_offset = match &idx_new {
                                 Value::Constant(Constant::Bitvec {
                                     bits: _,
@@ -682,7 +704,7 @@ impl<'a> Context<'a> {
                             fields.get(field_offset).unwrap()
                         }
                         Type::Array { element, length: _ } => {
-                            let idx_new = self.parse_value_bv32_or_bv64(idx)?;
+                            let idx_new = self.parse_value_bv32_or_bv64(idx, register_types)?;
                             indices_new.push(idx_new);
                             element.as_ref()
                         }
@@ -701,7 +723,7 @@ impl<'a> Context<'a> {
                     ));
                 }
 
-                let pointer_new = self.parse_value(pointer, &Type::Pointer)?;
+                let pointer_new = self.parse_value(pointer, &Type::Pointer, register_types)?;
                 Instruction::GEP {
                     src_pointee_type: src_ty,
                     dst_pointee_type: dst_ty,
@@ -717,10 +739,10 @@ impl<'a> Context<'a> {
                 then_value,
                 else_value,
             } => {
-                let cond_new = self.parse_value(cond, &Type::Bitvec { bits: 1 })?;
+                let cond_new = self.parse_value(cond, &Type::Bitvec { bits: 1 }, register_types)?;
                 let inst_ty = self.typing.convert(ty)?;
-                let then_value_new = self.parse_value(then_value, &inst_ty)?;
-                let else_value_new = self.parse_value(else_value, &inst_ty)?;
+                let then_value_new = self.parse_value(then_value, &inst_ty, register_types)?;
+                let else_value_new = self.parse_value(else_value, &inst_ty, register_types)?;
                 Instruction::ITE {
                     cond: cond_new,
                     then_value: then_value_new,
@@ -737,7 +759,7 @@ impl<'a> Context<'a> {
                             "unknown incoming edge into phi node".into(),
                         ));
                     }
-                    let value_new = self.parse_value(&opt.value, &inst_ty)?;
+                    let value_new = self.parse_value(&opt.value, &inst_ty, register_types)?;
                     let label_new = opt.block.into();
                     match options_new.get(&label_new) {
                         None => (),
@@ -801,7 +823,7 @@ impl<'a> Context<'a> {
                     ));
                 }
 
-                let aggregate_new = self.parse_value(aggregate, &src_ty)?;
+                let aggregate_new = self.parse_value(aggregate, &src_ty, register_types)?;
                 Instruction::GetValue {
                     src_ty,
                     dst_ty,
@@ -845,8 +867,8 @@ impl<'a> Context<'a> {
                 }
                 let dst_ty = cur_ty.clone();
 
-                let aggregate_new = self.parse_value(aggregate, &src_ty)?;
-                let value_new = self.parse_value(value, &dst_ty)?;
+                let aggregate_new = self.parse_value(aggregate, &src_ty, register_types)?;
+                let value_new = self.parse_value(value, &dst_ty, register_types)?;
                 Instruction::SetValue {
                     src_ty,
                     dst_ty,
@@ -883,6 +905,7 @@ impl<'a> Context<'a> {
     pub fn parse_terminator(
         &self,
         inst: &adapter::instruction::Instruction,
+        register_types: &mut BTreeMap<RegisterSlot, Type>,
     ) -> EngineResult<Terminator> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
@@ -903,7 +926,7 @@ impl<'a> Context<'a> {
                     ));
                 }
                 (Some(val), Some(ty)) => {
-                    let converted = self.parse_value(val, ty)?;
+                    let converted = self.parse_value(val, ty, register_types)?;
                     Terminator::Return {
                         val: Some(converted),
                     }
@@ -927,7 +950,8 @@ impl<'a> Context<'a> {
                     }
                 }
                 Some(val) => {
-                    let cond_new = self.parse_value(val, &Type::Bitvec { bits: 1 })?;
+                    let cond_new =
+                        self.parse_value(val, &Type::Bitvec { bits: 1 }, register_types)?;
                     if targets.len() != 2 {
                         return Err(EngineError::InvalidAssumption(
                             "conditinal branch should have exactly two targets".into(),
@@ -965,7 +989,7 @@ impl<'a> Context<'a> {
                         "switch condition must be bitvec".into(),
                     ));
                 }
-                let cond_new = self.parse_value(cond, &cond_ty_new)?;
+                let cond_new = self.parse_value(cond, &cond_ty_new, register_types)?;
 
                 let mut mapping = BTreeMap::new();
                 for case in cases {

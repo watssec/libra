@@ -95,6 +95,7 @@ impl ControlFlowGraph {
             args: arg_labels,
             ret: ret_ty.cloned(),
         };
+        let mut register_types = BTreeMap::new();
 
         // convert block by block
         let mut graph = DiGraph::new();
@@ -110,9 +111,9 @@ impl ControlFlowGraph {
 
             let body_new = body
                 .iter()
-                .map(|inst| ctxt.parse_instruction(inst))
+                .map(|inst| ctxt.parse_instruction(inst, &mut register_types))
                 .collect::<EngineResult<_>>()?;
-            let terminator_new = ctxt.parse_terminator(terminator)?;
+            let terminator_new = ctxt.parse_terminator(terminator, &mut register_types)?;
 
             // collect the edges
             match &terminator_new {
