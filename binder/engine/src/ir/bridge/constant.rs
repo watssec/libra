@@ -295,16 +295,15 @@ impl Constant {
             }
             AdaptedConst::Expr { inst } => {
                 check_type(ty)?;
-                let ctxt = Context {
+                let mut ctxt = Context {
                     typing,
                     symbols,
                     // simulate an environment where there is no function body
                     blocks: BTreeSet::new(),
-                    insts: BTreeSet::new(),
+                    insts: BTreeMap::new(),
                     args: BTreeMap::new(),
                     ret: None,
                 };
-                let mut register_types = BTreeMap::new();
 
                 // create a dummy instruction
                 let fake_inst = adapter::instruction::Instruction {
@@ -312,7 +311,7 @@ impl Constant {
                     index: usize::MAX,
                     repr: inst.as_ref().clone(),
                 };
-                let inst_parsed = ctxt.parse_instruction(&fake_inst, &mut register_types)?;
+                let inst_parsed = ctxt.parse_instruction(&fake_inst)?;
                 let expr_parsed = Expression::from_instruction(inst_parsed)?;
                 Self::Expr(Box::new(expr_parsed))
             }

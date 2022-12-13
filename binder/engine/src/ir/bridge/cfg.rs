@@ -74,20 +74,22 @@ impl ControlFlowGraph {
         }
 
         // construct instruction and its types
-        let mut inst_labels = BTreeSet::new();
+        let mut inst_labels = BTreeMap::new();
         for block in blocks {
             for inst in block.body.iter().chain(std::iter::once(&block.terminator)) {
-                let success = inst_labels.insert(inst.index);
-                if !success {
-                    return Err(EngineError::InvariantViolation(
-                        "duplicated instruction index".into(),
-                    ));
+                match inst_labels.insert(inst.index, None) {
+                    None => (),
+                    Some(_) => {
+                        return Err(EngineError::InvariantViolation(
+                            "duplicated instruction index".into(),
+                        ));
+                    }
                 }
             }
         }
 
         // create the context
-        let ctxt = Context {
+        let mut ctxt = Context {
             typing,
             symbols,
             blocks: block_labels,
@@ -95,7 +97,6 @@ impl ControlFlowGraph {
             args: arg_labels,
             ret: ret_ty.cloned(),
         };
-        let mut register_types = BTreeMap::new();
 
         // convert block by block
         let mut graph = DiGraph::new();
@@ -111,9 +112,9 @@ impl ControlFlowGraph {
 
             let body_new = body
                 .iter()
-                .map(|inst| ctxt.parse_instruction(inst, &mut register_types))
+                .map(|inst| ctxt.parse_instruction(inst))
                 .collect::<EngineResult<_>>()?;
-            let terminator_new = ctxt.parse_terminator(terminator, &mut register_types)?;
+            let terminator_new = ctxt.parse_terminator(terminator)?;
 
             // collect the edges
             match &terminator_new {
