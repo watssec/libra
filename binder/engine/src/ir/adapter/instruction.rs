@@ -117,7 +117,7 @@ pub enum Inst {
     ShuffleVector {
         lhs: Value,
         rhs: Value,
-        mask: Value,
+        mask: Constant,
     },
     // concurrency (TODO: need to support them)
     Fence,

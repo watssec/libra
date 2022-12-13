@@ -609,7 +609,7 @@ json::Object FunctionSerializationContext::serialize_inst_shuffle_vector(
   json::Object result;
   result["lhs"] = serialize_value(*inst.getOperand(0));
   result["rhs"] = serialize_value(*inst.getOperand(1));
-  result["mask"] = serialize_value(*inst.getOperand(2));
+  result["mask"] = serialize_constant(*inst.getShuffleMaskForBitcode());
   return result;
 }
 
