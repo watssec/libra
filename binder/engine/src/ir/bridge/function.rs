@@ -7,7 +7,7 @@ use crate::ir::bridge::typing::{Type, TypeRegistry};
 /// An adapted representation of an LLVM function
 #[derive(Eq, PartialEq)]
 pub struct Function {
-    /// variable name
+    /// function name
     pub name: Identifier,
     /// parameter definitions
     pub params: Vec<(Option<Identifier>, Type)>,
