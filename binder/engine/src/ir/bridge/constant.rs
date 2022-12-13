@@ -530,6 +530,7 @@ impl Expression {
             | Instruction::Call { .. }
             | Instruction::FreezeBitvec { .. }
             | Instruction::FreezePtr
+            | Instruction::FreezeNop { .. }
             | Instruction::Phi { .. } => {
                 return Err(EngineError::InvalidAssumption(
                     "unexpected instruction type for const expr".into(),

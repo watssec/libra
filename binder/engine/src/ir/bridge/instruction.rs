@@ -75,6 +75,9 @@ pub enum Instruction {
     FreezeBitvec {
         bits: usize,
     },
+    FreezeNop {
+        operand: Value,
+    },
     // GEP
     GEP {
         src_pointee_type: Type,
@@ -615,11 +618,8 @@ impl<'a> Context<'a> {
                         Instruction::FreezeBitvec { bits }
                     }
                     Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "freeze instruction only allowed on undef".into(),
-                        ));
-                    }
+                    // TODO(mengxu): freeze instruction should only be possible on undef
+                    v @ _ => Instruction::FreezeNop { operand: v },
                 }
             }
             // GEP
