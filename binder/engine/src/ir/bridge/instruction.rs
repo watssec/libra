@@ -737,12 +737,20 @@ impl<'a> Context<'a> {
                             "unknown incoming edge into phi node".into(),
                         ));
                     }
-                    options_new.insert(opt.block.into(), self.parse_value(&opt.value, &inst_ty)?);
-                }
-                if options_new.len() != options.len() {
-                    return Err(EngineError::InvariantViolation(
-                        "duplicated edges into phi node".into(),
-                    ));
+                    let value_new = self.parse_value(&opt.value, &inst_ty)?;
+                    let label_new = opt.block.into();
+                    match options_new.get(&label_new) {
+                        None => (),
+                        Some(existing) => {
+                            // TODO(mengxu): LLVM IR may contain duplicated entries with the same label/value pair
+                            if existing != &value_new {
+                                return Err(EngineError::InvariantViolation(
+                                    "duplicated edges into phi node with different values".into(),
+                                ));
+                            }
+                        }
+                    }
+                    options_new.insert(label_new, value_new);
                 }
                 Instruction::Phi {
                     ty: inst_ty,
