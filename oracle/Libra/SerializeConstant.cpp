@@ -64,8 +64,6 @@ json::Object serialize_const(const Constant &val) {
       result["None"] = json::Value(nullptr);
     } else if (isa<UndefValue>(val)) {
       result["Undef"] = json::Value(nullptr);
-    } else if (isa<BlockAddress>(val)) {
-      result["PC"] = json::Value(nullptr);
     } else if (isa<ConstantAggregateZero>(val)) {
       result["Default"] = json::Value(nullptr);
     } else if (isa<ConstantDataArray>(val)) {
@@ -77,6 +75,11 @@ json::Object serialize_const(const Constant &val) {
     } else {
       LOG->fatal("unknown constant data: {0}", val);
     }
+  }
+
+  // constant block address
+  else if (isa<BlockAddress>(val)) {
+    result["PC"] = json::Value(nullptr);
   }
 
   // constant aggregate
