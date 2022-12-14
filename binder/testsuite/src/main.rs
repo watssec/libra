@@ -107,7 +107,7 @@ fn main() -> Result<()> {
             debug!("running: {}", name);
 
             match run_test_case(depth, inputs, Some(&path_artifact)) {
-                TestResult::Pass(_) | TestResult::Unsupported | TestResult::Uncompilable => (),
+                TestResult::Pass(_) | TestResult::Unsupported(_) | TestResult::Uncompilable => (),
                 TestResult::Fail(err) => {
                     error!("{}", err);
                     bail!("unexpected analysis error");
@@ -129,13 +129,16 @@ fn main() -> Result<()> {
     // split the results
     let mut result_pass = vec![];
     let mut result_fail = vec![];
-    let mut result_unsupported = vec![];
+    let mut result_unsupported = BTreeMap::new();
     let mut result_uncompilable = vec![];
 
     for (name, result) in results {
         match result {
             TestResult::Pass(length) => result_pass.push((name, length)),
-            TestResult::Unsupported => result_unsupported.push(name),
+            TestResult::Unsupported(reason) => result_unsupported
+                .entry(reason)
+                .or_insert_with(|| vec![])
+                .push(name),
             TestResult::Uncompilable => result_uncompilable.push(name),
             TestResult::Fail(_) => result_fail.push(name),
         }
@@ -143,27 +146,39 @@ fn main() -> Result<()> {
 
     info!("passed: {}", result_pass.len());
     info!("failed: {}", result_fail.len());
-    info!("unsupported: {}", result_unsupported.len());
+    info!(
+        "unsupported: {}",
+        result_unsupported.values().map(|e| e.len()).sum()
+    );
     info!("uncompilable: {}", result_uncompilable.len());
 
     match output {
         None => (),
         Some(path) => {
-            // write passed results
+            // write results
             let mut content = vec![];
+
+            content.push("==== pass ====".into());
             for (name, rounds) in result_pass {
                 content.push(format!("{}:{}", name, rounds));
             }
-            let path_pass = path.with_extension("pass");
-            fs::write(&path_pass, content.join("\n"))?;
-
-            // write failed resultgs
-            content.clear();
+            content.push("==== fail ====".into());
             for name in result_fail {
                 content.push(name);
             }
-            let path_fail = path.with_extension("fail");
-            fs::write(&path_fail, content.join("\n"))?;
+            content.push("==== unsupported ====".into());
+            for (reason, names) in result_unsupported {
+                content.push(format!("---- {} ----", reason));
+                for name in names {
+                    content.push(name);
+                }
+            }
+            content.push("==== uncompilable ====".into());
+            for name in result_uncompilable {
+                content.push(name);
+            }
+
+            fs::write(&path, content.join("\n"))?;
         }
     }
 
@@ -233,7 +248,7 @@ fn collect_test_cases(
 
 enum TestResult {
     Pass(usize),
-    Unsupported,
+    Unsupported(String),
     Uncompilable,
     Fail(EngineError),
 }
@@ -242,7 +257,7 @@ fn run_test_case(depth: usize, inputs: Vec<PathBuf>, keep: Option<&Path>) -> Tes
     let temp = tempdir().expect("unable to create a temporary directory");
     match analyze(Some(depth), vec![], inputs, temp.path().to_path_buf()) {
         Ok(trace) => TestResult::Pass(trace.len()),
-        Err(EngineError::NotSupportedYet(_)) => TestResult::Unsupported,
+        Err(EngineError::NotSupportedYet(reason)) => TestResult::Unsupported(reason.to_string()),
         Err(EngineError::CompilationError(_)) => TestResult::Uncompilable,
         Err(err) => {
             if let Some(path_artifact) = keep {
