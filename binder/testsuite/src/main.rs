@@ -148,7 +148,7 @@ fn main() -> Result<()> {
     info!("failed: {}", result_fail.len());
     info!(
         "unsupported: {}",
-        result_unsupported.values().map(|e| e.len()).sum()
+        result_unsupported.values().map(|e| e.len()).sum::<usize>()
     );
     info!("uncompilable: {}", result_uncompilable.len());
 
