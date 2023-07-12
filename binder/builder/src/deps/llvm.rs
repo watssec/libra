@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 
 #[cfg(target_os = "macos")]
 use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM, UNAME_RELEASE, XCODE_SDK_PATH};
@@ -64,7 +64,9 @@ impl Dependency for DepLLVM {
                     ))
                     .arg(format!("-DDEFAULT_SYSROOT={}", XCODE_SDK_PATH.as_str()));
             }
-            _ => (),
+            _ => {
+                bail!("other macos platforms not supported yet");
+            }
         }
 
         // done with the configuration
