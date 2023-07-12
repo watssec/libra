@@ -22,3 +22,5 @@ lazy_static! {
         path
     };
 }
+
+pub const TMPDIR_IN_STUDIO: &str = "tmp";

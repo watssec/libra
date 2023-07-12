@@ -6,6 +6,8 @@ use log::{info, warn};
 use structopt::StructOpt;
 use tempfile::tempdir;
 
+use libra_shared::config::TMPDIR_IN_STUDIO;
+
 use crate::deps::common::{DepState, Dependency};
 use crate::deps::llvm::DepLLVM;
 
@@ -18,7 +20,7 @@ pub enum DepAction {
     Build {
         /// Temporary directory for the build process
         #[structopt(short, long)]
-        tmpdir: Option<PathBuf>,
+        tmpdir: bool,
 
         /// Run the configuration step instead of build
         #[structopt(short, long)]
@@ -55,23 +57,23 @@ impl DepArgs {
 
         match command {
             DepAction::Build {
-                tmpdir,
+                tmpdir: use_tmpdir,
                 config,
                 force,
             } => {
                 // prepare the tmpdir first
-                let tmpwks = match tmpdir {
-                    None => Ok(tempdir()?),
-                    Some(path) => {
-                        if path.exists() {
-                            if !force {
-                                bail!("Tmpdir {} already exists", path.to_str().unwrap());
-                            }
-                            fs::remove_dir_all(&path)?;
+                let tmpwks = if use_tmpdir {
+                    Ok(tempdir()?)
+                } else {
+                    let path = studio.join(TMPDIR_IN_STUDIO);
+                    if path.exists() {
+                        if !force {
+                            bail!("Tmpdir {} already exists", path.to_str().unwrap());
                         }
-                        fs::create_dir_all(&path)?;
-                        Err(path)
+                        fs::remove_dir_all(&path)?;
                     }
+                    fs::create_dir_all(&path)?;
+                    Err(path)
                 };
                 let tmpdir = match &tmpwks {
                     Ok(dir) => dir.path(),
