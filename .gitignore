@@ -1,2 +1,5 @@
 # artifacts
 /studio/
+
+# MacOS
+.DS_Store
