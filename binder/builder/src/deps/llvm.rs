@@ -3,6 +3,8 @@ use std::process::Command;
 
 use anyhow::{anyhow, Result};
 
+use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM};
+
 use crate::deps::common::Dependency;
 
 // path constants
@@ -33,7 +35,7 @@ impl Dependency for DepLLVM {
     }
 
     fn build(path_src: &Path, path_build: &Path, artifact: &Path) -> Result<()> {
-        // configure
+        // llvm configuration
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
@@ -47,8 +49,19 @@ impl Dependency for DepLLVM {
             ))
             .arg("-DLLVM_ENABLE_RTTI=On")
             .arg("-DBUILD_SHARED_LIBS=On")
-            .arg("-DCMAKE_BUILD_TYPE=Debug")
-            .arg(path_src.join("llvm"));
+            .arg("-DCMAKE_BUILD_TYPE=Debug");
+
+        // platform-specific configuration
+        match (UNAME_PLATFORM.as_str(), UNAME_HARDWARE.as_str()) {
+            ("Darwin", "arm64") => {
+                cmd.arg("-DCMAKE_OSX_ARCHITECTURES=arm64")
+                    .arg("-DLLVM_TARGETS_TO_BUILD=AArch64");
+            }
+            _ => (),
+        }
+
+        // done with the configuration
+        cmd.arg(path_src.join("llvm"));
         cmd.current_dir(path_build);
         let status = cmd.status()?;
         if !status.success() {

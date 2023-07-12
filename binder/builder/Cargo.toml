@@ -13,5 +13,4 @@ num_cpus = "*"
 simplelog = "*"
 structopt = "*"
 tempfile = "*"
-
 libra-shared = { path = "../shared" }
