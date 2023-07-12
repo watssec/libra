@@ -39,15 +39,11 @@ impl Dependency for DepLLVM {
             .arg("Ninja")
             .arg(format!(
                 "-DLLVM_ENABLE_PROJECTS={}",
-                [
-                    "clang",
-                    "clang-tools-extra",
-                    "compiler-rt",
-                    "lld",
-                    "lldb",
-                    "polly"
-                ]
-                .join(";")
+                ["clang", "clang-tools-extra", "lld", "lldb", "polly"].join(";")
+            ))
+            .arg(format!(
+                "-DLLVM_ENABLE_RUNTIMES={}",
+                ["compiler-rt", "libc", "libcxx"].join(";")
             ))
             .arg("-DLLVM_ENABLE_RTTI=On")
             .arg("-DBUILD_SHARED_LIBS=On")
