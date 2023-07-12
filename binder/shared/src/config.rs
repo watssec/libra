@@ -4,12 +4,8 @@ use std::process::Command;
 
 use lazy_static::lazy_static;
 
-// common configurations
+// paths
 lazy_static! {
-    //
-    // paths
-    //
-
     pub static ref DOCERIZED: bool = matches!(env::var("DOCKER"), Ok(val) if val == "1");
     pub static ref PATH_ROOT: PathBuf = {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -26,25 +22,54 @@ lazy_static! {
         }
         path
     };
+}
 
-    //
-    // platform configurations
-    //
+pub const TMPDIR_IN_STUDIO: &str = "tmp";
 
+// platform-specific constants
+#[cfg(target_os = "macos")]
+lazy_static! {
     pub static ref UNAME_HARDWARE: String = {
         let cmd = Command::new("uname").arg("-m").output().expect("uname");
         if !cmd.status.success() || !cmd.stderr.is_empty() {
             panic!("uname");
         }
-        String::from_utf8(cmd.stdout).expect("uname").trim().to_string()
+        String::from_utf8(cmd.stdout)
+            .expect("uname")
+            .trim()
+            .to_string()
     };
     pub static ref UNAME_PLATFORM: String = {
         let cmd = Command::new("uname").arg("-s").output().expect("uname");
         if !cmd.status.success() || !cmd.stderr.is_empty() {
             panic!("uname");
         }
-        String::from_utf8(cmd.stdout).expect("uname").trim().to_string()
+        String::from_utf8(cmd.stdout)
+            .expect("uname")
+            .trim()
+            .to_string()
+    };
+    pub static ref UNAME_RELEASE: String = {
+        let cmd = Command::new("uname").arg("-r").output().expect("uname");
+        if !cmd.status.success() || !cmd.stderr.is_empty() {
+            panic!("uname");
+        }
+        String::from_utf8(cmd.stdout)
+            .expect("uname")
+            .trim()
+            .to_string()
+    };
+    pub static ref XCODE_SDK_PATH: String = {
+        let cmd = Command::new("xcrun")
+            .arg("--show-sdk-path")
+            .output()
+            .expect("xcode");
+        if !cmd.status.success() || !cmd.stderr.is_empty() {
+            panic!("xcode");
+        }
+        String::from_utf8(cmd.stdout)
+            .expect("xcode")
+            .trim()
+            .to_string()
     };
 }
-
-pub const TMPDIR_IN_STUDIO: &str = "tmp";

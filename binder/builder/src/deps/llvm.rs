@@ -3,7 +3,8 @@ use std::process::Command;
 
 use anyhow::{anyhow, Result};
 
-use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM};
+#[cfg(target_os = "macos")]
+use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM, UNAME_RELEASE, XCODE_SDK_PATH};
 
 use crate::deps::common::Dependency;
 
@@ -52,10 +53,16 @@ impl Dependency for DepLLVM {
             .arg("-DCMAKE_BUILD_TYPE=Debug");
 
         // platform-specific configuration
+        #[cfg(target_os = "macos")]
         match (UNAME_PLATFORM.as_str(), UNAME_HARDWARE.as_str()) {
             ("Darwin", "arm64") => {
                 cmd.arg("-DCMAKE_OSX_ARCHITECTURES=arm64")
-                    .arg("-DLLVM_TARGETS_TO_BUILD=AArch64");
+                    .arg("-DLLVM_TARGETS_TO_BUILD=AArch64")
+                    .arg(format!(
+                        "-DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-apple-darwin{}",
+                        UNAME_RELEASE.as_str()
+                    ))
+                    .arg(format!("-DDEFAULT_SYSROOT={}", XCODE_SDK_PATH.as_str()));
             }
             _ => (),
         }
