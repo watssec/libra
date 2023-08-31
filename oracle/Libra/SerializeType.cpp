@@ -77,8 +77,11 @@ json::Object serialize_type(const Type &type) {
   case Type::MetadataTyID:
     result["Metadata"] = json::Value(nullptr);
     break;
-  case Type::DXILPointerTyID:
-    result["Other"] = mk_other("DXIL pointer");
+  case Type::TypedPointerTyID:
+    result["Other"] = mk_other("typed pointer");
+    break;
+  case Type::TargetExtTyID:
+    result["Other"] = mk_other("target extension");
     break;
   }
   return result;
@@ -132,9 +135,6 @@ json::Object serialize_type_function(const FunctionType &type) {
 
 json::Object serialize_type_pointer(const PointerType &type) {
   json::Object result;
-  if (!type.isOpaque()) {
-    result["pointee"] = serialize_type(*type.getNonOpaquePointerElementType());
-  }
   result["address_space"] = type.getAddressSpace();
   return result;
 }

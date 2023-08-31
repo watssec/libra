@@ -6,21 +6,14 @@
 #include <string>
 
 #include <llvm/ADT/SmallString.h>
-#include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/Analysis/AssumptionCache.h>
-#include <llvm/Analysis/BasicAliasAnalysis.h>
-#include <llvm/Analysis/CFLAndersAliasAnalysis.h>
-#include <llvm/Analysis/CFLSteensAliasAnalysis.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/GlobalsModRef.h>
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/Analysis/MemorySSA.h>
 #include <llvm/Analysis/PhiValues.h>
 #include <llvm/Analysis/ScalarEvolution.h>
-#include <llvm/Analysis/ScalarEvolutionAliasAnalysis.h>
-#include <llvm/Analysis/ScopedNoAliasAA.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
-#include <llvm/Analysis/TypeBasedAliasAnalysis.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/InlineAsm.h>
