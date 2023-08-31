@@ -22,7 +22,11 @@ endif ()
 
 # helpers
 function(add_llvm_pass name)
-    add_library(${name} SHARED ${ARGN})
+    add_library(${name} MODULE ${ARGN})
+
+    # Allow undefined symbols in shared objects on Darwin
+    target_link_libraries(${name}
+            "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 endfunction()
 
 # targets
