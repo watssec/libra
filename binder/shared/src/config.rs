@@ -1,8 +1,10 @@
 use std::env;
 use std::path::PathBuf;
-use std::process::Command;
 
 use lazy_static::lazy_static;
+
+#[cfg(target_os = "macos")]
+use std::process::Command;
 
 // paths
 lazy_static! {

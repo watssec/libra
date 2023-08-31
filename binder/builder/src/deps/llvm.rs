@@ -1,12 +1,15 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
+
+use crate::deps::common::Dependency;
+
+#[cfg(target_os = "macos")]
+use anyhow::bail;
 
 #[cfg(target_os = "macos")]
 use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM};
-
-use crate::deps::common::Dependency;
 
 // path constants
 static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];

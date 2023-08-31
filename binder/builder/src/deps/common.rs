@@ -108,13 +108,13 @@ impl<T: Dependency> DepState<T> {
             Self::Package(Package {
                 repo,
                 artifact,
-                _phantom: PhantomData::default(),
+                _phantom: PhantomData,
             })
         } else {
             Self::Scratch(Scratch {
                 repo,
                 artifact,
-                _phantom: PhantomData::default(),
+                _phantom: PhantomData,
             })
         };
 
