@@ -130,7 +130,7 @@ impl<T: Dependency> DepState<T> {
         };
 
         // prepare source code
-        let path_src = tmpdir.join("../../../src");
+        let path_src = tmpdir.join("src");
         repo.checkout(&path_src)?;
 
         // list the build options
