@@ -62,7 +62,7 @@ FunctionSerializationContext::serialize_block(const BasicBlock &block) const {
   json::Object result;
 
   // basics
-  result["label"] = this->get_block(block);
+  result["label"] = get_block(block);
   if (block.hasName()) {
     result["name"] = block.getName();
   }
@@ -80,12 +80,12 @@ FunctionSerializationContext::serialize_block(const BasicBlock &block) const {
     if (is_debug_instruction(inst)) {
       continue;
     }
-    body.push_back(this->serialize_instruction(inst));
+    body.push_back(serialize_instruction(inst));
   }
   result["body"] = std::move(body);
 
   // terminator
-  result["terminator"] = this->serialize_instruction(*term);
+  result["terminator"] = serialize_instruction(*term);
 
   return result;
 }

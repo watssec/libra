@@ -6,12 +6,11 @@ json::Object
 FunctionSerializationContext::serialize_value(const Value &val) const {
   json::Object result;
   if (isa<Argument>(val)) {
-    result["Argument"] = this->serialize_value_argument(cast<Argument>(val));
+    result["Argument"] = serialize_value_argument(cast<Argument>(val));
   } else if (isa<Constant>(val)) {
     result["Constant"] = serialize_constant(cast<Constant>(val));
   } else if (isa<Instruction>(val)) {
-    result["Instruction"] =
-        this->serialize_value_instruction(cast<Instruction>(val));
+    result["Instruction"] = serialize_value_instruction(cast<Instruction>(val));
   } else if (isa<MetadataAsValue>(val)) {
     // TODO: metadata system is not ready
     result["Metadata"] = json::Value(nullptr);
@@ -33,7 +32,7 @@ json::Object FunctionSerializationContext::serialize_value_argument(
     const Argument &arg) const {
   json::Object result;
   result["ty"] = serialize_type(*arg.getType());
-  result["index"] = this->get_argument(arg);
+  result["index"] = get_argument(arg);
   return result;
 }
 
@@ -41,7 +40,7 @@ json::Object FunctionSerializationContext::serialize_value_instruction(
     const Instruction &inst) const {
   json::Object result;
   result["ty"] = serialize_type(*inst.getType());
-  result["index"] = this->get_instruction(inst);
+  result["index"] = get_instruction(inst);
   return result;
 }
 
