@@ -23,6 +23,7 @@ void prepare_for_serialization(Module &module);
 [[nodiscard]] json::Object serialize_type_function(const FunctionType &type);
 [[nodiscard]] json::Object serialize_type_pointer(const PointerType &type);
 [[nodiscard]] json::Object serialize_type_vector(const VectorType &type);
+[[nodiscard]] json::Object serialize_type_extension(const TargetExtType &type);
 
 [[nodiscard]] json::Object serialize_constant(const Constant &val);
 [[nodiscard]] json::Object serialize_const(const Constant &val);

@@ -23,6 +23,9 @@ json::Object serialize_module(const Module &module) {
   }
   result["global_variables"] = std::move(global_vars);
 
+  // TODO: alias
+  // TODO: ifunc
+
   // functions
   json::Array functions;
   for (const auto &func : module.functions()) {

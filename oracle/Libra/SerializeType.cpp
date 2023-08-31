@@ -9,12 +9,6 @@ json::Object mk_float(uint64_t width, const char *name) {
   return result;
 }
 
-json::Object mk_other(const char *name) {
-  json::Object result;
-  result["name"] = name;
-  return result;
-}
-
 } // namespace
 
 namespace libra {
@@ -68,6 +62,9 @@ json::Object serialize_type(const Type &type) {
   case Type::X86_MMXTyID:
     result["Vector"] = serialize_type_vector(cast<VectorType>(type));
     break;
+  case Type::TargetExtTyID:
+    result["Extension"] = serialize_type_extension(cast<TargetExtType>(type));
+    break;
   case Type::LabelTyID:
     result["Label"] = json::Value(nullptr);
     break;
@@ -78,11 +75,7 @@ json::Object serialize_type(const Type &type) {
     result["Metadata"] = json::Value(nullptr);
     break;
   case Type::TypedPointerTyID:
-    result["Other"] = mk_other("typed pointer");
-    break;
-  case Type::TargetExtTyID:
-    result["Other"] = mk_other("target extension");
-    break;
+    LOG->fatal("serialized a typed pointer");
   }
   return result;
 }
@@ -152,6 +145,20 @@ json::Object serialize_type_vector(const VectorType &type) {
   } else {
     llvm_unreachable("invalid vector type");
   }
+
+  return result;
+}
+
+json::Object serialize_type_extension(const TargetExtType &type) {
+  json::Object result;
+
+  result["name"] = type.getName();
+
+  json::Array params;
+  for (const auto *param : type.type_params()) {
+    params.push_back(serialize_type(*param));
+  }
+  result["params"] = std::move(params);
 
   return result;
 }

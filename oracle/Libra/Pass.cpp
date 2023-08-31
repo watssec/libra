@@ -22,12 +22,18 @@ struct LibraPass : PassInfoMixin<LibraPass> {
     }
     init_default_logger(level, OptVerbose);
 
-    // serialize and dump to file
+    // initialization
     if (auto e = module.materializeAll()) {
       LOG->fatal("unable to materialize module: {0}", e);
     }
+    if (auto e = module.materializeMetadata()) {
+      LOG->fatal("unable to materialize metadata: {0}", e);
+    }
 
+    // TODO: hack for constant expressions
     prepare_for_serialization(module);
+
+    // serialize and dump to file
     auto data = serialize_module(module);
     std::error_code ec;
     raw_fd_ostream stm(OptOutput, ec,

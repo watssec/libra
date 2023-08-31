@@ -62,6 +62,8 @@ json::Object serialize_const(const Constant &val) {
       result["Null"] = json::Value(nullptr);
     } else if (isa<ConstantTokenNone>(val)) {
       result["None"] = json::Value(nullptr);
+    } else if (isa<ConstantTargetNone>(val)) {
+      result["Extension"] = json::Value(nullptr);
     } else if (isa<UndefValue>(val)) {
       result["Undef"] = json::Value(nullptr);
     } else if (isa<ConstantAggregateZero>(val)) {
@@ -79,6 +81,7 @@ json::Object serialize_const(const Constant &val) {
 
   // constant block address
   else if (isa<BlockAddress>(val)) {
+    // TODO: assign each block a unique id
     result["PC"] = json::Value(nullptr);
   }
 
@@ -129,8 +132,12 @@ json::Object serialize_const(const Constant &val) {
 json::Object serialize_const_data_int(const ConstantInt &val) {
   json::Object result;
   if (val.getBitWidth() > OPT_MAX_BITS_FOR_INT) {
-    LOG->error("constant integer width exceeds limited: {0}",
-               val.getBitWidth());
+    LOG->error("constant integer width exceeds limit: {0}", val.getBitWidth());
+  }
+  if (val.getValue().ugt(UINT64_MAX)) {
+    SmallString<64> dump;
+    val.getValue().toStringUnsigned(dump);
+    LOG->fatal("constant integer value exceeds limit: {0}", dump);
   }
   result["value"] = val.getValue().getLimitedValue(UINT64_MAX);
   return result;
