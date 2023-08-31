@@ -52,7 +52,8 @@ impl Dependency for DepLLVM {
                     "compiler-rt",
                     "lld",
                     "lldb",
-                    "polly"
+                    "polly",
+                    "mlir",
                 ]
                 .join(";")
             ))
