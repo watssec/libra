@@ -4,7 +4,7 @@ use std::process::Command;
 use anyhow::{anyhow, bail, Result};
 
 #[cfg(target_os = "macos")]
-use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM, UNAME_RELEASE, XCODE_SDK_PATH};
+use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM};
 
 use crate::deps::common::Dependency;
 
@@ -42,11 +42,20 @@ impl Dependency for DepLLVM {
             .arg("Ninja")
             .arg(format!(
                 "-DLLVM_ENABLE_PROJECTS={}",
-                ["clang", "clang-tools-extra", "lld", "lldb", "polly"].join(";")
+                [
+                    "clang",
+                    "clang-tools-extra",
+                    "libc",
+                    "compiler-rt",
+                    "lld",
+                    "lldb",
+                    "polly"
+                ]
+                .join(";")
             ))
             .arg(format!(
                 "-DLLVM_ENABLE_RUNTIMES={}",
-                ["compiler-rt", "libc", "libcxx"].join(";")
+                ["libcxx", "libcxxabi"].join(";")
             ))
             .arg("-DLLVM_ENABLE_RTTI=On")
             .arg("-DBUILD_SHARED_LIBS=On")
@@ -56,13 +65,7 @@ impl Dependency for DepLLVM {
         #[cfg(target_os = "macos")]
         match (UNAME_PLATFORM.as_str(), UNAME_HARDWARE.as_str()) {
             ("Darwin", "arm64") => {
-                cmd.arg("-DCMAKE_OSX_ARCHITECTURES=arm64")
-                    .arg("-DLLVM_TARGETS_TO_BUILD=AArch64")
-                    .arg(format!(
-                        "-DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-apple-darwin{}",
-                        UNAME_RELEASE.as_str()
-                    ))
-                    .arg(format!("-DDEFAULT_SYSROOT={}", XCODE_SDK_PATH.as_str()));
+                cmd.arg("-DCMAKE_OSX_ARCHITECTURES=arm64");
             }
             _ => {
                 bail!("other macos platforms not supported yet");
