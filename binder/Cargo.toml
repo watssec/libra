@@ -5,3 +5,4 @@ members = [
     "shared",
     "testsuite",
 ]
+resolver = "2"
