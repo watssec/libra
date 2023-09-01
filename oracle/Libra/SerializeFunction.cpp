@@ -50,10 +50,37 @@ json::Object serialize_function(const Function &func) {
 
 json::Object serialize_parameter(const Argument &param) {
   json::Object result;
+
+  // basics
   result["ty"] = serialize_type(*param.getType());
   if (param.hasName()) {
     result["name"] = param.getName();
   }
+
+  // argument-specific attrs
+  if (param.hasByValAttr()) {
+    result["by_val"] = serialize_type(*param.getParamByValType());
+  }
+  if (param.hasByRefAttr()) {
+    result["by_ref"] = serialize_type(*param.getParamByRefType());
+  }
+  if (param.hasStructRetAttr()) {
+    result["struct_ret"] = serialize_type(*param.getParamStructRetType());
+  }
+  if (param.hasPreallocatedAttr()) {
+    result["pre_allocated"] =
+        serialize_type(*param.getPointeeInMemoryValueType());
+  }
+  if (param.hasInAllocaAttr()) {
+    result["in_alloca"] = serialize_type(*param.getParamInAllocaType());
+  }
+
+  // opaque pointer
+  if (param.hasAttribute(Attribute::AttrKind::ElementType)) {
+    result["element_type"] = serialize_type(
+        *param.getAttribute(Attribute::AttrKind::ElementType).getValueAsType());
+  }
+
   return result;
 }
 
