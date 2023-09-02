@@ -506,10 +506,12 @@ FunctionSerializationContext::serialize_inst_cast(const CastInst &inst) const {
   }
   case Instruction::CastOps::PtrToInt: {
     result["opcode"] = "ptr_to_int";
+    result["address_space"] = cast<PtrToIntInst>(inst).getPointerAddressSpace();
     break;
   }
   case Instruction::CastOps::IntToPtr: {
     result["opcode"] = "int_to_ptr";
+    result["address_space"] = cast<IntToPtrInst>(inst).getAddressSpace();
     break;
   }
   case Instruction::CastOps::BitCast: {
@@ -518,6 +520,10 @@ FunctionSerializationContext::serialize_inst_cast(const CastInst &inst) const {
   }
   case Instruction::CastOps::AddrSpaceCast: {
     result["opcode"] = "address_space_cast";
+    result["src_address_space"] =
+        cast<AddrSpaceCastInst>(inst).getSrcAddressSpace();
+    result["dst_address_space"] =
+        cast<AddrSpaceCastInst>(inst).getDestAddressSpace();
     break;
   }
   case Instruction::CastOpsEnd: {
