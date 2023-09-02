@@ -115,6 +115,11 @@ public:
   serialize_inst_set_element(const InsertElementInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_shuffle_vector(const ShuffleVectorInst &inst) const;
+  [[nodiscard]] json::Object serialize_inst_fence(const FenceInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_atomic_cmpxchg(const AtomicCmpXchgInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_atomic_rmw(const AtomicRMWInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_return(const ReturnInst &inst) const;
   [[nodiscard]] json::Object

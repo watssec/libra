@@ -1,5 +1,21 @@
 #include "Serializer.h"
 
+// utilities
+namespace libra {
+
+std::string get_sync_scope_name(SyncScope::ID scope) {
+  switch (scope) {
+  case SyncScope::System:
+    return "system";
+  case SyncScope::SingleThread:
+    return "thread";
+  default:
+    LOG->fatal("invalid sync scope");
+  }
+}
+
+} // namespace libra
+
 namespace libra {
 
 json::Object FunctionSerializationContext::serialize_instruction(
@@ -86,13 +102,14 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
         serialize_inst_shuffle_vector(cast<ShuffleVectorInst>(inst));
   }
 
-  // TODO: concurrency instructions
+  // concurrency instructions
   else if (isa<FenceInst>(inst)) {
-    result["Fence"] = json::Value(nullptr);
+    result["Fence"] = serialize_inst_fence(cast<FenceInst>(inst));
   } else if (isa<AtomicCmpXchgInst>(inst)) {
-    result["AtomicCmpXchg"] = json::Value(nullptr);
+    result["AtomicCmpXchg"] =
+        serialize_inst_atomic_cmpxchg(cast<AtomicCmpXchgInst>(inst));
   } else if (isa<AtomicRMWInst>(inst)) {
-    result["AtomicRMW"] = json::Value(nullptr);
+    result["AtomicRMW"] = serialize_inst_atomic_rmw(cast<AtomicRMWInst>(inst));
   }
 
   // terminators
@@ -126,6 +143,7 @@ json::Object FunctionSerializationContext::serialize_inst_alloca(
   if (inst.isArrayAllocation()) {
     result["size"] = serialize_value(*inst.getArraySize());
   }
+  result["address_space"] = inst.getAddressSpace();
   return result;
 }
 
@@ -134,6 +152,7 @@ FunctionSerializationContext::serialize_inst_load(const LoadInst &inst) const {
   json::Object result;
   result["pointee_type"] = serialize_type(*inst.getType());
   result["pointer"] = serialize_value(*inst.getPointerOperand());
+  result["ordering"] = toIRString(inst.getOrdering());
   result["address_space"] = inst.getPointerAddressSpace();
   return result;
 }
@@ -144,6 +163,7 @@ json::Object FunctionSerializationContext::serialize_inst_store(
   result["pointee_type"] = serialize_type(*inst.getValueOperand()->getType());
   result["pointer"] = serialize_value(*inst.getPointerOperand());
   result["value"] = serialize_value(*inst.getValueOperand());
+  result["ordering"] = toIRString(inst.getOrdering());
   result["address_space"] = inst.getPointerAddressSpace();
   return result;
 }
@@ -610,6 +630,107 @@ json::Object FunctionSerializationContext::serialize_inst_shuffle_vector(
   result["lhs"] = serialize_value(*inst.getOperand(0));
   result["rhs"] = serialize_value(*inst.getOperand(1));
   result["mask"] = serialize_constant(*inst.getShuffleMaskForBitcode());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_fence(
+    const FenceInst &inst) const {
+  json::Object result;
+  result["ordering"] = toIRString(inst.getOrdering());
+  result["scope"] = get_sync_scope_name(inst.getSyncScopeID());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_atomic_cmpxchg(
+    const AtomicCmpXchgInst &inst) const {
+  json::Object result;
+
+  // basics
+  result["pointee_type"] = serialize_type(*inst.getType());
+  result["pointer"] = serialize_value(*inst.getPointerOperand());
+  result["value_cmp"] = serialize_value(*inst.getCompareOperand());
+  result["value_xchg"] = serialize_value(*inst.getNewValOperand());
+  result["address_space"] = inst.getPointerAddressSpace();
+
+  // atomicity
+  result["ordering_success"] = toIRString(inst.getSuccessOrdering());
+  result["ordering_failure"] = toIRString(inst.getFailureOrdering());
+  result["scope"] = get_sync_scope_name(inst.getSyncScopeID());
+
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_atomic_rmw(
+    const AtomicRMWInst &inst) const {
+  json::Object result;
+
+  // basics
+  result["pointee_type"] = serialize_type(*inst.getType());
+  result["pointer"] = serialize_value(*inst.getPointerOperand());
+  result["value"] = serialize_value(*inst.getValOperand());
+  result["address_space"] = inst.getPointerAddressSpace();
+
+  // operand
+  switch (inst.getOperation()) {
+  case AtomicRMWInst::BinOp::Xchg:
+    result["opcode"] = "xchg";
+    break;
+  case AtomicRMWInst::BinOp::Add:
+    result["opcode"] = "add";
+    break;
+  case AtomicRMWInst::BinOp::FAdd:
+    result["opcode"] = "fadd";
+    break;
+  case AtomicRMWInst::BinOp::Sub:
+    result["opcode"] = "sub";
+    break;
+  case AtomicRMWInst::BinOp::FSub:
+    result["opcode"] = "fsub";
+    break;
+  case AtomicRMWInst::BinOp::UIncWrap:
+    result["opcode"] = "uinc";
+    break;
+  case AtomicRMWInst::BinOp::UDecWrap:
+    result["opcode"] = "udec";
+    break;
+  case AtomicRMWInst::BinOp::Max:
+    result["opcode"] = "max";
+    break;
+  case AtomicRMWInst::BinOp::UMax:
+    result["opcode"] = "umax";
+    break;
+  case AtomicRMWInst::BinOp::FMax:
+    result["opcode"] = "fmax";
+    break;
+  case AtomicRMWInst::BinOp::Min:
+    result["opcode"] = "min";
+    break;
+  case AtomicRMWInst::BinOp::UMin:
+    result["opcode"] = "umin";
+    break;
+  case AtomicRMWInst::BinOp::FMin:
+    result["opcode"] = "fmin";
+    break;
+  case AtomicRMWInst::BinOp::And:
+    result["opcode"] = "and";
+    break;
+  case AtomicRMWInst::BinOp::Or:
+    result["opcode"] = "or";
+    break;
+  case AtomicRMWInst::BinOp::Xor:
+    result["opcode"] = "xor";
+    break;
+  case AtomicRMWInst::BinOp::Nand:
+    result["opcode"] = "nand";
+    break;
+  case AtomicRMWInst::BinOp::BAD_BINOP:
+    LOG->fatal("unexpected bad atomic-rmw operator");
+  }
+
+  // atomicity
+  result["ordering"] = toIRString(inst.getOrdering());
+  result["scope"] = get_sync_scope_name(inst.getSyncScopeID());
+
   return result;
 }
 
