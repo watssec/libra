@@ -125,6 +125,8 @@ public:
   [[nodiscard]] json::Object
   serialize_inst_branch(const BranchInst &inst) const;
   [[nodiscard]] json::Object
+  serialize_inst_jump_indirect(const IndirectBrInst &inst) const;
+  [[nodiscard]] json::Object
   serialize_inst_switch(const SwitchInst &inst) const;
 
   [[nodiscard]] json::Object serialize_value(const Value &val) const;

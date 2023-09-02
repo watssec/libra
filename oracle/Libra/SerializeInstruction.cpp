@@ -112,20 +112,35 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["AtomicRMW"] = serialize_inst_atomic_rmw(cast<AtomicRMWInst>(inst));
   }
 
+  // exception handling (non-terminator)
+  else if (isa<InvokeInst>(inst) || isa<CatchPadInst>(inst) ||
+           isa<LandingPadInst>(inst) || isa<CleanupPadInst>(inst)) {
+    LOG->fatal("exception handling not supported yet: {0}", inst);
+  }
+
+  // very rare cases (non-terminator)
+  else if (isa<CallBrInst>(inst)) {
+    LOG->fatal("unable to handle CallBrInst");
+  }
+
   // terminators
   else if (isa<ReturnInst>(inst)) {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
   } else if (isa<BranchInst>(inst)) {
     result["Branch"] = serialize_inst_branch(cast<BranchInst>(inst));
+  } else if (isa<IndirectBrInst>(inst)) {
+    result["IndirectJump"] =
+        serialize_inst_jump_indirect(cast<IndirectBrInst>(inst));
   } else if (isa<SwitchInst>(inst)) {
     result["Switch"] = serialize_inst_switch(cast<SwitchInst>(inst));
   } else if (isa<UnreachableInst>(inst)) {
     result["Unreachable"] = json::Value(nullptr);
   }
 
-  // TODO: indirect branch
-  else if (isa<IndirectBrInst>(inst)) {
-    result["IndirectJump"] = json::Value(nullptr);
+  // exception handling (terminator)
+  else if (isa<CatchSwitchInst>(inst) || isa<CatchReturnInst>(inst) ||
+           isa<ResumeInst>(inst) || isa<CleanupReturnInst>(inst)) {
+    LOG->fatal("exception handling not supported yet: {0}", inst);
   }
 
   // should have exhausted all valid cases
@@ -759,6 +774,18 @@ json::Object FunctionSerializationContext::serialize_inst_branch(
   json::Array targets;
   for (const auto *succ : inst.successors()) {
     targets.push_back(get_block(*succ));
+  }
+  result["targets"] = std::move(targets);
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_jump_indirect(
+    const IndirectBrInst &inst) const {
+  json::Object result;
+  result["address"] = serialize_value(*inst.getAddress());
+  json::Array targets;
+  for (unsigned i = 0; i < inst.getNumDestinations(); i++) {
+    targets.push_back(get_block(*inst.getDestination(i)));
   }
   result["targets"] = std::move(targets);
   return result;
