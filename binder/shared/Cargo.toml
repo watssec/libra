@@ -7,6 +7,6 @@ license = "GPL-3.0"
 edition = "2021"
 
 [dependencies]
-lazy_static = "*"
-log = "*"
-simplelog = "*"
+lazy_static = "1.4.0"
+log = "0.4.20"
+simplelog = "0.12.1"
