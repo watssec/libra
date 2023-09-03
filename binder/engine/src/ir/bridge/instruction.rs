@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::constant::Constant;
-use crate::ir::bridge::shared::SymbolRegistry;
+use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::ir::bridge::value::{BlockLabel, RegisterSlot, Value};
 
@@ -28,7 +28,12 @@ pub enum Instruction {
         value: Value,
     },
     // call
-    Call {
+    CallDirect {
+        function: Identifier,
+        args: Vec<Value>,
+        result: Option<(Type, RegisterSlot)>,
+    },
+    CallIndirect {
         callee: Value,
         args: Vec<Value>,
         result: Option<(Type, RegisterSlot)>,
@@ -74,9 +79,6 @@ pub enum Instruction {
     FreezePtr,
     FreezeBitvec {
         bits: usize,
-    },
-    FreezeNop {
-        operand: Value,
     },
     // GEP
     GEP {
@@ -319,18 +321,29 @@ impl<'a> Context<'a> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
 
-        let adapter::instruction::Instruction { ty, index, repr } = inst;
+        let adapter::instruction::Instruction {
+            name: _,
+            ty,
+            index,
+            repr,
+        } = inst;
 
         let item = match repr {
             // memory access
             AdaptedInst::Alloca {
                 allocated_type,
                 size,
+                address_space,
             } => {
                 let inst_ty = self.typing.convert(ty)?;
                 if !matches!(inst_ty, Type::Pointer) {
                     return Err(EngineError::InvalidAssumption(
                         "AllocaInst should return a pointer type".into(),
+                    ));
+                }
+                if *address_space != 0 {
+                    return Err(EngineError::NotSupportedYet(
+                        Unsupported::PointerAddressSpace,
                     ));
                 }
                 let base_type = self.typing.convert(allocated_type)?;
@@ -347,8 +360,12 @@ impl<'a> Context<'a> {
             AdaptedInst::Load {
                 pointee_type,
                 pointer,
+                ordering,
                 address_space,
             } => {
+                if ordering != "not_atomic" {
+                    return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
+                }
                 if *address_space != 0 {
                     return Err(EngineError::NotSupportedYet(
                         Unsupported::PointerAddressSpace,
@@ -373,8 +390,12 @@ impl<'a> Context<'a> {
                 pointee_type,
                 pointer,
                 value,
+                ordering,
                 address_space,
             } => {
+                if ordering != "not_atomic" {
+                    return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
+                }
                 if *address_space != 0 {
                     return Err(EngineError::NotSupportedYet(
                         Unsupported::PointerAddressSpace,
@@ -447,15 +468,48 @@ impl<'a> Context<'a> {
                             }
                         };
                         let callee_new = self.parse_value(callee, &Type::Pointer)?;
-                        Instruction::Call {
-                            callee: callee_new,
-                            args: args_new,
-                            result: ret_ty.map(|t| (t, index.into())),
+                        // TODO: better distinguish calls
+                        if matches!(
+                            inst,
+                            AdaptedInst::CallDirect { .. } | AdaptedInst::Intrinsic { .. }
+                        ) {
+                            match callee_new {
+                                Value::Constant(Constant::Function { name: callee_name }) => {
+                                    Instruction::CallDirect {
+                                        function: callee_name,
+                                        args: args_new,
+                                        result: ret_ty.map(|t| (t, index.into())),
+                                    }
+                                }
+                                _ => {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "direct or intrinsic call should target a named function"
+                                            .into(),
+                                    ));
+                                }
+                            }
+                        } else {
+                            if !matches!(inst, AdaptedInst::CallIndirect { .. }) {
+                                return Err(EngineError::InvariantViolation(
+                                    "expecting an indirect call but found some other call type"
+                                        .into(),
+                                ));
+                            }
+                            if matches!(callee_new, Value::Constant(Constant::Function { .. })) {
+                                return Err(EngineError::InvalidAssumption(
+                                    "indirect call should not target a named function".into(),
+                                ));
+                            }
+                            Instruction::CallIndirect {
+                                callee: callee_new,
+                                args: args_new,
+                                result: ret_ty.map(|t| (t, index.into())),
+                            }
                         }
                     }
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "CallIndirectInst refer to a non-function callee".into(),
+                            "CallInst refer to a non-function callee".into(),
                         ));
                     }
                 }
@@ -545,6 +599,8 @@ impl<'a> Context<'a> {
                 opcode,
                 src_ty,
                 dst_ty,
+                src_address_space,
+                dst_address_space,
                 operand,
             } => {
                 let inst_ty = self.typing.convert(ty)?;
@@ -574,10 +630,22 @@ impl<'a> Context<'a> {
                     },
                     "ptr_to_int" => match (src_ty_new, dst_ty_new) {
                         (Type::Pointer, Type::Bitvec { bits: bits_into }) => {
-                            Instruction::CastPtrToBitvec {
-                                bits_into,
-                                operand: operand_new,
-                                result: index.into(),
+                            match src_address_space {
+                                None => {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "expect (src address_space) for ptr_to_int cast".into(),
+                                    ));
+                                }
+                                Some(0) => Instruction::CastPtrToBitvec {
+                                    bits_into,
+                                    operand: operand_new,
+                                    result: index.into(),
+                                },
+                                Some(_) => {
+                                    return Err(EngineError::NotSupportedYet(
+                                        Unsupported::PointerAddressSpace,
+                                    ));
+                                }
                             }
                         }
                         _ => {
@@ -588,10 +656,22 @@ impl<'a> Context<'a> {
                     },
                     "int_to_ptr" => match (src_ty_new, dst_ty_new) {
                         (Type::Bitvec { bits: bits_from }, Type::Pointer) => {
-                            Instruction::CastBitvecToPtr {
-                                bits_from,
-                                operand: operand_new,
-                                result: index.into(),
+                            match dst_address_space {
+                                None => {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "expect (dst address_space) for int_to_ptr cast".into(),
+                                    ));
+                                }
+                                Some(0) => Instruction::CastBitvecToPtr {
+                                    bits_from,
+                                    operand: operand_new,
+                                    result: index.into(),
+                                },
+                                Some(_) => {
+                                    return Err(EngineError::NotSupportedYet(
+                                        Unsupported::PointerAddressSpace,
+                                    ));
+                                }
                             }
                         }
                         _ => {
@@ -634,7 +714,13 @@ impl<'a> Context<'a> {
                     }
                     Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
                     // TODO(mengxu): freeze instruction should only be possible on undef
-                    v @ _ => Instruction::FreezeNop { operand: v },
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(format!(
+                            "freeze instruction should only be possible on undef constants, not {}",
+                            serde_json::to_string_pretty(operand)
+                                .unwrap_or_else(|e| format!("unable to deserialize: {}", e))
+                        )));
+                    }
                 }
             }
             // GEP
@@ -681,7 +767,14 @@ impl<'a> Context<'a> {
                                 Value::Constant(Constant::Bitvec {
                                     bits: _,
                                     value: field_offset,
-                                }) => *field_offset as usize,
+                                }) => match field_offset.to_usize() {
+                                    None => {
+                                        return Err(EngineError::InvariantViolation(
+                                            "field number must be within the range of usize".into(),
+                                        ));
+                                    }
+                                    Some(v) => v,
+                                },
                                 _ => {
                                     return Err(EngineError::InvalidAssumption(
                                         "field number must be bv32".into(),
@@ -877,7 +970,9 @@ impl<'a> Context<'a> {
                 return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
             }
             // concurrency
-            AdaptedInst::Fence | AdaptedInst::AtomicCmpXchg | AdaptedInst::AtomicRMW => {
+            AdaptedInst::Fence { .. }
+            | AdaptedInst::AtomicCmpXchg { .. }
+            | AdaptedInst::AtomicRMW { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
             }
             // terminators should never appear here
@@ -996,7 +1091,14 @@ impl<'a> Context<'a> {
                         Constant::Bitvec {
                             bits: _,
                             value: label_val,
-                        } => label_val,
+                        } => match label_val.to_u64() {
+                            None => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "switch casing label larger than u64".into(),
+                                ));
+                            }
+                            Some(v) => v,
+                        },
                         _ => {
                             return Err(EngineError::InvariantViolation(
                                 "switch case is not a constant bitvec".into(),

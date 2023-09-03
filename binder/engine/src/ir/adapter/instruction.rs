@@ -73,8 +73,8 @@ pub enum Inst {
         opcode: String,
         src_ty: Type,
         dst_ty: Type,
-        src_address_space: usize,
-        dst_address_space: usize,
+        src_address_space: Option<usize>,
+        dst_address_space: Option<usize>,
         operand: Value,
     },
     // freeze
