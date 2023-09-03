@@ -162,7 +162,7 @@ impl Workflow {
         self.run_opt(
             input,
             None,
-            &[
+            [
                 "-load",
                 lib_pass,
                 &format!("-load-pass-plugin={}", lib_pass),
