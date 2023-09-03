@@ -61,7 +61,9 @@ impl GlobalVariable {
         // convert the name
         let ident: Identifier = name
             .as_ref()
-            .ok_or_else(|| EngineError::InvalidAssumption("no anonymous global variable".into()))?
+            .ok_or_else(|| {
+                EngineError::InvalidAssumption("unexpected anonymous global variable".into())
+            })?
             .into();
 
         // convert the type

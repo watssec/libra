@@ -27,7 +27,7 @@ enum TypeToken {
         params: Vec<TypeToken>,
         ret: Box<TypeToken>,
     },
-    Pointer, // opaque pointer scheme has no pointee type
+    Pointer,
 }
 
 impl TypeToken {
@@ -110,44 +110,34 @@ impl TypeToken {
                     ret: Box::new(ret_new),
                 }
             }
-            AdaptedType::Pointer {
-                pointee,
-                address_space: _,
-            } => {
-                match pointee {
-                    None => (),
-                    Some(sub_ty) => {
-                        return Err(EngineError::InvalidAssumption(format!(
-                            "all pointer type should be opaque, received a pointee `{}` instead",
-                            serde_json::to_string(sub_ty).unwrap_or_else(|e| e.to_string()),
-                        )));
-                    }
-                };
+            AdaptedType::Pointer { address_space, .. } => {
+                if address_space != 0 {
+                    return Err(EngineError::NotSupportedYet(
+                        Unsupported::PointerAddressSpace,
+                    ));
+                }
                 Self::Pointer
             }
             AdaptedType::Vector { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
             }
+            AdaptedType::Extension { .. } => {
+                return Err(EngineError::NotSupportedYet(Unsupported::TypeExtension));
+            }
             AdaptedType::Label => {
                 return Err(EngineError::InvalidAssumption(
-                    "no unexpected llvm primitive type: label".into(),
+                    "unexpected llvm primitive type: label".into(),
                 ));
             }
             AdaptedType::Token => {
                 return Err(EngineError::InvalidAssumption(
-                    "no unexpected llvm primitive type: token".into(),
+                    "unexpected llvm primitive type: token".into(),
                 ));
             }
             AdaptedType::Metadata => {
                 return Err(EngineError::InvalidAssumption(
-                    "no unexpected llvm primitive type: metadata".into(),
+                    "unexpected llvm primitive type: metadata".into(),
                 ));
-            }
-            AdaptedType::Other { name } => {
-                return Err(EngineError::InvalidAssumption(format!(
-                    "no unexpected llvm complex type: {}",
-                    name
-                )));
             }
         };
         Ok(converted)

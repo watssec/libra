@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use num_bigint::BigUint;
+
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::instruction::{BinaryOperator, ComparePredicate, Context, Instruction};
@@ -11,7 +13,7 @@ use crate::EngineResult;
 #[derive(Eq, PartialEq, Clone)]
 pub enum Constant {
     /// Integer
-    Bitvec { bits: usize, value: u64 },
+    Bitvec { bits: usize, value: BigUint },
     /// Null pointer
     Null,
     /// Array
@@ -38,7 +40,7 @@ impl Constant {
         let value = match ty {
             Type::Bitvec { bits } => Self::Bitvec {
                 bits: *bits,
-                value: 0,
+                value: BigUint::zero(),
             },
             Type::Array { element, length } => {
                 let elements = (0..*length)
@@ -133,7 +135,9 @@ impl Constant {
                 match expected_type {
                     Type::Bitvec { bits } => Self::Bitvec {
                         bits: *bits,
-                        value: *value,
+                        value: BigUint::from_str_radix(value, 10).map_err(|e| {
+                            EngineError::InvariantViolation(format!("const int parse error: {}", e))
+                        })?,
                     },
                     _ => {
                         return Err(EngineError::InvalidAssumption(format!(
@@ -162,12 +166,12 @@ impl Constant {
                     expected_type
                 )));
             }
+            AdaptedConst::Extension => {
+                return Err(EngineError::NotSupportedYet(Unsupported::TypeExtension));
+            }
             AdaptedConst::Undef => {
                 check_type(ty)?;
                 Self::undef_from_type(expected_type)?
-            }
-            AdaptedConst::PC => {
-                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
             }
             AdaptedConst::Default => {
                 check_type(ty)?;
@@ -246,14 +250,14 @@ impl Constant {
                 match name {
                     None => {
                         return Err(EngineError::InvalidAssumption(
-                            "no reference to an anonymous global variable".into(),
+                            "unexpected reference to an anonymous global variable".into(),
                         ));
                     }
                     Some(n) => {
                         let ident = n.into();
                         if !symbols.has_global(&ident) {
                             return Err(EngineError::InvalidAssumption(format!(
-                                "reference to an unknown global variable: {}",
+                                "unexpected reference to an unknown global variable: {}",
                                 ident
                             )));
                         }
@@ -272,14 +276,14 @@ impl Constant {
                 match name {
                     None => {
                         return Err(EngineError::InvalidAssumption(
-                            "no reference to an anonymous function".into(),
+                            "unexpected reference to an anonymous function".into(),
                         ));
                     }
                     Some(n) => {
                         let ident = n.into();
                         if !symbols.has_function(&ident) {
                             return Err(EngineError::InvalidAssumption(format!(
-                                "reference to an unknown function: {}",
+                                "unexpected reference to an unknown function: {}",
                                 ident
                             )));
                         }
@@ -292,6 +296,9 @@ impl Constant {
             }
             AdaptedConst::Interface { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::InterfaceResolver));
+            }
+            AdaptedConst::PC => {
+                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
             }
             AdaptedConst::Expr { inst } => {
                 check_type(ty)?;
@@ -307,6 +314,7 @@ impl Constant {
 
                 // create a dummy instruction
                 let fake_inst = adapter::instruction::Instruction {
+                    name: None,
                     ty: ty.clone(),
                     index: usize::MAX,
                     repr: inst.as_ref().clone(),
