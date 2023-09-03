@@ -1,3 +1,5 @@
+use num_traits::ToPrimitive;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::{EngineError, EngineResult, Unsupported};
@@ -470,7 +472,7 @@ impl<'a> Context<'a> {
                         let callee_new = self.parse_value(callee, &Type::Pointer)?;
                         // TODO: better distinguish calls
                         if matches!(
-                            inst,
+                            repr,
                             AdaptedInst::CallDirect { .. } | AdaptedInst::Intrinsic { .. }
                         ) {
                             match callee_new {
@@ -489,7 +491,7 @@ impl<'a> Context<'a> {
                                 }
                             }
                         } else {
-                            if !matches!(inst, AdaptedInst::CallIndirect { .. }) {
+                            if !matches!(repr, AdaptedInst::CallIndirect { .. }) {
                                 return Err(EngineError::InvariantViolation(
                                     "expecting an indirect call but found some other call type"
                                         .into(),
@@ -979,7 +981,7 @@ impl<'a> Context<'a> {
             AdaptedInst::Return { .. }
             | AdaptedInst::Branch { .. }
             | AdaptedInst::Switch { .. }
-            | AdaptedInst::IndirectJump
+            | AdaptedInst::IndirectJump { .. }
             | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with terminator instruction in the body".into(),
@@ -1126,7 +1128,7 @@ impl<'a> Context<'a> {
                     default: default_new,
                 }
             }
-            AdaptedInst::IndirectJump => {
+            AdaptedInst::IndirectJump { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
             }
             AdaptedInst::Unreachable => Terminator::Unreachable,
@@ -1152,9 +1154,9 @@ impl<'a> Context<'a> {
             | AdaptedInst::GetElement { .. }
             | AdaptedInst::SetElement { .. }
             | AdaptedInst::ShuffleVector { .. }
-            | AdaptedInst::Fence
-            | AdaptedInst::AtomicCmpXchg
-            | AdaptedInst::AtomicRMW => {
+            | AdaptedInst::Fence { .. }
+            | AdaptedInst::AtomicCmpXchg { .. }
+            | AdaptedInst::AtomicRMW { .. } => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

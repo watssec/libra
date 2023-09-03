@@ -4,17 +4,142 @@ use crate::ir::bridge::cfg::ControlFlowGraph;
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 
+/// An adapted representation of an LLVM function parameter
+#[derive(Eq, PartialEq)]
+pub struct Parameter {
+    /// name
+    pub name: Option<Identifier>,
+    /// declared type
+    pub ty: Type,
+    /// element annotation
+    pub annotated_pointee_type: Option<Type>,
+}
+
 /// An adapted representation of an LLVM function
 #[derive(Eq, PartialEq)]
 pub struct Function {
     /// function name
     pub name: Identifier,
     /// parameter definitions
-    pub params: Vec<(Option<Identifier>, Type)>,
+    pub params: Vec<Parameter>,
     /// return type
     pub ret: Option<Type>,
     /// body of the function (in terms of a CFG)
     pub body: Option<ControlFlowGraph>,
+}
+
+impl Parameter {
+    fn set_or_check_annotated_type(
+        current: &mut Option<Type>,
+        expected_ty: &Type,
+        typing: &TypeRegistry,
+        ty: Option<&adapter::typing::Type>,
+        tag: &str,
+    ) -> EngineResult<()> {
+        match ty {
+            None => (),
+            Some(annotated) => {
+                if !matches!(expected_ty, Type::Pointer) {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "only pointer parameters can have attribute {}",
+                        tag
+                    )));
+                }
+                let converted = typing.convert(annotated)?;
+                match current {
+                    None => {
+                        *current = Some(converted);
+                    }
+                    Some(existing) => {
+                        if existing != &converted {
+                            return Err(EngineError::InvalidAssumption(format!(
+                                "attribute {} does not match with existing annotation",
+                                tag
+                            )));
+                        }
+                    }
+                }
+            }
+        };
+        Ok(())
+    }
+
+    pub fn convert(
+        param: &adapter::function::Parameter,
+        expected_ty: &Type,
+        typing: &TypeRegistry,
+    ) -> EngineResult<Self> {
+        let adapter::function::Parameter {
+            name: param_name,
+            ty: param_ty,
+            by_val,
+            by_ref,
+            pre_allocated,
+            struct_ret,
+            in_alloca,
+            element_type,
+        } = param;
+
+        // extract basic type
+        let param_ty_new = typing.convert(param_ty)?;
+        if &param_ty_new != expected_ty {
+            return Err(EngineError::InvalidAssumption(format!(
+                "parameter type mismatch: expect {}, actual {}",
+                expected_ty, param_ty_new
+            )));
+        }
+
+        // extract type annotations, if any
+        let mut annotated_pointee_type = None;
+        Self::set_or_check_annotated_type(
+            &mut annotated_pointee_type,
+            expected_ty,
+            typing,
+            by_val.as_ref(),
+            "by-val",
+        )?;
+        Self::set_or_check_annotated_type(
+            &mut annotated_pointee_type,
+            expected_ty,
+            typing,
+            by_ref.as_ref(),
+            "by-ref",
+        )?;
+        Self::set_or_check_annotated_type(
+            &mut annotated_pointee_type,
+            expected_ty,
+            typing,
+            pre_allocated.as_ref(),
+            "pre-allocated",
+        )?;
+        Self::set_or_check_annotated_type(
+            &mut annotated_pointee_type,
+            expected_ty,
+            typing,
+            struct_ret.as_ref(),
+            "struct-ret",
+        )?;
+        Self::set_or_check_annotated_type(
+            &mut annotated_pointee_type,
+            expected_ty,
+            typing,
+            in_alloca.as_ref(),
+            "in-alloca",
+        )?;
+        Self::set_or_check_annotated_type(
+            &mut annotated_pointee_type,
+            expected_ty,
+            typing,
+            element_type.as_ref(),
+            "element-type",
+        )?;
+
+        Ok(Parameter {
+            name: param_name.as_ref().map(|e| e.into()),
+            ty: param_ty_new,
+            annotated_pointee_type,
+        })
+    }
 }
 
 impl Function {
@@ -66,22 +191,7 @@ impl Function {
         let params_new: Vec<_> = params
             .iter()
             .zip(param_tys)
-            .map(|(p, t)| {
-                let adapter::function::Parameter {
-                    name: param_name,
-                    ty: param_ty,
-                } = p;
-
-                let param_ty_new = typing.convert(param_ty)?;
-                if param_ty_new != t {
-                    Err(EngineError::InvalidAssumption(format!(
-                        "parameter type mismatch for function: {}",
-                        ident
-                    )))
-                } else {
-                    Ok((param_name.as_ref().map(|e| e.into()), t))
-                }
-            })
+            .map(|(p, t)| Parameter::convert(p, &t, typing))
             .collect::<EngineResult<_>>()?;
 
         let body = if *is_defined {

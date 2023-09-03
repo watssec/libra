@@ -5,8 +5,9 @@ use petgraph::graph::{DiGraph, NodeIndex};
 
 use crate::error::EngineError;
 use crate::ir::adapter;
+use crate::ir::bridge::function::Parameter;
 use crate::ir::bridge::instruction::{Context, Instruction, Terminator};
-use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
+use crate::ir::bridge::shared::SymbolRegistry;
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::ir::bridge::value::BlockLabel;
 use crate::EngineResult;
@@ -52,7 +53,7 @@ impl ControlFlowGraph {
     pub fn build(
         typing: &TypeRegistry,
         symbols: &SymbolRegistry,
-        params: &[(Option<Identifier>, Type)],
+        params: &[Parameter],
         ret_ty: Option<&Type>,
         blocks: &[adapter::cfg::Block],
     ) -> EngineResult<Self> {
@@ -62,7 +63,7 @@ impl ControlFlowGraph {
         let arg_labels: BTreeMap<_, _> = params
             .iter()
             .enumerate()
-            .map(|(i, (_, ty))| (i, ty.clone()))
+            .map(|(i, p)| (i, p.ty.clone()))
             .collect();
 
         // construct block labels

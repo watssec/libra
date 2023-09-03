@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_bigint::BigUint;
+use num_traits::{identities::Zero, Num};
 
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
@@ -167,7 +168,9 @@ impl Constant {
                 )));
             }
             AdaptedConst::Extension => {
-                return Err(EngineError::NotSupportedYet(Unsupported::TypeExtension));
+                return Err(EngineError::NotSupportedYet(
+                    Unsupported::ArchSpecificExtension,
+                ));
             }
             AdaptedConst::Undef => {
                 check_type(ty)?;
@@ -535,10 +538,10 @@ impl Expression {
             Instruction::Alloca { .. }
             | Instruction::Load { .. }
             | Instruction::Store { .. }
-            | Instruction::Call { .. }
+            | Instruction::CallDirect { .. }
+            | Instruction::CallIndirect { .. }
             | Instruction::FreezeBitvec { .. }
             | Instruction::FreezePtr
-            | Instruction::FreezeNop { .. }
             | Instruction::Phi { .. } => {
                 return Err(EngineError::InvalidAssumption(
                     "unexpected instruction type for const expr".into(),

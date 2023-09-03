@@ -9,7 +9,6 @@ pub enum Unsupported {
     GlobalAlias,
     FloatingPoint,
     Vectorization,
-    TypeExtension,
     VariadicArguments,
     ArchSpecificExtension,
     ThreadLocalStorage,
@@ -41,9 +40,6 @@ impl Display for Unsupported {
             }
             Self::Vectorization => {
                 write!(f, "SIMD vectorization")
-            }
-            Self::TypeExtension => {
-                write!(f, "type extension")
             }
             Self::VariadicArguments => {
                 write!(f, "variadic arguments")

@@ -111,7 +111,7 @@ impl TypeToken {
                 }
             }
             AdaptedType::Pointer { address_space, .. } => {
-                if address_space != 0 {
+                if *address_space != 0 {
                     return Err(EngineError::NotSupportedYet(
                         Unsupported::PointerAddressSpace,
                     ));
@@ -122,7 +122,9 @@ impl TypeToken {
                 return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
             }
             AdaptedType::Extension { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::TypeExtension));
+                return Err(EngineError::NotSupportedYet(
+                    Unsupported::ArchSpecificExtension,
+                ));
             }
             AdaptedType::Label => {
                 return Err(EngineError::InvalidAssumption(

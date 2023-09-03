@@ -33,12 +33,12 @@ pub struct Parameter {
     pub by_val: Option<Type>,
     /// attribute: by-ref
     pub by_ref: Option<Type>,
-    /// attribute: in-alloca
-    pub in_alloca: Option<Type>,
-    /// attribute: struct-ret
-    pub struct_ret: Option<Type>,
     /// attribute: pre-allocated
     pub pre_allocated: Option<Type>,
+    /// attribute: struct-ret
+    pub struct_ret: Option<Type>,
+    /// attribute: in-alloca
+    pub in_alloca: Option<Type>,
     /// opaque pointer
     pub element_type: Option<Type>,
 }

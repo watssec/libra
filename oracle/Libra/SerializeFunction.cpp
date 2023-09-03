@@ -64,12 +64,12 @@ json::Object serialize_parameter(const Argument &param) {
   if (param.hasByRefAttr()) {
     result["by_ref"] = serialize_type(*param.getParamByRefType());
   }
-  if (param.hasStructRetAttr()) {
-    result["struct_ret"] = serialize_type(*param.getParamStructRetType());
-  }
   if (param.hasPreallocatedAttr()) {
     result["pre_allocated"] =
         serialize_type(*param.getPointeeInMemoryValueType());
+  }
+  if (param.hasStructRetAttr()) {
+    result["struct_ret"] = serialize_type(*param.getParamStructRetType());
   }
   if (param.hasInAllocaAttr()) {
     result["in_alloca"] = serialize_type(*param.getParamInAllocaType());

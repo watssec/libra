@@ -446,6 +446,7 @@ dependencies = [
  "libra-shared",
  "log",
  "num-bigint",
+ "num-traits",
  "petgraph",
  "serde",
  "serde_json",
