@@ -137,7 +137,7 @@ fn main() -> Result<()> {
             TestResult::Pass(length) => result_pass.push((name, length)),
             TestResult::Unsupported(reason) => result_unsupported
                 .entry(reason)
-                .or_insert_with(|| vec![])
+                .or_insert_with(Vec::new)
                 .push(name),
             TestResult::Uncompilable => result_uncompilable.push(name),
             TestResult::Fail(_) => result_fail.push(name),
@@ -178,7 +178,7 @@ fn main() -> Result<()> {
                 content.push(name);
             }
 
-            fs::write(&path, content.join("\n"))?;
+            fs::write(path, content.join("\n"))?;
         }
     }
 
