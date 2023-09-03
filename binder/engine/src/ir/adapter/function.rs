@@ -29,4 +29,16 @@ pub struct Parameter {
     pub name: Option<String>,
     /// type of the function
     pub ty: Type,
+    /// attribute: by-val
+    pub by_val: Option<Type>,
+    /// attribute: by-ref
+    pub by_ref: Option<Type>,
+    /// attribute: in-alloca
+    pub in_alloca: Option<Type>,
+    /// attribute: struct-ret
+    pub struct_ret: Option<Type>,
+    /// attribute: pre-allocated
+    pub pre_allocated: Option<Type>,
+    /// opaque pointer
+    pub element_type: Option<Type>,
 }

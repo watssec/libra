@@ -128,11 +128,11 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
   } else if (isa<BranchInst>(inst)) {
     result["Branch"] = serialize_inst_branch(cast<BranchInst>(inst));
+  } else if (isa<SwitchInst>(inst)) {
+    result["Switch"] = serialize_inst_switch(cast<SwitchInst>(inst));
   } else if (isa<IndirectBrInst>(inst)) {
     result["IndirectJump"] =
         serialize_inst_jump_indirect(cast<IndirectBrInst>(inst));
-  } else if (isa<SwitchInst>(inst)) {
-    result["Switch"] = serialize_inst_switch(cast<SwitchInst>(inst));
   } else if (isa<UnreachableInst>(inst)) {
     result["Unreachable"] = json::Value(nullptr);
   }
@@ -521,12 +521,13 @@ FunctionSerializationContext::serialize_inst_cast(const CastInst &inst) const {
   }
   case Instruction::CastOps::PtrToInt: {
     result["opcode"] = "ptr_to_int";
-    result["address_space"] = cast<PtrToIntInst>(inst).getPointerAddressSpace();
+    result["src_address_space"] =
+        cast<PtrToIntInst>(inst).getPointerAddressSpace();
     break;
   }
   case Instruction::CastOps::IntToPtr: {
     result["opcode"] = "int_to_ptr";
-    result["address_space"] = cast<IntToPtrInst>(inst).getAddressSpace();
+    result["dst_address_space"] = cast<IntToPtrInst>(inst).getAddressSpace();
     break;
   }
   case Instruction::CastOps::BitCast: {

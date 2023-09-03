@@ -11,16 +11,19 @@ pub enum Inst {
     Alloca {
         allocated_type: Type,
         size: Option<Value>,
+        address_space: usize,
     },
     Load {
         pointee_type: Type,
         pointer: Value,
+        ordering: String,
         address_space: usize,
     },
     Store {
         pointee_type: Type,
         pointer: Value,
         value: Value,
+        ordering: String,
         address_space: usize,
     },
     VAArg {
@@ -70,6 +73,8 @@ pub enum Inst {
         opcode: String,
         src_ty: Type,
         dst_ty: Type,
+        src_address_space: usize,
+        dst_address_space: usize,
         operand: Value,
     },
     // freeze
@@ -119,10 +124,30 @@ pub enum Inst {
         rhs: Value,
         mask: Constant,
     },
-    // concurrency (TODO: need to support them)
-    Fence,
-    AtomicCmpXchg,
-    AtomicRMW,
+    // concurrency
+    Fence {
+        ordering: String,
+        scope: String,
+    },
+    AtomicCmpXchg {
+        pointee_type: Type,
+        pointer: Value,
+        value_cmp: Value,
+        value_xchg: Value,
+        ordering_success: String,
+        ordering_failure: String,
+        scope: String,
+        address_space: usize,
+    },
+    AtomicRMW {
+        pointee_type: Type,
+        pointer: Value,
+        value: Value,
+        opcode: String,
+        ordering: String,
+        scope: String,
+        address_space: usize,
+    },
     // terminator
     Return {
         value: Option<Value>,
@@ -137,12 +162,17 @@ pub enum Inst {
         cases: Vec<SwitchCase>,
         default: Option<usize>,
     },
-    IndirectJump, // TODO: need to support this
+    IndirectJump {
+        address: Value,
+        targets: Vec<usize>,
+    },
     Unreachable,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Instruction {
+    /// optional name of instruction
+    pub name: Option<String>,
     /// type of the instruction
     pub ty: Type,
     /// a unique id for the instruction

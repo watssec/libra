@@ -6,12 +6,12 @@ use crate::ir::adapter::typing::Type;
 /// A representation of an LLVM constant
 #[derive(Serialize, Deserialize, Clone)]
 pub enum Const {
-    Int { value: u64 },
+    Int { value: String },
     Float { value: String },
     Null,
     None,
+    Extension,
     Undef,
-    PC,
     Default,
     Array { elements: Vec<Constant> },
     Vector { elements: Vec<Constant> },
@@ -20,6 +20,7 @@ pub enum Const {
     Function { name: Option<String> },
     Alias { name: Option<String> },
     Interface { name: Option<String> },
+    PC,
     Expr { inst: Box<Inst> },
 }
 

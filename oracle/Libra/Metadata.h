@@ -1,7 +1,6 @@
 #ifndef LIBRA_METADATA_H
 #define LIBRA_METADATA_H
 
-#include "Config.hpp"
 #include "Deps.h"
 #include "Logger.h"
 

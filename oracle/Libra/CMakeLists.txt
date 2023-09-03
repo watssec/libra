@@ -1,6 +1,5 @@
 # target
 add_llvm_pass(Libra
-              Config.hpp
               Logger.cpp
               Metadata.cpp
               SerializeAsm.cpp

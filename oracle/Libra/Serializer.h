@@ -1,7 +1,6 @@
 #ifndef LIBRA_SERIALIZER_H
 #define LIBRA_SERIALIZER_H
 
-#include "Config.hpp"
 #include "Deps.h"
 #include "Logger.h"
 #include "Metadata.h"

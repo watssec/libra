@@ -23,24 +23,21 @@ pub enum Type {
         ret: Box<Type>,
     },
     /// Pointer type
-    Pointer {
-        pointee: Option<Box<Type>>,
-        address_space: usize,
-    },
+    Pointer { address_space: usize },
     /// SIMD vector type
     Vector {
         element: Box<Type>,
         fixed: bool,
         length: usize,
     },
+    /// Target extension type
+    Extension { name: String, params: Vec<Type> },
     /// Label type
     Label,
     /// Token type
     Token,
     /// Metadata type
     Metadata,
-    /// A catch-all case
-    Other { name: String },
 }
 
 /// User-defined struct (high-level) to the module
