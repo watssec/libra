@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "*"
-fs_extra = "*"
+fs_extra = "1.3.0"
 log = "*"
 rayon = "*"
 structopt = "*"
