@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 
-use crate::error::{EngineError, Unsupported};
+use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::adapter::typing::UserDefinedStruct;
 use crate::ir::bridge::shared::Identifier;
-use crate::EngineResult;
 
 /// A naive translation from an LLVM type
 #[derive(Eq, PartialEq)]

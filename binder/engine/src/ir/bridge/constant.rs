@@ -3,12 +3,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use num_bigint::BigUint;
 use num_traits::{identities::Zero, Num};
 
-use crate::error::{EngineError, Unsupported};
+use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::instruction::{BinaryOperator, ComparePredicate, Context, Instruction};
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
-use crate::EngineResult;
 
 /// A naive translation from an LLVM constant
 #[derive(Eq, PartialEq, Clone)]

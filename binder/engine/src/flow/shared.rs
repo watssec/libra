@@ -151,3 +151,9 @@ impl Context {
         Self::deserialize(&output)
     }
 }
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -1,9 +1,8 @@
-use crate::error::{EngineError, Unsupported};
+use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::constant::Constant;
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
-use crate::EngineResult;
 
 /// An adapted representation of an LLVM global variable
 #[derive(Eq, PartialEq, Clone)]

@@ -3,14 +3,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use petgraph::algo::is_isomorphic_matching;
 use petgraph::graph::{DiGraph, NodeIndex};
 
-use crate::error::EngineError;
+use crate::error::{EngineError, EngineResult};
 use crate::ir::adapter;
 use crate::ir::bridge::function::Parameter;
 use crate::ir::bridge::instruction::{Context, Instruction, Terminator};
 use crate::ir::bridge::shared::SymbolRegistry;
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::ir::bridge::value::BlockLabel;
-use crate::EngineResult;
 
 /// An adapted representation of an LLVM basic block
 #[derive(Eq, PartialEq)]

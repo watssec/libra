@@ -118,18 +118,12 @@ fn main() -> Result<()> {
                 }
                 _ => unreachable!(),
             };
-            info!(
-                "Bitcode generated at {}",
-                path_output
-                    .into_os_string()
-                    .to_str()
-                    .unwrap_or("<non-ascii-path>")
-            );
-
+            info!("Bitcode generated at {}", path_output.to_string_lossy());
             // ensure there is no more build actions
             if actions.iter().any(|a| matches!(a, Action::Build)) {
                 bail!("only one build action is allowed");
             }
+            path_output
         }
     };
 
@@ -144,7 +138,7 @@ fn main() -> Result<()> {
                     bail!("fixedpoint optimization leaves no modules in trace");
                 }
                 info!("Number of fixedpoint optimization rounds: {}", trace.len());
-                trace.into_iter().rev().next().unwrap()
+                trace.into_iter().next_back().unwrap()
             }
             _ => unreachable!(),
         },

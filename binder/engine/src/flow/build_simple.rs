@@ -1,7 +1,6 @@
-use crate::error::EngineResult;
-use crate::EngineError;
 use std::path::PathBuf;
 
+use crate::error::{EngineError, EngineResult};
 use crate::flow::shared::Context;
 
 /// Default flags to be sent to clang
@@ -42,7 +41,7 @@ impl<'a> FlowBuildSimple<'a> {
         let all_flags = PRESET_CLANG_FLAGS
             .iter()
             .map(|i| i.to_string())
-            .chain(flags.into_iter())
+            .chain(flags)
             .collect();
         Self {
             ctxt,

@@ -10,7 +10,7 @@ use structopt::StructOpt;
 use tempfile::tempdir;
 use walkdir::WalkDir;
 
-use libra_engine::{analyze, EngineError};
+use libra_engine::error::EngineError;
 use libra_shared::config::{PATH_ROOT, PATH_STUDIO};
 use libra_shared::logging;
 
