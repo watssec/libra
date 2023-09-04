@@ -72,13 +72,9 @@ impl Context {
         self.run_clang(input, output, flags)
     }
 
-    pub fn link_bitcode<I, S>(&self, input: &[&Path], output: &Path, args: I) -> Result<()>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<OsStr>,
-    {
+    pub fn link_bitcode(&self, input: &[&Path], output: &Path) -> Result<()> {
         let mut cmd = Command::new(&self.bin_llvm_link);
-        cmd.args(args).arg("-o").arg(output).args(input);
+        cmd.arg("--internalize").arg("-o").arg(output).args(input);
         Self::run(cmd)
     }
 
