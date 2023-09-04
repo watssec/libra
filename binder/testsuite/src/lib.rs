@@ -1,11 +1,7 @@
-use std::fs;
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use libra_shared::config::TMPDIR_IN_STUDIO;
-use log::{info, warn};
 use structopt::StructOpt;
-use tempfile::tempdir;
 
 use libra_shared::dep::{DepState, Dependency};
 
@@ -56,56 +52,11 @@ impl DepArgs {
 
         match command {
             DepAction::Build {
-                tmpdir: use_tmpdir,
+                tmpdir,
                 config,
                 force,
             } => {
-                // prepare the tmpdir first
-                let tmpwks = if use_tmpdir {
-                    Ok(tempdir()?)
-                } else {
-                    let path = studio.join(TMPDIR_IN_STUDIO);
-                    if path.exists() {
-                        if !force {
-                            bail!("Tmpdir {} already exists", path.to_str().unwrap());
-                        }
-                        fs::remove_dir_all(&path)?;
-                    }
-                    fs::create_dir_all(&path)?;
-                    Err(path)
-                };
-                let tmpdir = match &tmpwks {
-                    Ok(dir) => dir.path(),
-                    Err(path) => path.as_path(),
-                };
-
-                // case on config
-                if config {
-                    state.list_build_options(tmpdir)?;
-                } else {
-                    match state {
-                        DepState::Scratch(scratch) => {
-                            scratch.make(tmpdir)?;
-                        }
-                        DepState::Package(package) => {
-                            if !force {
-                                info!("Package already exists");
-                            } else {
-                                warn!("Force rebuilding package");
-                                let scratch = package.destroy()?;
-                                scratch.make(tmpdir)?;
-                            }
-                        }
-                    }
-                }
-
-                // clean-up the temporary directory
-                match tmpwks {
-                    Ok(_) => {}
-                    Err(path) => {
-                        fs::remove_dir_all(path)?;
-                    }
-                }
+                state.build(tmpdir, config, force)?;
             }
         }
         Ok(())
