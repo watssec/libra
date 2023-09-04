@@ -6,6 +6,10 @@ authors = ["Meng Xu <meng.xu.cs@uwaterloo.ca>"]
 license = "GPL-3.0"
 edition = "2021"
 
+[build-dependencies]
+libra-builder = { path = "../builder" }
+libra-shared = { path = "../shared" }
+
 [dependencies]
 anyhow = "1.0.75"
 fs_extra = "1.3.0"

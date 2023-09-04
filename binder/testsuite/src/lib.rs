@@ -1,15 +1,15 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{bail, Result};
+use libra_shared::config::TMPDIR_IN_STUDIO;
 use log::{info, warn};
 use structopt::StructOpt;
 use tempfile::tempdir;
 
-use libra_shared::config::TMPDIR_IN_STUDIO;
 use libra_shared::dep::{DepState, Dependency};
 
-use crate::deps::llvm::DepLLVM;
+use crate::llvm::DepLLVMTestSuite;
 
 mod llvm;
 
@@ -114,21 +114,8 @@ impl DepArgs {
     pub fn run(self, studio: &Path) -> Result<()> {
         let name = self.name.as_str();
         match name {
-            "llvm" => self.run_internal::<DepLLVM>(studio),
+            "llvm" => self.run_internal::<DepLLVMTestSuite>(studio),
             _ => bail!("Invalid deps name: {}", name),
         }
     }
-}
-
-/// Retrieve the paths of dependencies
-fn get_artifact_path<T: Dependency>(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
-    let path = match DepState::<T>::new(studio, version)? {
-        DepState::Scratch(_) => bail!("Package not ready"),
-        DepState::Package(pkg) => pkg.artifact_path().to_path_buf(),
-    };
-    Ok(path)
-}
-
-pub fn artifact_for_llvm(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
-    get_artifact_path::<DepLLVM>(studio, version)
 }

@@ -11,7 +11,6 @@ use crate::pass::PassArgs;
 
 mod deps;
 mod pass;
-mod util;
 
 #[derive(StructOpt)]
 #[structopt(

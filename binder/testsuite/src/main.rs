@@ -255,6 +255,10 @@ enum TestResult {
 
 fn run_test_case(depth: usize, inputs: Vec<PathBuf>, keep: Option<&Path>) -> TestResult {
     let temp = tempdir().expect("unable to create a temporary directory");
+    drop(temp);
+    TestResult::Uncompilable
+
+    /* TODO: implement it
     match analyze(Some(depth), vec![], inputs, temp.path().to_path_buf()) {
         Ok(trace) => TestResult::Pass(trace.len()),
         Err(EngineError::NotSupportedYet(reason)) => TestResult::Unsupported(reason.to_string()),
@@ -272,4 +276,5 @@ fn run_test_case(depth: usize, inputs: Vec<PathBuf>, keep: Option<&Path>) -> Tes
             TestResult::Fail(err)
         }
     }
+    */
 }

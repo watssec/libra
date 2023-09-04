@@ -4,9 +4,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use libra_shared::config::PATH_ROOT;
-
-use crate::util::git::GitRepo;
+use crate::config::PATH_ROOT;
+use crate::git::GitRepo;
 
 /// A trait that marks a dependency in the project
 pub trait Dependency {

@@ -35,6 +35,13 @@ impl Context {
         }
     }
 
+    pub fn path_clang(&self) -> Result<&str> {
+        self.bin_clang
+            .as_path()
+            .to_str()
+            .ok_or_else(|| anyhow!("non-ascii path for clang"))
+    }
+
     fn run(mut cmd: Command) -> Result<()> {
         let status = cmd.status()?;
         if !status.success() {
@@ -110,7 +117,7 @@ impl Context {
 
     /// Run a specified opt pipeline
     pub fn opt_pipeline(&self, input: &Path, output: &Path, pipeline: &str) -> Result<()> {
-        self.run_opt(input, Some(output), [format!("--passes='{}'", pipeline)])
+        self.run_opt(input, Some(output), [format!("--passes={}", pipeline)])
     }
 
     /// Serialize a bitcode file to JSON

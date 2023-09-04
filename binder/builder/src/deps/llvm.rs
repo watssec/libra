@@ -3,7 +3,7 @@ use std::process::Command;
 
 use anyhow::{anyhow, Result};
 
-use crate::deps::common::Dependency;
+use libra_shared::dep::Dependency;
 
 #[cfg(target_os = "macos")]
 use anyhow::bail;
