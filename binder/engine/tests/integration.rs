@@ -1,13 +1,17 @@
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
 use datatest_stable::{harness, Result};
 use fs_extra::dir::CopyOptions;
 use tempfile::tempdir;
 
-use libra_engine::analyze;
+use libra_engine::error::EngineResult;
+use libra_engine::flow::build_simple::FlowBuildSimple;
+use libra_engine::flow::fixedpoint::FlowFixedpoint;
+use libra_engine::flow::shared::Context;
+use libra_engine::ir::bridge;
 
 #[derive(Copy, Clone)]
 enum Verbosity {
@@ -15,6 +19,27 @@ enum Verbosity {
     Normal,
     Verbose,
     Extensive,
+}
+
+fn workflow(inputs: Vec<PathBuf>, output: PathBuf) -> EngineResult<Vec<bridge::module::Module>> {
+    let ctxt = Context::new();
+
+    // build
+    let flow_build = FlowBuildSimple::new(
+        &ctxt,
+        inputs,
+        output.clone(),
+        vec![
+            // do not include standard items
+            "-nostdinc".into(),
+            "-nostdlib".into(),
+        ],
+    );
+    let merged_bc = flow_build.execute()?;
+
+    // fixedpoint optimization
+    let flow_fixedpoint = FlowFixedpoint::new(&ctxt, merged_bc, output, None);
+    flow_fixedpoint.execute()
 }
 
 fn run_test(path_output: &Path) -> Result<()> {
@@ -54,16 +79,7 @@ fn run_test(path_output: &Path) -> Result<()> {
 
     // create output dir
     let temp = tempdir().expect("unable to create a temporary directory");
-    let success = match analyze(
-        None,
-        vec![
-            // do not include standard items
-            "-nostdinc".into(),
-            "-nostdlib".into(),
-        ],
-        inputs,
-        temp.path().to_path_buf(),
-    ) {
+    let success = match workflow(inputs, temp.path().to_path_buf()) {
         Ok(trace) => {
             if expected.is_empty() {
                 if matches!(verbosity, Verbosity::Verbose | Verbosity::Extensive) {

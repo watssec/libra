@@ -1,12 +1,15 @@
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
+use libra_engine::flow::build_simple::FlowBuildSimple;
+use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use log::info;
 use structopt::StructOpt;
 use tempfile::tempdir;
 
-use libra_engine::analyze;
+use libra_engine::flow::shared::Context;
 use libra_shared::config::PATH_STUDIO;
 use libra_shared::logging;
 
@@ -25,6 +28,14 @@ struct Args {
     #[structopt(short, long)]
     verbose: bool,
 
+    /// Keep the workflow artifacts in the studio
+    #[structopt(short, long)]
+    keep: bool,
+
+    /// Actions
+    #[structopt(short, long)]
+    actions: Vec<Action>,
+
     /// Source code files
     #[structopt(required = true)]
     inputs: Vec<PathBuf>,
@@ -36,10 +47,27 @@ struct Args {
     /// Limit the depth of fixedpoint optimization
     #[structopt(short, long)]
     depth: Option<usize>,
+}
 
-    /// Keep the workflow artifacts in the studio
-    #[structopt(short, long)]
-    keep: bool,
+#[derive(StructOpt)]
+enum Action {
+    /// Build the source code
+    Build,
+    /// Run fixedpoint optimization
+    Fixedpoint,
+}
+
+impl FromStr for Action {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let action = match s {
+            "build" => Self::Build,
+            "fixedpoint" => Self::Fixedpoint,
+            _ => return Err("invalid action"),
+        };
+        Ok(action)
+    }
 }
 
 fn main() -> Result<()> {
@@ -47,10 +75,11 @@ fn main() -> Result<()> {
     let Args {
         studio,
         verbose,
+        keep,
+        mut actions,
         inputs,
         flags,
         depth,
-        keep,
     } = args;
     let studio = studio.as_ref().unwrap_or(&PATH_STUDIO);
 
@@ -71,14 +100,54 @@ fn main() -> Result<()> {
         (Some(dir), path)
     };
 
-    // run the analysis
-    match analyze(depth, flags, inputs, output) {
-        Ok(trace) => {
-            info!("Number of optimization rounds: {}", trace.len());
+    // run the workflow
+    let ctxt = Context::new();
+
+    // phase 1: see if anything to build
+    let path_base_bitcode = match actions.iter().position(|a| matches!(a, Action::Build)) {
+        None => {
+            if inputs.len() != 1 {
+                bail!("expecting one and only one input if not building from sources");
+            }
+            inputs.into_iter().next().unwrap()
         }
-        Err(err) => {
-            println!("{}", err);
+        Some(index) => {
+            let path_output = match actions.remove(index) {
+                Action::Build => {
+                    FlowBuildSimple::new(&ctxt, inputs, output.clone(), flags).execute()?
+                }
+                _ => unreachable!(),
+            };
+            info!(
+                "Bitcode generated at {}",
+                path_output
+                    .into_os_string()
+                    .to_str()
+                    .unwrap_or("<non-ascii-path>")
+            );
+
+            // ensure there is no more build actions
+            if actions.iter().any(|a| matches!(a, Action::Build)) {
+                bail!("only one build action is allowed");
+            }
         }
+    };
+
+    // phase 2: any optimizations to run
+    let _ir = match actions.iter().position(|a| matches!(a, Action::Fixedpoint)) {
+        None => ctxt.load(&path_base_bitcode)?,
+        Some(index) => match actions.remove(index) {
+            Action::Fixedpoint => {
+                let trace =
+                    FlowFixedpoint::new(&ctxt, path_base_bitcode, output, depth).execute()?;
+                if trace.is_empty() {
+                    bail!("fixedpoint optimization leaves no modules in trace");
+                }
+                info!("Number of fixedpoint optimization rounds: {}", trace.len());
+                trace.into_iter().rev().next().unwrap()
+            }
+            _ => unreachable!(),
+        },
     };
 
     // drop temp dir explicitly

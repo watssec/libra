@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use log::debug;
 
+use crate::error::EngineError;
 use crate::error::EngineResult;
 use crate::flow::shared::Context;
 use crate::ir::bridge;
-use crate::EngineError;
 
 pub struct FlowFixedpoint<'a> {
     /// Context manager

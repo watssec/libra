@@ -5,9 +5,8 @@ use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
 
-use crate::error::EngineResult;
+use crate::error::{EngineError, EngineResult};
 use crate::ir::{adapter, bridge};
-use crate::EngineError;
 
 /// Context for all workflow
 pub struct Context {
