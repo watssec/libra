@@ -9,8 +9,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 log = "0.4.20"
-num_cpus = "1.16.0"
-simplelog = "0.12.1"
 structopt = "0.3.26"
-tempfile = "3.8.0"
 libra-shared = { path = "../shared" }

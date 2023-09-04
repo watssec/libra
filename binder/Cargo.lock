@@ -362,10 +362,7 @@ dependencies = [
  "anyhow",
  "libra-shared",
  "log",
- "num_cpus",
- "simplelog",
  "structopt",
- "tempfile",
 ]
 
 [[package]]
@@ -374,7 +371,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "datatest-stable",
- "either",
  "fs_extra",
  "libra-builder",
  "libra-shared",
