@@ -48,7 +48,7 @@ struct Args {
     name: String,
 
     /// Version of the test suite (tag or branch)
-    #[structopt(short, long)]
+    #[structopt(long)]
     version: Option<String>,
 
     /// Subcommand
