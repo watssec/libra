@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use log::debug;
+
 use crate::error::{EngineError, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::function::Function;
@@ -22,7 +24,7 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn convert(prefix: &str, module_adapted: &adapter::module::Module) -> EngineResult<Self> {
+    pub fn convert(module_adapted: &adapter::module::Module) -> EngineResult<Self> {
         let adapter::module::Module {
             name,
             asm,
@@ -32,16 +34,7 @@ impl Module {
         } = module_adapted;
 
         // check name
-        // TODO: use name
-        let _ident: Identifier = match name.strip_prefix(prefix) {
-            None => {
-                return Err(EngineError::InvariantViolation(format!(
-                    "module name `{}` does not start with prefix `{}`",
-                    name, prefix
-                )));
-            }
-            Some(n) => n.into(),
-        };
+        debug!("converting module: {}", name);
 
         // reject module-level inline assembly
         if !asm.is_empty() {
