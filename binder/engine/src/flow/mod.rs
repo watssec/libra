@@ -96,9 +96,9 @@ impl Workflow {
         let merged_bc_path = self.get_merged_bc_path();
         self.run_llvm_link(&path_refs, &merged_bc_path, ["--internalize"])
             .map_err(|e| EngineError::CompilationError(format!("Error during llvm-link: {}", e)))?;
-        self.run_opt(&merged_bc_path, None, ["--verify"])
+        self.run_opt(&merged_bc_path, None, ["-passes=verify"])
             .map_err(|e| {
-                EngineError::CompilationError(format!("Error during opt --verify: {}", e))
+                EngineError::CompilationError(format!("Error during opt -passes=verify: {}", e))
             })?;
         self.disassemble(&merged_bc_path)
             .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
@@ -163,8 +163,6 @@ impl Workflow {
             input,
             None,
             [
-                "-load",
-                lib_pass,
                 &format!("-load-pass-plugin={}", lib_pass),
                 "-passes=Libra",
                 &format!("--libra-output={}", output.to_str().unwrap()),
