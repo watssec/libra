@@ -10,6 +10,8 @@ use crate::ir::{adapter, bridge};
 
 /// Context for all workflow
 pub struct Context {
+    /// Path to the llvm installation base
+    pkg_llvm: PathBuf,
     /// Path to the clang compiler
     bin_clang: PathBuf,
     /// Path to the llvm-link tool
@@ -27,6 +29,7 @@ impl Context {
         let pkg_llvm = Path::new(env!("LIBRA_CONST_LLVM_ARTIFACT"));
         let lib_pass = Path::new(env!("LIBRA_CONST_PASS_ARTIFACT"));
         Self {
+            pkg_llvm: pkg_llvm.to_path_buf(),
             bin_clang: pkg_llvm.join("bin").join("clang"),
             bin_llvm_link: pkg_llvm.join("bin").join("llvm-link"),
             bin_llvm_dis: pkg_llvm.join("bin").join("llvm-dis"),
@@ -35,11 +38,16 @@ impl Context {
         }
     }
 
-    pub fn path_clang(&self) -> Result<&str> {
-        self.bin_clang
-            .as_path()
-            .to_str()
-            .ok_or_else(|| anyhow!("non-ascii path for clang"))
+    pub fn path_llvm<I, S>(&self, segments: I) -> Result<String>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<Path>,
+    {
+        let mut path = self.pkg_llvm.to_path_buf();
+        path.extend(segments);
+        path.into_os_string()
+            .into_string()
+            .map_err(|_| anyhow!("non-ascii llvm path"))
     }
 
     fn run(mut cmd: Command) -> Result<()> {

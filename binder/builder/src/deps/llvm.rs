@@ -61,6 +61,7 @@ impl Dependency for DepLLVM {
                 "-DLLVM_ENABLE_RUNTIMES={}",
                 ["libcxx", "libcxxabi"].join(";")
             ))
+            .arg("-DLLVM_LIBC_FULL_BUILD=On")
             .arg("-DLLVM_ENABLE_RTTI=On")
             .arg("-DBUILD_SHARED_LIBS=On")
             .arg("-DCMAKE_BUILD_TYPE=Debug");

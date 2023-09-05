@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -5,6 +6,17 @@ use libra_engine::flow::shared::Context;
 use libra_shared::dep::Dependency;
 
 use anyhow::{anyhow, Result};
+
+#[cfg(target_os = "macos")]
+use std::os::unix;
+
+#[cfg(target_os = "macos")]
+use anyhow::bail;
+#[cfg(target_os = "macos")]
+use tempfile::tempdir;
+
+#[cfg(target_os = "macos")]
+use libra_shared::config::{UNAME_HARDWARE, UNAME_PLATFORM};
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 
@@ -34,7 +46,10 @@ impl Dependency for DepLLVMTestSuite {
         // dump cmake options
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
-            .arg(format!("-DCMAKE_C_COMPILER={}", ctxt.path_clang()?))
+            .arg(format!(
+                "-DCMAKE_C_COMPILER={}",
+                ctxt.path_llvm(["bin", "clang"])?
+            ))
             .arg(format!("-C{}", Self::cmake_profile(path_src)?))
             .arg(path_src);
         cmd.current_dir(path_build);
@@ -54,10 +69,42 @@ impl Dependency for DepLLVMTestSuite {
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
-            .arg(format!("-DCMAKE_C_COMPILER={}", ctxt.path_clang()?))
+            .arg(format!(
+                "-DCMAKE_C_COMPILER={}",
+                ctxt.path_llvm(["bin", "clang"])?
+            ))
             .arg(format!("-C{}", Self::cmake_profile(path_src)?))
-            .arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
-            .arg(path_src);
+            .arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON");
+
+        // platform-specific configuration
+        #[cfg(target_os = "macos")]
+        let tmp_sysroot = match (UNAME_PLATFORM.as_str(), UNAME_HARDWARE.as_str()) {
+            ("Darwin", "arm64") => {
+                // fake a sysroot directory for the tests
+                let sysroot = tempdir()?;
+                let sysroot_usr = sysroot.path().join("usr");
+                fs::create_dir(&sysroot_usr)?;
+                unix::fs::symlink(
+                    ctxt.path_llvm(["include", "c++", "v1"])?,
+                    sysroot_usr.join("include"),
+                )?;
+                unix::fs::symlink(ctxt.path_llvm(["lib"])?, sysroot_usr.join("lib"))?;
+                cmd.arg(format!(
+                    "-DCMAKE_OSX_SYSROOT={}",
+                    sysroot
+                        .path()
+                        .to_str()
+                        .ok_or_else(|| anyhow!("non-ascii sysroot path"))?
+                ));
+                sysroot
+            }
+            _ => {
+                bail!("other macos platforms not supported yet");
+            }
+        };
+
+        // done with the configuration
+        cmd.arg(path_src);
         cmd.current_dir(path_build);
         let status = cmd.status()?;
         if !status.success() {
@@ -71,6 +118,9 @@ impl Dependency for DepLLVMTestSuite {
         if !status.success() {
             return Err(anyhow!("Build failed"));
         }
+
+        #[cfg(target_os = "macos")]
+        tmp_sysroot.close()?;
 
         // done
         Ok(())
