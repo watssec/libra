@@ -32,9 +32,8 @@ fn baseline_cmake_options() -> Vec<String> {
             ["libcxx", "libcxxabi"].join(";")
         ),
         "-DLLVM_ENABLE_RTTI=ON".into(),
-        "-DLLVM_ENABLE_LLD=ON".into(),
         "-DLIBC_ENABLE_USE_BY_CLANG=ON".into(),
-        "-DCLANG_DEFAULT_CXX_STDLIB=libstdc++".into(),
+        "-DCLANG_DEFAULT_CXX_STDLIB=libc++".into(),
         #[cfg(target_os = "macos")]
         "-DCMAKE_OSX_ARCHITECTURES=arm64".into(),
     ]
