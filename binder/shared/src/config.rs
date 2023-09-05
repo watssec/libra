@@ -36,20 +36,24 @@ lazy_static! {
         if !cmd.status.success() || !cmd.stderr.is_empty() {
             panic!("uname");
         }
-        String::from_utf8(cmd.stdout)
+        let out = String::from_utf8(cmd.stdout)
             .expect("uname")
             .trim()
-            .to_string()
+            .to_string();
+        assert_eq!(out.as_str(), "arm64");
+        out
     };
     pub static ref UNAME_PLATFORM: String = {
         let cmd = Command::new("uname").arg("-s").output().expect("uname");
         if !cmd.status.success() || !cmd.stderr.is_empty() {
             panic!("uname");
         }
-        String::from_utf8(cmd.stdout)
+        let out = String::from_utf8(cmd.stdout)
             .expect("uname")
             .trim()
-            .to_string()
+            .to_string();
+        assert_eq!(out.as_str(), "Darwin");
+        out
     };
     pub static ref UNAME_RELEASE: String = {
         let cmd = Command::new("uname").arg("-r").output().expect("uname");
