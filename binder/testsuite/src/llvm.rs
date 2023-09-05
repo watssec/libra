@@ -11,8 +11,6 @@ use anyhow::{anyhow, Result};
 use std::os::unix;
 
 #[cfg(target_os = "macos")]
-use anyhow::bail;
-#[cfg(target_os = "macos")]
 use tempfile::tempdir;
 
 #[cfg(target_os = "macos")]
@@ -99,7 +97,7 @@ impl Dependency for DepLLVMTestSuite {
                 sysroot
             }
             _ => {
-                bail!("other macos platforms not supported yet");
+                panic!("other macos platforms not supported yet");
             }
         };
 
