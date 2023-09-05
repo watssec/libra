@@ -20,6 +20,10 @@ fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
     Ok(vec![
         format!("-DCMAKE_C_COMPILER={}", ctxt.path_llvm(["bin", "clang"])?),
         format!("-C{}", profile),
+        format!(
+            "-DTEST_SUITE_SUBDIRS={}",
+            ["SingleSource", "MultiSource", "Bitcode"].join(";")
+        ),
     ])
 }
 
