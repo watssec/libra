@@ -36,6 +36,7 @@ fn baseline_cmake_options() -> Vec<String> {
         ),
         "-DLLVM_ENABLE_RTTI=ON".into(),
         "-DLIBC_ENABLE_USE_BY_CLANG=ON".into(),
+        "-DCLANG_DEFAULT_CXX_STDLIB=libc++".into(),
     ];
 
     // platform-specific configuration
