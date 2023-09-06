@@ -52,7 +52,8 @@ impl DepArgs {
             DepAction::Build { force } => {
                 let workdir = studio.join(TMPDIR_IN_STUDIO);
                 fs::create_dir_all(&workdir)?;
-                state.build(Some(&workdir), force)?
+                state.build(Some(&workdir), force)?;
+                fs::remove_dir_all(workdir)?;
             }
         }
         Ok(())
