@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use fs_extra::dir;
 
 use libra_engine::flow::shared::Context;
-use libra_shared::compile_db::{CompileDB, CompileEntry, TokenStream};
+use libra_shared::compile_db::{ClangArg, CompileDB, CompileEntry, TokenStream};
 use libra_shared::dep::Dependency;
 use libra_shared::git::GitRepo;
 
@@ -130,11 +130,11 @@ impl DepLLVMTestSuite {
 
         let mut sub_tokens = TokenStream::new(token.split('/'));
         let sub_token = sub_tokens.prev_expect_token()?;
-        match sub_token {
-            "clang" => {}
-            "clang++" => {}
+        let _args = match sub_token {
+            "clang" => ClangArg::consume(tokens)?,
+            "clang++" => ClangArg::consume(tokens)?,
             _ => bail!("unrecognized compiler"),
-        }
+        };
         sub_tokens.prev_expect_literal("bin")?;
 
         Ok(Some(()))
