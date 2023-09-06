@@ -1,12 +1,13 @@
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use anyhow::{anyhow, Result};
 use fs_extra::dir;
 
 use libra_engine::flow::shared::Context;
 use libra_shared::dep::Dependency;
 
-use anyhow::{anyhow, Result};
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 
 fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
@@ -76,6 +77,11 @@ impl Dependency for DepLLVMTestSuite {
         }
 
         // install
+        fs::create_dir_all(
+            artifact
+                .parent()
+                .ok_or_else(|| anyhow!("invalid artifact path"))?,
+        )?;
         let options = dir::CopyOptions::new();
         dir::copy(path_build, artifact, &options)?;
 
