@@ -63,7 +63,9 @@ impl Dependency for DepLLVM {
         Ok(())
     }
 
-    fn build(path_src: &Path, path_build: &Path, artifact: &Path) -> Result<()> {
+    fn build(path_src: &Path, path_build: &Path, path_install: Option<&Path>) -> Result<()> {
+        let artifact = path_install.ok_or_else(|| anyhow!("No artifact path"))?;
+
         // llvm configuration
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")

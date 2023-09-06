@@ -1,9 +1,7 @@
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
-use fs_extra::dir;
 
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{ClangArg, CompileDB, CompileEntry, TokenStream};
@@ -58,7 +56,12 @@ impl Dependency for DepLLVMTestSuite {
         Ok(())
     }
 
-    fn build(path_src: &Path, path_build: &Path, artifact: &Path) -> Result<()> {
+    fn build(path_src: &Path, path_build: &Path, path_install: Option<&Path>) -> Result<()> {
+        // sanity check
+        if let Some(artifact) = path_install {
+            bail!("Unexpected artifact path: {}", artifact.to_string_lossy());
+        }
+
         // llvm configuration
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
@@ -79,11 +82,6 @@ impl Dependency for DepLLVMTestSuite {
         if !status.success() {
             return Err(anyhow!("Build failed"));
         }
-
-        // install
-        fs::create_dir_all(artifact)?;
-        let options = dir::CopyOptions::new().content_only(true);
-        dir::copy(path_build, artifact, &options)?;
 
         // done
         Ok(())

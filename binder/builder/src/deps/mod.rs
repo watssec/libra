@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Result};
 use structopt::StructOpt;
 
+use libra_shared::config::TMPDIR_IN_STUDIO;
 use libra_shared::dep::{DepState, Dependency};
 
 use crate::deps::llvm::DepLLVM;
@@ -11,16 +12,11 @@ mod llvm;
 
 #[derive(StructOpt)]
 pub enum DepAction {
+    /// Config the dependency
+    Config,
+
     /// Build the dependency
     Build {
-        /// Temporary directory for the build process
-        #[structopt(short, long)]
-        tmpdir: bool,
-
-        /// Run the configuration step instead of build
-        #[structopt(short, long)]
-        config: bool,
-
         /// Force the build to proceed
         #[structopt(short, long)]
         force: bool,
@@ -51,12 +47,10 @@ impl DepArgs {
         let state: DepState<T> = DepState::new(studio, version.as_deref())?;
 
         match command {
-            DepAction::Build {
-                tmpdir,
-                config,
-                force,
-            } => {
-                state.build(tmpdir, config, force)?;
+            DepAction::Config => state.list_build_options()?,
+            DepAction::Build { force } => {
+                let workdir = studio.join(TMPDIR_IN_STUDIO);
+                state.build(Some(&workdir), force)?
             }
         }
         Ok(())

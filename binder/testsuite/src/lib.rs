@@ -15,20 +15,16 @@ mod llvm;
 
 #[derive(StructOpt)]
 enum Command {
+    /// Config the test suite
+    Config,
+
     /// Build the test suite
     Build {
-        /// Temporary directory for the build process
-        #[structopt(short, long)]
-        tmpdir: bool,
-
-        /// Run the configuration step instead of build
-        #[structopt(short, long)]
-        config: bool,
-
         /// Force the build to proceed
         #[structopt(short, long)]
         force: bool,
     },
+
     /// Run the test suite
     Run,
 }
@@ -91,12 +87,9 @@ fn run_internal<T: Dependency + TestSuite>(
 ) -> Result<()> {
     let state: DepState<T> = DepState::new(studio, version)?;
     match command {
-        Command::Build {
-            tmpdir,
-            config,
-            force,
-        } => {
-            state.build(tmpdir, config, force)?;
+        Command::Config => state.list_build_options()?,
+        Command::Build { force } => {
+            state.build(None, force)?;
         }
         Command::Run => match state {
             DepState::Scratch(_) => bail!("package not ready"),
