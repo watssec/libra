@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
@@ -50,6 +51,7 @@ impl DepArgs {
             DepAction::Config => state.list_build_options()?,
             DepAction::Build { force } => {
                 let workdir = studio.join(TMPDIR_IN_STUDIO);
+                fs::create_dir_all(&workdir)?;
                 state.build(Some(&workdir), force)?
             }
         }
