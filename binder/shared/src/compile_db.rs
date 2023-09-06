@@ -188,12 +188,6 @@ impl ClangArg {
             Some(token) => {
                 if !token.starts_with('-') {
                     Self::Input(token.to_string())
-                } else if token.starts_with("--") {
-                    match token {
-                        "--debug" => Self::Debug,
-                        "--no-warnings" => Self::NoWarnings,
-                        _ => bail!("unknown flag: {}", token),
-                    }
                 } else {
                     match token {
                         "-c" => Self::ModeCompile,
@@ -220,7 +214,7 @@ impl ClangArg {
                         "-arch" => {
                             Self::Architecture(Self::expect_plain(stream.next_expect_token()?)?)
                         }
-                        "-g" => Self::Debug,
+                        "-g" | "--debug" => Self::Debug,
                         "-isysroot" => Self::IncludeSysroot(Self::unescape_quotes(
                             stream.next_expect_token()?,
                             stream,
@@ -235,7 +229,7 @@ impl ClangArg {
                             let (k, v) = Self::parse_maybe_key_value(item, stream)?;
                             Self::Warning(k, v)
                         }
-                        "-w" => Self::NoWarnings,
+                        "-w" | "--no-warnings" => Self::NoWarnings,
                         "-pthread" => Self::POSIXThread,
                         "-o" => Self::Output(Self::unescape_quotes(
                             stream.next_expect_token()?,
