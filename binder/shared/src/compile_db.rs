@@ -94,7 +94,9 @@ pub enum ClangArg {
     /// -O<level>
     Optimization(String),
     /// -arch <token>
-    Architecture(String),
+    Arch(String),
+    /// -march=<token>
+    MachineArch(String),
     /// -g, --debug
     Debug,
     /// -isysroot <token>
@@ -212,8 +214,10 @@ impl ClangArg {
                             let item = t.strip_prefix("-O").unwrap();
                             Self::Optimization(Self::expect_plain(item)?)
                         }
-                        "-arch" => {
-                            Self::Architecture(Self::expect_plain(stream.next_expect_token()?)?)
+                        "-arch" => Self::Arch(Self::expect_plain(stream.next_expect_token()?)?),
+                        t if t.starts_with("-march=") => {
+                            let item = t.strip_prefix("-march=").unwrap();
+                            Self::MachineArch(Self::expect_plain(item)?)
                         }
                         "-g" | "--debug" => Self::Debug,
                         "-isysroot" => Self::IncludeSysroot(Self::unescape_quotes(
