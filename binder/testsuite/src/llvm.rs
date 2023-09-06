@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::process::Command;
 
+use fs_extra::dir;
+
 use libra_engine::flow::shared::Context;
 use libra_shared::dep::Dependency;
 
@@ -51,7 +53,7 @@ impl Dependency for DepLLVMTestSuite {
         Ok(())
     }
 
-    fn build(path_src: &Path, path_build: &Path, _artifact: &Path) -> Result<()> {
+    fn build(path_src: &Path, path_build: &Path, artifact: &Path) -> Result<()> {
         // llvm configuration
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
@@ -72,6 +74,10 @@ impl Dependency for DepLLVMTestSuite {
         if !status.success() {
             return Err(anyhow!("Build failed"));
         }
+
+        // install
+        let options = dir::CopyOptions::new();
+        dir::copy(path_build, artifact, &options)?;
 
         // done
         Ok(())
