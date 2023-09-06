@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct CompileEntry {
     pub file: String,
+    #[cfg(target_os = "macos")]
     pub output: String,
     pub directory: String,
     pub command: String,
