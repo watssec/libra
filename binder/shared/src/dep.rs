@@ -39,7 +39,10 @@ impl<T: Dependency> Scratch<T> {
 
         // build
         match workdir {
-            None => T::build(repo.path(), &artifact, None)?,
+            None => {
+                fs::create_dir_all(&artifact)?;
+                T::build(repo.path(), &artifact, None)?
+            }
             Some(path) => T::build(repo.path(), path, Some(&artifact))?,
         }
 
