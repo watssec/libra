@@ -10,5 +10,7 @@ edition = "2021"
 anyhow = "1.0.75"
 lazy_static = "1.4.0"
 log = "0.4.20"
+serde = { version = "1.0.188", features = ["derive"] }
+serde_json = "1.0.105"
 simplelog = "0.12.1"
 tempfile = "3.8.0"

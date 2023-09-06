@@ -2,10 +2,11 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use fs_extra::dir;
 
 use libra_engine::flow::shared::Context;
+use libra_shared::compile_db::{CompileDB, CompileEntry, TokenStream};
 use libra_shared::dep::Dependency;
 use libra_shared::git::GitRepo;
 
@@ -90,7 +91,61 @@ impl Dependency for DepLLVMTestSuite {
 }
 
 impl TestSuite for DepLLVMTestSuite {
-    fn run(_repo: &GitRepo, _path_artifact: &Path) -> Result<()> {
-        todo!()
+    fn run(_repo: &GitRepo, path_artifact: &Path) -> Result<()> {
+        // parse compilation database
+        Self::parse_compile_database(path_artifact)?;
+        Ok(())
+    }
+}
+
+impl DepLLVMTestSuite {
+    fn parse_compile_entry(entry: &CompileEntry) -> Result<Option<()>> {
+        let mut tokens = TokenStream::new(entry.command.split(' '));
+
+        // check the header
+        let token = tokens.next_expect_token()?;
+
+        let mut sub_tokens = TokenStream::new(token.split('/'));
+        let sub_token = sub_tokens.prev_expect_token()?;
+        match sub_token {
+            "timeit" => {
+                sub_tokens.prev_expect_literal("tools")?;
+            }
+            "clang" | "clang++" => {
+                // this is for host compilation, ignore them
+                return Ok(None);
+            }
+            _ => bail!("unrecognized binary"),
+        }
+
+        // next token should be summary
+        tokens.next_expect_literal("--summary")?;
+        let token = tokens.next_expect_token()?;
+        if !token.ends_with(".time") {
+            bail!("expect a timeit summary file");
+        }
+
+        // next token should be a llvm tool
+        let token = tokens.next_expect_token()?;
+
+        let mut sub_tokens = TokenStream::new(token.split('/'));
+        let sub_token = sub_tokens.prev_expect_token()?;
+        match sub_token {
+            "clang" => {}
+            "clang++" => {}
+            _ => bail!("unrecognized compiler"),
+        }
+        sub_tokens.prev_expect_literal("bin")?;
+
+        Ok(Some(()))
+    }
+
+    fn parse_compile_database(path_artifact: &Path) -> Result<()> {
+        let comp_db = CompileDB::new(&path_artifact.join("compile_commands.json"))?;
+        for entry in comp_db.entries {
+            Self::parse_compile_entry(&entry)
+                .map_err(|e| anyhow!("failed to parse '{}': {}", entry.command, e))?;
+        }
+        Ok(())
     }
 }

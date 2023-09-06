@@ -391,6 +391,8 @@ dependencies = [
  "anyhow",
  "lazy_static",
  "log",
+ "serde",
+ "serde_json",
  "simplelog",
  "tempfile",
 ]
