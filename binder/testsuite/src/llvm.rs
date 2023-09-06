@@ -7,6 +7,9 @@ use fs_extra::dir;
 
 use libra_engine::flow::shared::Context;
 use libra_shared::dep::Dependency;
+use libra_shared::git::GitRepo;
+
+use crate::common::TestSuite;
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 
@@ -77,15 +80,17 @@ impl Dependency for DepLLVMTestSuite {
         }
 
         // install
-        fs::create_dir_all(
-            artifact
-                .parent()
-                .ok_or_else(|| anyhow!("invalid artifact path"))?,
-        )?;
-        let options = dir::CopyOptions::new();
+        fs::create_dir_all(artifact)?;
+        let options = dir::CopyOptions::new().content_only(true);
         dir::copy(path_build, artifact, &options)?;
 
         // done
         Ok(())
+    }
+}
+
+impl TestSuite for DepLLVMTestSuite {
+    fn run(_repo: &GitRepo, _path_artifact: &Path) -> Result<()> {
+        todo!()
     }
 }

@@ -24,7 +24,12 @@ impl GitRepo {
         Ok(Self { path, commit })
     }
 
-    /// Retrieve the commit hash of this version
+    /// Retrieve the path of this repo
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Retrieve the commit hash of this repo
     pub fn commit(&self) -> &str {
         &self.commit
     }

@@ -7,13 +7,15 @@ use libra_shared::config::PATH_STUDIO;
 use libra_shared::dep::{DepState, Dependency};
 use libra_shared::logging;
 
+use crate::common::TestSuite;
 use crate::llvm::DepLLVMTestSuite;
 
+mod common;
 mod llvm;
 
 #[derive(StructOpt)]
 enum Command {
-    /// Build the dependency
+    /// Build the test suite
     Build {
         /// Temporary directory for the build process
         #[structopt(short, long)]
@@ -27,6 +29,8 @@ enum Command {
         #[structopt(short, long)]
         force: bool,
     },
+    /// Run the test suite
+    Run,
 }
 
 #[derive(StructOpt)]
@@ -80,7 +84,7 @@ pub fn entrypoint() -> Result<()> {
     Ok(())
 }
 
-fn run_internal<T: Dependency>(
+fn run_internal<T: Dependency + TestSuite>(
     studio: &Path,
     version: Option<&str>,
     command: Command,
@@ -94,6 +98,12 @@ fn run_internal<T: Dependency>(
         } => {
             state.build(tmpdir, config, force)?;
         }
+        Command::Run => match state {
+            DepState::Scratch(_) => bail!("package not ready"),
+            DepState::Package(pkg) => {
+                T::run(pkg.git_repo(), pkg.artifact_path())?;
+            }
+        },
     }
     Ok(())
 }

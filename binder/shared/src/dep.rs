@@ -92,6 +92,11 @@ impl<T: Dependency> Package<T> {
         })
     }
 
+    /// Get the git repo from the package
+    pub fn git_repo(&self) -> &GitRepo {
+        &self.repo
+    }
+
     /// Get the artifact path from the package
     pub fn artifact_path(&self) -> &Path {
         &self.artifact

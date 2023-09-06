@@ -74,7 +74,7 @@ impl DepArgs {
 /// Retrieve the paths of dependencies
 fn get_artifact_path<T: Dependency>(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
     let path = match DepState::<T>::new(studio, version)? {
-        DepState::Scratch(_) => bail!("Package not ready"),
+        DepState::Scratch(_) => bail!("package not ready"),
         DepState::Package(pkg) => pkg.artifact_path().to_path_buf(),
     };
     Ok(path)
