@@ -74,7 +74,7 @@ fn run_internal<R: Resolver, T: Dependency<R> + TestSuite<R>>(command: Command) 
         }
         Command::Run => {
             let (repo, resolver) = state.into_source_and_artifact()?;
-            T::run(&repo, resolver)?;
+            T::run(repo, resolver)?;
         }
     }
     Ok(())

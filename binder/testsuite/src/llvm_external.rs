@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
+use libra_builder::ResolverLLVM;
 
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{ClangCommand, CompileDB, CompileEntry, TokenStream};
@@ -28,7 +29,7 @@ fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
         format!("-C{}", profile),
         format!(
             "-DTEST_SUITE_SUBDIRS={}",
-            ["SingleSource", "MultiSource", "Bitcode"].join(";")
+            ["SingleSource", "Bitcode"].join(";")
         ),
     ])
 }
@@ -107,9 +108,11 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
 }
 
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
-    fn run(_repo: &GitRepo, resolver: ResolverLLVMExternal) -> Result<()> {
+    fn run(_repo: GitRepo, resolver: ResolverLLVMExternal) -> Result<()> {
+        // lit test discovery
+        Self::lit_test_discovery(&resolver)?;
         // parse compilation database
-        Self::parse_compile_database(&resolver.path_compile_db)?;
+        Self::parse_compile_database(&resolver)?;
         Ok(())
     }
 }
@@ -156,8 +159,8 @@ impl DepLLVMExternal {
         Ok(Some(clang_cmd))
     }
 
-    fn parse_compile_database(path: &Path) -> Result<()> {
-        let comp_db = CompileDB::new(path)?;
+    fn parse_compile_database(resolver: &ResolverLLVMExternal) -> Result<()> {
+        let comp_db = CompileDB::new(&resolver.path_compile_db)?;
 
         // collect commands
         let mut commands = vec![];
@@ -171,9 +174,59 @@ impl DepLLVMExternal {
 
         // construct build hierarchy
         // TODO
-        for x in commands {
-            println!("{}", x);
+        Ok(())
+    }
+
+    fn lit_test_discovery(resolver: &ResolverLLVMExternal) -> Result<()> {
+        // locate the lit tool
+        let (_, pkg_llvm) = ResolverLLVM::seek()?;
+        let bin_lit = pkg_llvm.path_build().join("bin").join("llvm-lit");
+
+        // run discovery
+        let output = Command::new(bin_lit)
+            .arg("--show-tests")
+            .arg(&resolver.path_artifact)
+            .output()?;
+
+        // sanity check the execution
+        if !output.stderr.is_empty() {
+            bail!(
+                "stderr: {}",
+                String::from_utf8(output.stderr)
+                    .unwrap_or_else(|_| "<unable-to-parse>".to_string())
+            );
         }
+        if !output.status.success() {
+            bail!("lit test discovery fails");
+        }
+
+        let content = String::from_utf8(output.stdout)?;
+        let mut lines = content.lines();
+
+        // skip first line
+        if lines.next().map_or(true, |l| l != "-- Available Tests --") {
+            bail!("invalid header line");
+        }
+
+        // parse the result
+        for line in lines {
+            let mut tokens = line.trim().split(" :: ");
+            let ty = tokens.next().ok_or_else(|| anyhow!("expect test type"))?;
+            if ty != "test-suite" {
+                bail!("unexpected test type: {}", ty);
+            }
+            let name = tokens.next().ok_or_else(|| anyhow!("expect test name"))?;
+
+            // check existence
+            let path_test = resolver.path_artifact.join(name);
+            if !path_test.exists() {
+                bail!("test marker does not exist: {}", name);
+            }
+
+            // TODO
+            println!("{}", name);
+        }
+
         Ok(())
     }
 }
