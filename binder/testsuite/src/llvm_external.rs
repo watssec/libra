@@ -171,6 +171,9 @@ impl DepLLVMExternal {
 
         // construct build hierarchy
         // TODO
+        for x in commands {
+            println!("{}", x);
+        }
         Ok(())
     }
 }

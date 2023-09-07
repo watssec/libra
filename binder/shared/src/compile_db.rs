@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::Path;
 use std::str::Split;
@@ -91,6 +92,8 @@ pub enum ClangArg {
     Define(String),
     /// -I <token>
     Include(String),
+    /// -isysroot <token>
+    IncludeSysroot(String),
     /// -O<level>
     Optimization(String),
     /// -arch <token>
@@ -99,8 +102,6 @@ pub enum ClangArg {
     MachineArch(String),
     /// -g, --debug
     Debug,
-    /// -isysroot <token>
-    IncludeSysroot(String),
     /// -f<key>{=<value>}
     Flag(String, Option<String>),
     /// -W<key>{=<value>}
@@ -249,6 +250,30 @@ impl ClangArg {
     }
 }
 
+impl Display for ClangArg {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ModeCompile => write!(f, "-c"),
+            Self::Standard(v) => write!(f, "-std={}", v),
+            Self::Define(v) => write!(f, "-D{}", v),
+            Self::Include(v) => write!(f, "-I{}", v),
+            Self::IncludeSysroot(v) => write!(f, "-isysroot {}", v),
+            Self::Optimization(v) => write!(f, "-O{}", v),
+            Self::Arch(v) => write!(f, "-arch {}", v),
+            Self::MachineArch(v) => write!(f, "-march={}", v),
+            Self::Debug => write!(f, "-g"),
+            Self::Flag(k, None) => write!(f, "-f{}", k),
+            Self::Flag(k, Some(v)) => write!(f, "-f{}={}", k, v),
+            Self::Warning(k, None) => write!(f, "-W{}", k),
+            Self::Warning(k, Some(v)) => write!(f, "-W{}={}", k, v),
+            Self::NoWarnings => write!(f, "-w"),
+            Self::POSIXThread => write!(f, "-pthread"),
+            Self::Output(v) => write!(f, "-o {}", v),
+            Self::Input(v) => write!(f, "{}", v),
+        }
+    }
+}
+
 pub struct ClangCommand {
     is_cpp: bool,
     args: Vec<ClangArg>,
@@ -261,5 +286,14 @@ impl ClangCommand {
             args.push(arg);
         }
         Ok(Self { is_cpp, args })
+    }
+}
+
+impl Display for ClangCommand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let Self { is_cpp, args } = self;
+        let mut tokens = vec![if *is_cpp { "clang++" } else { "clang" }.to_string()];
+        tokens.extend(args.iter().map(|arg| arg.to_string()));
+        write!(f, "{}", tokens.join(" "))
     }
 }
