@@ -2,20 +2,29 @@ use std::fs;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::{info, warn};
 use tempfile::tempdir;
 
 use crate::config::PATH_ROOT;
 use crate::git::GitRepo;
 
+/// A trait that marks an artifact resolver
+pub trait Resolver: Sized {
+    /// Construct a resolver from the baseline path
+    fn construct(path: PathBuf) -> Self;
+
+    /// Destruct the resolver and get back the baseline path
+    fn destruct(self) -> PathBuf;
+
+    /// Try to create a resolver from the baseline path
+    fn seek(studio: &Path, version: Option<&str>) -> Result<Self>;
+}
+
 /// A trait that marks a dependency in the project
-pub trait Dependency<R> {
+pub trait Dependency<R: Resolver> {
     /// Location of the git repo from the project root
     fn repo_path_from_root() -> &'static [&'static str];
-
-    /// Construct an artifact resolver
-    fn artifact_resolver(path_artifact: &Path) -> R;
 
     /// List configurable options for building
     fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()>;
@@ -25,14 +34,14 @@ pub trait Dependency<R> {
 }
 
 /// A struct that represents the build-from-scratch state
-pub struct Scratch<R, T: Dependency<R>> {
+pub struct Scratch<R: Resolver, T: Dependency<R>> {
     repo: GitRepo,
     artifact: PathBuf,
     _phantom_r: PhantomData<R>,
     _phantom_t: PhantomData<T>,
 }
 
-impl<R, T: Dependency<R>> Scratch<R, T> {
+impl<R: Resolver, T: Dependency<R>> Scratch<R, T> {
     /// Build the deps from scratch
     pub fn make(self) -> Result<Package<R, T>> {
         let Self {
@@ -43,43 +52,41 @@ impl<R, T: Dependency<R>> Scratch<R, T> {
         } = self;
 
         fs::create_dir_all(&artifact)?;
-        let resolver = T::artifact_resolver(&artifact);
+        let resolver = R::construct(artifact);
         T::build(repo.path(), &resolver)?;
 
         Ok(Package {
             repo,
-            artifact,
-            _phantom_r,
-            _phantom_t,
+            artifact: resolver,
+            _phantom: PhantomData,
         })
     }
 }
 
 /// A struct that represents the package-ready state
-pub struct Package<R, T: Dependency<R>> {
+pub struct Package<R: Resolver, T: Dependency<R>> {
     repo: GitRepo,
-    artifact: PathBuf,
-    _phantom_r: PhantomData<R>,
-    _phantom_t: PhantomData<T>,
+    artifact: R,
+    _phantom: PhantomData<T>,
 }
 
-impl<R, T: Dependency<R>> Package<R, T> {
+impl<R: Resolver, T: Dependency<R>> Package<R, T> {
     /// Destroy the deps so that we can build it again
     pub fn destroy(self) -> Result<Scratch<R, T>> {
         let Self {
             repo,
             artifact,
-            _phantom_r,
-            _phantom_t,
+            _phantom,
         } = self;
 
-        fs::remove_dir_all(&artifact)?;
+        let path_artifact = artifact.destruct();
+        fs::remove_dir_all(&path_artifact)?;
 
         Ok(Scratch {
             repo,
-            artifact,
-            _phantom_r,
-            _phantom_t,
+            artifact: path_artifact,
+            _phantom_r: PhantomData,
+            _phantom_t: PhantomData,
         })
     }
 
@@ -87,20 +94,15 @@ impl<R, T: Dependency<R>> Package<R, T> {
     pub fn git_repo(&self) -> &GitRepo {
         &self.repo
     }
-
-    /// Get the artifact resolver from the package
-    pub fn artifact_path(&self) -> &Path {
-        &self.artifact
-    }
 }
 
 /// Automatically differentiate the scratch and package version of LLVM
-pub enum DepState<R, T: Dependency<R>> {
+pub enum DepState<R: Resolver, T: Dependency<R>> {
     Scratch(Scratch<R, T>),
     Package(Package<R, T>),
 }
 
-impl<R, T: Dependency<R>> DepState<R, T> {
+impl<R: Resolver, T: Dependency<R>> DepState<R, T> {
     /// Get the deps state
     pub fn new(studio: &Path, version: Option<&str>) -> Result<Self> {
         // derive the correct path
@@ -118,9 +120,8 @@ impl<R, T: Dependency<R>> DepState<R, T> {
         let state = if artifact.exists() {
             Self::Package(Package {
                 repo,
-                artifact,
-                _phantom_r: PhantomData,
-                _phantom_t: PhantomData,
+                artifact: R::construct(artifact),
+                _phantom: PhantomData,
             })
         } else {
             Self::Scratch(Scratch {
@@ -166,5 +167,13 @@ impl<R, T: Dependency<R>> DepState<R, T> {
         };
         scratch.make()?;
         Ok(())
+    }
+
+    /// Retrieve the artifact resolver
+    pub fn into_artifact_resolver(self) -> Result<R> {
+        match self {
+            Self::Scratch(_) => Err(anyhow!("package not ready")),
+            Self::Package(pkg) => Ok(pkg.artifact),
+        }
     }
 }

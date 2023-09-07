@@ -4,7 +4,7 @@ use std::process::Command;
 
 use anyhow::{anyhow, Result};
 
-use libra_shared::dep::Dependency;
+use libra_shared::dep::{DepState, Dependency, Resolver};
 
 // path constants
 static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
@@ -42,8 +42,30 @@ fn baseline_cmake_options() -> Vec<String> {
 
 /// Artifact path resolver for LLVM
 pub struct ResolverLLVM {
+    /// Base path for the artifact directory
+    path_artifact: PathBuf,
+    /// <artifact>/build
     path_build: PathBuf,
+    /// <artifact>/build
     path_install: PathBuf,
+}
+
+impl Resolver for ResolverLLVM {
+    fn construct(path: PathBuf) -> Self {
+        Self {
+            path_build: path.join("build"),
+            path_install: path.join("install"),
+            path_artifact: path,
+        }
+    }
+
+    fn destruct(self) -> PathBuf {
+        self.path_artifact
+    }
+
+    fn seek(studio: &Path, version: Option<&str>) -> Result<Self> {
+        DepState::<ResolverLLVM, DepLLVM>::new(studio, version)?.into_artifact_resolver()
+    }
 }
 
 impl ResolverLLVM {
@@ -62,13 +84,6 @@ pub struct DepLLVM {}
 impl Dependency<ResolverLLVM> for DepLLVM {
     fn repo_path_from_root() -> &'static [&'static str] {
         &PATH_REPO
-    }
-
-    fn artifact_resolver(path_artifact: &Path) -> ResolverLLVM {
-        ResolverLLVM {
-            path_build: path_artifact.join("build"),
-            path_install: path_artifact.join("install"),
-        }
     }
 
     fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {

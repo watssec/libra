@@ -1,3 +1,6 @@
+mod deps;
+mod pass;
+
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -6,11 +9,9 @@ use structopt::StructOpt;
 use libra_shared::config::PATH_STUDIO;
 use libra_shared::logging;
 
+pub use crate::deps::llvm::ResolverLLVM;
 use crate::deps::DepArgs;
 use crate::pass::PassArgs;
-
-pub mod deps;
-pub mod pass;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -63,10 +64,7 @@ pub fn entrypoint() -> Result<()> {
     Ok(())
 }
 
-pub fn artifact_for_deps_llvm(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
-    deps::artifact_for_llvm(studio, version)
-}
-
+/// Utility function for exposing pass to others
 pub fn artifact_for_pass(studio: &Path, llvm_version: Option<&str>) -> Result<PathBuf> {
     pass::artifact(studio, llvm_version)
 }

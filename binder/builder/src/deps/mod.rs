@@ -1,9 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{bail, Result};
 use structopt::StructOpt;
 
-use libra_shared::dep::{DepState, Dependency};
+use libra_shared::dep::{DepState, Dependency, Resolver};
 
 use crate::deps::llvm::{DepLLVM, ResolverLLVM};
 
@@ -37,7 +37,7 @@ pub struct DepArgs {
 }
 
 impl DepArgs {
-    fn run_internal<R, T: Dependency<R>>(self, studio: &Path) -> Result<()> {
+    fn run_internal<R: Resolver, T: Dependency<R>>(self, studio: &Path) -> Result<()> {
         let Self {
             name: _,
             version,
@@ -59,17 +59,4 @@ impl DepArgs {
             _ => bail!("Invalid deps name: {}", name),
         }
     }
-}
-
-/// Retrieve the paths of dependencies
-fn get_artifact_path<R, T: Dependency<R>>(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
-    let path = match DepState::<R, T>::new(studio, version)? {
-        DepState::Scratch(_) => bail!("package not ready"),
-        DepState::Package(pkg) => pkg.artifact_path().to_path_buf(),
-    };
-    Ok(path)
-}
-
-pub fn artifact_for_llvm(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
-    get_artifact_path::<ResolverLLVM, DepLLVM>(studio, version)
 }

@@ -8,10 +8,9 @@ use anyhow::{anyhow, bail, Result};
 use structopt::StructOpt;
 
 use libra_shared::config::PATH_ROOT;
-use libra_shared::dep::Dependency;
+use libra_shared::dep::Resolver;
 
-use crate::deps::artifact_for_llvm;
-use crate::deps::llvm::DepLLVM;
+use crate::deps::llvm::ResolverLLVM;
 
 // path constants
 static SEGMENTS: [&str; 1] = ["oracle"];
@@ -35,8 +34,7 @@ impl PassArgs {
         } = self;
 
         // derive deps and paths
-        let (config_hash, dep_llvm) = derive_deps(studio, llvm_version.as_deref())?;
-        let resolver_llvm = DepLLVM::artifact_resolver(&dep_llvm);
+        let (config_hash, resolver_llvm) = derive_deps(studio, llvm_version.as_deref())?;
 
         let mut path_src = PATH_ROOT.clone();
         path_src.extend(SEGMENTS);
@@ -90,10 +88,11 @@ impl PassArgs {
 }
 
 /// Derive the config hash for the pass
-fn derive_deps(studio: &Path, llvm_version: Option<&str>) -> Result<(String, PathBuf)> {
+fn derive_deps(studio: &Path, llvm_version: Option<&str>) -> Result<(String, ResolverLLVM)> {
     // get dep: llvm
-    let path_llvm = artifact_for_llvm(studio, llvm_version)?;
-    let repr_llvm = path_llvm
+    let resolver_llvm = ResolverLLVM::seek(studio, llvm_version)?;
+    let repr_llvm = resolver_llvm
+        .path_install()
         .to_str()
         .ok_or_else(|| anyhow!("non-ascii path"))?;
 
@@ -103,7 +102,7 @@ fn derive_deps(studio: &Path, llvm_version: Option<&str>) -> Result<(String, Pat
     let config_hash = hasher.finish();
 
     // done
-    Ok((format!("{:#18x}", config_hash), path_llvm))
+    Ok((format!("{:#18x}", config_hash), resolver_llvm))
 }
 
 /// Retrieve the artifact path
