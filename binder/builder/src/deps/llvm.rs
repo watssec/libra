@@ -5,6 +5,7 @@ use std::process::Command;
 use anyhow::{anyhow, Result};
 
 use libra_shared::dep::{DepState, Dependency, Resolver};
+use libra_shared::git::GitRepo;
 
 // path constants
 static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
@@ -63,8 +64,8 @@ impl Resolver for ResolverLLVM {
         self.path_artifact
     }
 
-    fn seek(studio: &Path, version: Option<&str>) -> Result<Self> {
-        DepState::<ResolverLLVM, DepLLVM>::new(studio, version)?.into_artifact_resolver()
+    fn seek() -> Result<(GitRepo, Self)> {
+        DepState::<ResolverLLVM, DepLLVM>::new()?.into_source_and_artifact()
     }
 }
 
@@ -87,7 +88,6 @@ impl Dependency<ResolverLLVM> for DepLLVM {
     }
 
     fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {
-        // dump cmake options
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
             .args(baseline_cmake_options())
@@ -97,8 +97,6 @@ impl Dependency<ResolverLLVM> for DepLLVM {
         if !status.success() {
             return Err(anyhow!("Configure failed"));
         }
-
-        // done
         Ok(())
     }
 

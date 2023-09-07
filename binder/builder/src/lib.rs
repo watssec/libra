@@ -1,12 +1,11 @@
 mod deps;
 mod pass;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use structopt::StructOpt;
 
-use libra_shared::config::PATH_STUDIO;
 use libra_shared::logging;
 
 pub use crate::deps::llvm::ResolverLLVM;
@@ -20,10 +19,6 @@ use crate::pass::PassArgs;
     rename_all = "kebab-case"
 )]
 struct Args {
-    /// Studio directory
-    #[structopt(short, long)]
-    studio: Option<PathBuf>,
-
     /// Verbosity
     #[structopt(short, long)]
     verbose: bool,
@@ -46,25 +41,19 @@ enum Command {
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
     let args = Args::from_args();
-    let Args {
-        studio,
-        verbose,
-        command,
-    } = args;
-    let studio = studio.as_ref().unwrap_or(&PATH_STUDIO);
-
+    let Args { verbose, command } = args;
     // setup logging
     logging::setup(verbose)?;
 
     // run the command
     match command {
-        Command::Deps(sub) => sub.run(studio)?,
-        Command::Pass(sub) => sub.build(studio)?,
+        Command::Deps(sub) => sub.run()?,
+        Command::Pass(sub) => sub.build()?,
     }
     Ok(())
 }
 
 /// Utility function for exposing pass to others
-pub fn artifact_for_pass(studio: &Path, llvm_version: Option<&str>) -> Result<PathBuf> {
-    pass::artifact(studio, llvm_version)
+pub fn artifact_for_pass() -> Result<PathBuf> {
+    pass::artifact()
 }

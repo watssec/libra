@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
+use libra_builder::{artifact_for_pass, ResolverLLVM};
+use libra_shared::dep::Resolver;
 
 use crate::error::{EngineError, EngineResult};
 use crate::ir::{adapter, bridge};
@@ -25,17 +27,19 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> Self {
-        let pkg_llvm = Path::new(env!("LIBRA_CONST_LLVM_ARTIFACT"));
-        let lib_pass = Path::new(env!("LIBRA_CONST_PASS_ARTIFACT"));
-        Self {
-            pkg_llvm: pkg_llvm.to_path_buf(),
+    pub fn new() -> Result<Self> {
+        let (_, resolver_llvm) = ResolverLLVM::seek()?;
+        let lib_pass = artifact_for_pass()?;
+        let pkg_llvm = resolver_llvm.path_install().to_path_buf();
+
+        Ok(Self {
             bin_clang: pkg_llvm.join("bin").join("clang"),
             bin_llvm_link: pkg_llvm.join("bin").join("llvm-link"),
             bin_llvm_dis: pkg_llvm.join("bin").join("llvm-dis"),
             bin_opt: pkg_llvm.join("bin").join("opt"),
+            pkg_llvm,
             lib_pass: lib_pass.to_path_buf(),
-        }
+        })
     }
 
     pub fn path_llvm<I, S>(&self, segments: I) -> Result<String>
@@ -164,11 +168,5 @@ impl Context {
             EngineError::LLVMLoadingError(format!("unable to serialize the bitcode file: {}", e))
         })?;
         Self::deserialize(&output)
-    }
-}
-
-impl Default for Context {
-    fn default() -> Self {
-        Self::new()
     }
 }

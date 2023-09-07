@@ -1,19 +1,20 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
 
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{ClangCommand, CompileDB, CompileEntry, TokenStream};
-use libra_shared::dep::Dependency;
+use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
 use crate::common::TestSuite;
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 
+/// Get baseline cmake command
 fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
-    let ctxt = Context::new();
+    let ctxt = Context::new()?;
     let profile = path_src
         .join("cmake")
         .join("caches")
@@ -32,16 +33,40 @@ fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
     ])
 }
 
-/// Represent the llvm-test-suite
-pub struct DepLLVMTestSuite {}
+/// Artifact path resolver for LLVM
+pub struct ResolverLLVMExternal {
+    /// Base path for the artifact directory
+    path_artifact: PathBuf,
+    /// <artifact>/compile_commands.json
+    path_compile_db: PathBuf,
+}
 
-impl Dependency for DepLLVMTestSuite {
+impl Resolver for ResolverLLVMExternal {
+    fn construct(path: PathBuf) -> Self {
+        Self {
+            path_compile_db: path.join("compile_commands.json"),
+            path_artifact: path,
+        }
+    }
+
+    fn destruct(self) -> PathBuf {
+        self.path_artifact
+    }
+
+    fn seek() -> Result<(GitRepo, Self)> {
+        DepState::<ResolverLLVMExternal, DepLLVMExternal>::new()?.into_source_and_artifact()
+    }
+}
+
+/// Represent the llvm-test-suite
+pub struct DepLLVMExternal {}
+
+impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
     fn repo_path_from_root() -> &'static [&'static str] {
         &PATH_REPO
     }
 
     fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {
-        // dump cmake options
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
             .args(baseline_cmake_options(path_src)?)
@@ -51,12 +76,10 @@ impl Dependency for DepLLVMTestSuite {
         if !status.success() {
             return Err(anyhow!("Configure failed"));
         }
-
-        // done
         Ok(())
     }
 
-    fn build(path_src: &Path, path_artifact: &Path) -> Result<()> {
+    fn build(path_src: &Path, resolver: &ResolverLLVMExternal) -> Result<()> {
         // config
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
@@ -64,7 +87,7 @@ impl Dependency for DepLLVMTestSuite {
             .args(baseline_cmake_options(path_src)?)
             .arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
             .arg(path_src)
-            .current_dir(&path_artifact);
+            .current_dir(&resolver.path_artifact);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -72,7 +95,7 @@ impl Dependency for DepLLVMTestSuite {
 
         // build
         let mut cmd = Command::new("cmake");
-        cmd.arg("--build").arg(path_artifact);
+        cmd.arg("--build").arg(&resolver.path_artifact);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Build failed"));
@@ -83,15 +106,15 @@ impl Dependency for DepLLVMTestSuite {
     }
 }
 
-impl TestSuite for DepLLVMTestSuite {
-    fn run(_repo: &GitRepo, path_artifact: &Path) -> Result<()> {
+impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
+    fn run(_repo: &GitRepo, resolver: ResolverLLVMExternal) -> Result<()> {
         // parse compilation database
-        Self::parse_compile_database(path_artifact)?;
+        Self::parse_compile_database(&resolver.path_compile_db)?;
         Ok(())
     }
 }
 
-impl DepLLVMTestSuite {
+impl DepLLVMExternal {
     fn parse_compile_entry(entry: &CompileEntry) -> Result<Option<ClangCommand>> {
         let mut tokens = TokenStream::new(entry.command.split(' '));
 
@@ -133,8 +156,8 @@ impl DepLLVMTestSuite {
         Ok(Some(clang_cmd))
     }
 
-    fn parse_compile_database(path_artifact: &Path) -> Result<()> {
-        let comp_db = CompileDB::new(&path_artifact.join("compile_commands.json"))?;
+    fn parse_compile_database(path: &Path) -> Result<()> {
+        let comp_db = CompileDB::new(path)?;
 
         // collect commands
         let mut commands = vec![];

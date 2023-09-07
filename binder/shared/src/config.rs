@@ -16,13 +16,12 @@ lazy_static! {
         path
     };
     pub static ref PATH_STUDIO: PathBuf = {
-        let mut path = PATH_ROOT.join("studio");
-        if *DOCERIZED {
-            path.push("docker");
-        } else {
-            path.push("native");
+        match env::var("LIBRA_STUDIO") {
+            Ok(val) if !val.is_empty() => PathBuf::from(val),
+            _ => PATH_ROOT
+                .join("studio")
+                .join(if *DOCERIZED { "docker" } else { "native" }),
         }
-        path
     };
 }
 

@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use log::{info, warn};
 use tempfile::tempdir;
 
-use crate::config::PATH_ROOT;
+use crate::config::{PATH_ROOT, PATH_STUDIO};
 use crate::git::GitRepo;
 
 /// A trait that marks an artifact resolver
@@ -18,7 +18,7 @@ pub trait Resolver: Sized {
     fn destruct(self) -> PathBuf;
 
     /// Try to create a resolver from the baseline path
-    fn seek(studio: &Path, version: Option<&str>) -> Result<Self>;
+    fn seek() -> Result<(GitRepo, Self)>;
 }
 
 /// A trait that marks a dependency in the project
@@ -89,11 +89,6 @@ impl<R: Resolver, T: Dependency<R>> Package<R, T> {
             _phantom_t: PhantomData,
         })
     }
-
-    /// Get the git repo from the package
-    pub fn git_repo(&self) -> &GitRepo {
-        &self.repo
-    }
 }
 
 /// Automatically differentiate the scratch and package version of LLVM
@@ -104,15 +99,15 @@ pub enum DepState<R: Resolver, T: Dependency<R>> {
 
 impl<R: Resolver, T: Dependency<R>> DepState<R, T> {
     /// Get the deps state
-    pub fn new(studio: &Path, version: Option<&str>) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         // derive the correct path
         let segments = T::repo_path_from_root();
 
         let mut repo_path = PATH_ROOT.clone();
         repo_path.extend(segments);
-        let repo = GitRepo::new(repo_path, version)?;
+        let repo = GitRepo::new(repo_path, None)?;
 
-        let mut artifact = studio.to_path_buf();
+        let mut artifact = PATH_STUDIO.to_path_buf();
         artifact.extend(segments);
         artifact.push(repo.commit());
 
@@ -169,11 +164,11 @@ impl<R: Resolver, T: Dependency<R>> DepState<R, T> {
         Ok(())
     }
 
-    /// Retrieve the artifact resolver
-    pub fn into_artifact_resolver(self) -> Result<R> {
+    /// Retrieve the source and artifact
+    pub fn into_source_and_artifact(self) -> Result<(GitRepo, R)> {
         match self {
             Self::Scratch(_) => Err(anyhow!("package not ready")),
-            Self::Package(pkg) => Ok(pkg.artifact),
+            Self::Package(Package { repo, artifact, .. }) => Ok((repo, artifact)),
         }
     }
 }

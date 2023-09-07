@@ -20,10 +20,6 @@ use libra_shared::logging;
     rename_all = "kebab-case"
 )]
 struct Args {
-    /// Studio directory
-    #[structopt(short, long)]
-    studio: Option<PathBuf>,
-
     /// Verbosity
     #[structopt(short, long)]
     verbose: bool,
@@ -73,7 +69,6 @@ impl FromStr for Action {
 fn main() -> Result<()> {
     let args = Args::from_args();
     let Args {
-        studio,
         verbose,
         keep,
         mut actions,
@@ -81,14 +76,12 @@ fn main() -> Result<()> {
         flags,
         depth,
     } = args;
-    let studio = studio.as_ref().unwrap_or(&PATH_STUDIO);
-
     // setup logging
     logging::setup(verbose)?;
 
     // decide on the workspace
     let (temp, output) = if keep {
-        let path = studio.join("libra");
+        let path = PATH_STUDIO.join("libra");
         if path.exists() {
             fs::remove_dir_all(&path)?;
         }
@@ -101,7 +94,7 @@ fn main() -> Result<()> {
     };
 
     // run the workflow
-    let ctxt = Context::new();
+    let ctxt = Context::new()?;
 
     // phase 1: see if anything to build
     let path_base_bitcode = match actions.iter().position(|a| matches!(a, Action::Build)) {

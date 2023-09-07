@@ -21,12 +21,14 @@ enum Verbosity {
     Extensive,
 }
 
-fn workflow(inputs: Vec<PathBuf>, output: PathBuf) -> EngineResult<Vec<bridge::module::Module>> {
-    let ctxt = Context::new();
-
+fn workflow(
+    ctxt: &Context,
+    inputs: Vec<PathBuf>,
+    output: PathBuf,
+) -> EngineResult<Vec<bridge::module::Module>> {
     // build
     let flow_build = FlowBuildSimple::new(
-        &ctxt,
+        ctxt,
         inputs,
         output.clone(),
         vec![
@@ -38,11 +40,14 @@ fn workflow(inputs: Vec<PathBuf>, output: PathBuf) -> EngineResult<Vec<bridge::m
     let merged_bc = flow_build.execute()?;
 
     // fixedpoint optimization
-    let flow_fixedpoint = FlowFixedpoint::new(&ctxt, merged_bc, output, None);
+    let flow_fixedpoint = FlowFixedpoint::new(ctxt, merged_bc, output, None);
     flow_fixedpoint.execute()
 }
 
 fn run_test(path_output: &Path) -> Result<()> {
+    // ready context
+    let ctxt = Context::new()?;
+
     // config based on environment variable
     let keep = env::var("KEEP").map_or(false, |v| v == "1");
     let verbosity =
@@ -79,7 +84,7 @@ fn run_test(path_output: &Path) -> Result<()> {
 
     // create output dir
     let temp = tempdir().expect("unable to create a temporary directory");
-    let success = match workflow(inputs, temp.path().to_path_buf()) {
+    let success = match workflow(&ctxt, inputs, temp.path().to_path_buf()) {
         Ok(trace) => {
             if expected.is_empty() {
                 if matches!(verbosity, Verbosity::Verbose | Verbosity::Extensive) {
