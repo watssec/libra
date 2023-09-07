@@ -9,8 +9,8 @@ use libra_shared::logging;
 use crate::deps::DepArgs;
 use crate::pass::PassArgs;
 
-mod deps;
-mod pass;
+pub mod deps;
+pub mod pass;
 
 #[derive(StructOpt)]
 #[structopt(

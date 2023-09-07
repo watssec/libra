@@ -89,7 +89,7 @@ fn run_internal<T: Dependency + TestSuite>(
     match command {
         Command::Config => state.list_build_options()?,
         Command::Build { force } => {
-            state.build(None, force)?;
+            state.build(force)?;
         }
         Command::Run => match state {
             DepState::Scratch(_) => bail!("package not ready"),

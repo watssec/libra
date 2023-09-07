@@ -10,71 +10,76 @@ use crate::config::PATH_ROOT;
 use crate::git::GitRepo;
 
 /// A trait that marks a dependency in the project
-pub trait Dependency {
+pub trait Dependency<R> {
     /// Location of the git repo from the project root
     fn repo_path_from_root() -> &'static [&'static str];
 
-    /// List configurable options for building
-    fn list_build_options(path_src: &Path, path_build: &Path) -> Result<()>;
+    /// Construct an artifact resolver
+    fn artifact_resolver(path_artifact: &Path) -> R;
 
-    /// Build the deps from scratch, install to artifact directory if needed
-    fn build(path_src: &Path, path_build: &Path, path_install: Option<&Path>) -> Result<()>;
+    /// List configurable options for building
+    fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()>;
+
+    /// Build the deps from scratch
+    fn build(path_src: &Path, resolver: &R) -> Result<()>;
 }
 
 /// A struct that represents the build-from-scratch state
-pub struct Scratch<T: Dependency> {
+pub struct Scratch<R, T: Dependency<R>> {
     repo: GitRepo,
     artifact: PathBuf,
-    _phantom: PhantomData<T>,
+    _phantom_r: PhantomData<R>,
+    _phantom_t: PhantomData<T>,
 }
 
-impl<T: Dependency> Scratch<T> {
+impl<R, T: Dependency<R>> Scratch<R, T> {
     /// Build the deps from scratch
-    pub fn make(self, workdir: Option<&Path>) -> Result<Package<T>> {
+    pub fn make(self) -> Result<Package<R, T>> {
         let Self {
             repo,
             artifact,
-            _phantom,
+            _phantom_r,
+            _phantom_t,
         } = self;
 
-        // build
-        match workdir {
-            None => {
-                fs::create_dir_all(&artifact)?;
-                T::build(repo.path(), &artifact, None)?
-            }
-            Some(path) => T::build(repo.path(), path, Some(&artifact))?,
-        }
+        fs::create_dir_all(&artifact)?;
+        let resolver = T::artifact_resolver(&artifact);
+        T::build(repo.path(), &resolver)?;
 
-        // done with the building procedure
         Ok(Package {
             repo,
             artifact,
-            _phantom,
+            _phantom_r,
+            _phantom_t,
         })
     }
 }
 
 /// A struct that represents the package-ready state
-pub struct Package<T: Dependency> {
+pub struct Package<R, T: Dependency<R>> {
     repo: GitRepo,
     artifact: PathBuf,
-    _phantom: PhantomData<T>,
+    _phantom_r: PhantomData<R>,
+    _phantom_t: PhantomData<T>,
 }
 
-impl<T: Dependency> Package<T> {
+impl<R, T: Dependency<R>> Package<R, T> {
     /// Destroy the deps so that we can build it again
-    pub fn destroy(self) -> Result<Scratch<T>> {
+    pub fn destroy(self) -> Result<Scratch<R, T>> {
         let Self {
             repo,
             artifact,
-            _phantom,
+            _phantom_r,
+            _phantom_t,
         } = self;
+
         fs::remove_dir_all(&artifact)?;
+
         Ok(Scratch {
             repo,
             artifact,
-            _phantom,
+            _phantom_r,
+            _phantom_t,
         })
     }
 
@@ -83,19 +88,19 @@ impl<T: Dependency> Package<T> {
         &self.repo
     }
 
-    /// Get the artifact path from the package
+    /// Get the artifact resolver from the package
     pub fn artifact_path(&self) -> &Path {
         &self.artifact
     }
 }
 
 /// Automatically differentiate the scratch and package version of LLVM
-pub enum DepState<T: Dependency> {
-    Scratch(Scratch<T>),
-    Package(Package<T>),
+pub enum DepState<R, T: Dependency<R>> {
+    Scratch(Scratch<R, T>),
+    Package(Package<R, T>),
 }
 
-impl<T: Dependency> DepState<T> {
+impl<R, T: Dependency<R>> DepState<R, T> {
     /// Get the deps state
     pub fn new(studio: &Path, version: Option<&str>) -> Result<Self> {
         // derive the correct path
@@ -114,13 +119,15 @@ impl<T: Dependency> DepState<T> {
             Self::Package(Package {
                 repo,
                 artifact,
-                _phantom: PhantomData,
+                _phantom_r: PhantomData,
+                _phantom_t: PhantomData,
             })
         } else {
             Self::Scratch(Scratch {
                 repo,
                 artifact,
-                _phantom: PhantomData,
+                _phantom_r: PhantomData,
+                _phantom_t: PhantomData,
             })
         };
 
@@ -144,7 +151,7 @@ impl<T: Dependency> DepState<T> {
     }
 
     /// Build the package
-    pub fn build(self, workdir: Option<&Path>, force: bool) -> Result<()> {
+    pub fn build(self, force: bool) -> Result<()> {
         let scratch = match self {
             DepState::Scratch(scratch) => scratch,
             DepState::Package(package) => {
@@ -157,7 +164,7 @@ impl<T: Dependency> DepState<T> {
                 }
             }
         };
-        scratch.make(workdir)?;
+        scratch.make()?;
         Ok(())
     }
 }

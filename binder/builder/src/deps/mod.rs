@@ -1,15 +1,13 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 use structopt::StructOpt;
 
-use libra_shared::config::TMPDIR_IN_STUDIO;
 use libra_shared::dep::{DepState, Dependency};
 
-use crate::deps::llvm::DepLLVM;
+use crate::deps::llvm::{DepLLVM, ResolverLLVM};
 
-mod llvm;
+pub mod llvm;
 
 #[derive(StructOpt)]
 pub enum DepAction {
@@ -39,22 +37,17 @@ pub struct DepArgs {
 }
 
 impl DepArgs {
-    fn run_internal<T: Dependency>(self, studio: &Path) -> Result<()> {
+    fn run_internal<R, T: Dependency<R>>(self, studio: &Path) -> Result<()> {
         let Self {
             name: _,
             version,
             action: command,
         } = self;
-        let state: DepState<T> = DepState::new(studio, version.as_deref())?;
+        let state: DepState<R, T> = DepState::new(studio, version.as_deref())?;
 
         match command {
             DepAction::Config => state.list_build_options()?,
-            DepAction::Build { force } => {
-                let workdir = studio.join(TMPDIR_IN_STUDIO);
-                fs::create_dir_all(&workdir)?;
-                state.build(Some(&workdir), force)?;
-                fs::remove_dir_all(workdir)?;
-            }
+            DepAction::Build { force } => state.build(force)?,
         }
         Ok(())
     }
@@ -62,15 +55,15 @@ impl DepArgs {
     pub fn run(self, studio: &Path) -> Result<()> {
         let name = self.name.as_str();
         match name {
-            "llvm" => self.run_internal::<DepLLVM>(studio),
+            "llvm" => self.run_internal::<ResolverLLVM, DepLLVM>(studio),
             _ => bail!("Invalid deps name: {}", name),
         }
     }
 }
 
 /// Retrieve the paths of dependencies
-fn get_artifact_path<T: Dependency>(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
-    let path = match DepState::<T>::new(studio, version)? {
+fn get_artifact_path<R, T: Dependency<R>>(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
+    let path = match DepState::<R, T>::new(studio, version)? {
         DepState::Scratch(_) => bail!("package not ready"),
         DepState::Package(pkg) => pkg.artifact_path().to_path_buf(),
     };
@@ -78,5 +71,5 @@ fn get_artifact_path<T: Dependency>(studio: &Path, version: Option<&str>) -> Res
 }
 
 pub fn artifact_for_llvm(studio: &Path, version: Option<&str>) -> Result<PathBuf> {
-    get_artifact_path::<DepLLVM>(studio, version)
+    get_artifact_path::<ResolverLLVM, DepLLVM>(studio, version)
 }

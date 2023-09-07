@@ -40,13 +40,13 @@ impl Dependency for DepLLVMTestSuite {
         &PATH_REPO
     }
 
-    fn list_build_options(path_src: &Path, path_build: &Path) -> Result<()> {
+    fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {
         // dump cmake options
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
             .args(baseline_cmake_options(path_src)?)
             .arg(path_src)
-            .current_dir(path_build);
+            .current_dir(path_config);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -56,20 +56,15 @@ impl Dependency for DepLLVMTestSuite {
         Ok(())
     }
 
-    fn build(path_src: &Path, path_build: &Path, path_install: Option<&Path>) -> Result<()> {
-        // sanity check
-        if let Some(artifact) = path_install {
-            bail!("Unexpected artifact path: {}", artifact.to_string_lossy());
-        }
-
-        // llvm configuration
+    fn build(path_src: &Path, path_artifact: &Path) -> Result<()> {
+        // config
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
             .args(baseline_cmake_options(path_src)?)
             .arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
             .arg(path_src)
-            .current_dir(path_build);
+            .current_dir(&path_artifact);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -77,7 +72,7 @@ impl Dependency for DepLLVMTestSuite {
 
         // build
         let mut cmd = Command::new("cmake");
-        cmd.arg("--build").arg(path_build);
+        cmd.arg("--build").arg(path_artifact);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Build failed"));

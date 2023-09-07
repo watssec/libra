@@ -26,8 +26,6 @@ lazy_static! {
     };
 }
 
-pub const TMPDIR_IN_STUDIO: &str = "tmp";
-
 // platform-specific constants
 #[cfg(target_os = "macos")]
 lazy_static! {

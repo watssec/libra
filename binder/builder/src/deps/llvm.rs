@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, Result};
@@ -39,21 +40,44 @@ fn baseline_cmake_options() -> Vec<String> {
     ]
 }
 
+/// Artifact path resolver for LLVM
+pub struct ResolverLLVM {
+    path_build: PathBuf,
+    path_install: PathBuf,
+}
+
+impl ResolverLLVM {
+    pub fn path_build(&self) -> &Path {
+        &self.path_build
+    }
+
+    pub fn path_install(&self) -> &Path {
+        &self.path_install
+    }
+}
+
 /// Represent the LLVM deps
 pub struct DepLLVM {}
 
-impl Dependency for DepLLVM {
+impl Dependency<ResolverLLVM> for DepLLVM {
     fn repo_path_from_root() -> &'static [&'static str] {
         &PATH_REPO
     }
 
-    fn list_build_options(path_src: &Path, path_build: &Path) -> Result<()> {
+    fn artifact_resolver(path_artifact: &Path) -> ResolverLLVM {
+        ResolverLLVM {
+            path_build: path_artifact.join("build"),
+            path_install: path_artifact.join("install"),
+        }
+    }
+
+    fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {
         // dump cmake options
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
             .args(baseline_cmake_options())
             .arg(path_src.join("llvm"))
-            .current_dir(path_build);
+            .current_dir(path_config);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -63,16 +87,15 @@ impl Dependency for DepLLVM {
         Ok(())
     }
 
-    fn build(path_src: &Path, path_build: &Path, path_install: Option<&Path>) -> Result<()> {
-        let artifact = path_install.ok_or_else(|| anyhow!("No artifact path"))?;
-
-        // llvm configuration
+    fn build(path_src: &Path, resolver: &ResolverLLVM) -> Result<()> {
+        // config
+        fs::create_dir(&resolver.path_build)?;
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
             .args(baseline_cmake_options())
             .arg(path_src.join("llvm"))
-            .current_dir(path_build);
+            .current_dir(&resolver.path_build);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -80,18 +103,20 @@ impl Dependency for DepLLVM {
 
         // build
         let mut cmd = Command::new("cmake");
-        cmd.arg("--build").arg(path_build);
+        cmd.arg("--build").arg(&resolver.path_build);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Build failed"));
         }
 
         // install
+        fs::create_dir(&resolver.path_install)?;
+
         let mut cmd = Command::new("cmake");
         cmd.arg("--install")
-            .arg(path_build)
+            .arg(&resolver.path_build)
             .arg("--prefix")
-            .arg(artifact);
+            .arg(&resolver.path_install);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Install failed"));

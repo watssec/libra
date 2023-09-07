@@ -8,8 +8,10 @@ use anyhow::{anyhow, bail, Result};
 use structopt::StructOpt;
 
 use libra_shared::config::PATH_ROOT;
+use libra_shared::dep::Dependency;
 
 use crate::deps::artifact_for_llvm;
+use crate::deps::llvm::DepLLVM;
 
 // path constants
 static SEGMENTS: [&str; 1] = ["oracle"];
@@ -34,6 +36,7 @@ impl PassArgs {
 
         // derive deps and paths
         let (config_hash, dep_llvm) = derive_deps(studio, llvm_version.as_deref())?;
+        let resolver_llvm = DepLLVM::artifact_resolver(&dep_llvm);
 
         let mut path_src = PATH_ROOT.clone();
         path_src.extend(SEGMENTS);
@@ -58,7 +61,13 @@ impl PassArgs {
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
-            .arg(format!("-DCFG_LLVM_INSTALL_DIR={}", dep_llvm))
+            .arg(format!(
+                "-DCFG_LLVM_INSTALL_DIR={}",
+                resolver_llvm
+                    .path_install()
+                    .to_str()
+                    .ok_or_else(|| anyhow!("non-ascii path"))?
+            ))
             .arg("-DCMAKE_BUILD_TYPE=Debug")
             .arg(path_src);
         cmd.current_dir(&path_build);
@@ -81,20 +90,20 @@ impl PassArgs {
 }
 
 /// Derive the config hash for the pass
-fn derive_deps(studio: &Path, llvm_version: Option<&str>) -> Result<(String, String)> {
+fn derive_deps(studio: &Path, llvm_version: Option<&str>) -> Result<(String, PathBuf)> {
     // get dep: llvm
-    let dep_llvm = artifact_for_llvm(studio, llvm_version)?
-        .into_os_string()
-        .into_string()
-        .unwrap();
+    let path_llvm = artifact_for_llvm(studio, llvm_version)?;
+    let repr_llvm = path_llvm
+        .to_str()
+        .ok_or_else(|| anyhow!("non-ascii path"))?;
 
     // config hash
     let mut hasher = DefaultHasher::new();
-    dep_llvm.hash(&mut hasher);
+    repr_llvm.hash(&mut hasher);
     let config_hash = hasher.finish();
 
     // done
-    Ok((format!("{:#18x}", config_hash), dep_llvm))
+    Ok((format!("{:#18x}", config_hash), path_llvm))
 }
 
 /// Retrieve the artifact path
