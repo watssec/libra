@@ -4,7 +4,7 @@ use std::process::Command;
 use anyhow::{anyhow, bail, Result};
 
 use libra_engine::flow::shared::Context;
-use libra_shared::compile_db::{ClangArg, CompileDB, CompileEntry, TokenStream};
+use libra_shared::compile_db::{ClangCommand, CompileDB, CompileEntry, TokenStream};
 use libra_shared::dep::Dependency;
 use libra_shared::git::GitRepo;
 
@@ -97,7 +97,7 @@ impl TestSuite for DepLLVMTestSuite {
 }
 
 impl DepLLVMTestSuite {
-    fn parse_compile_entry(entry: &CompileEntry) -> Result<Option<()>> {
+    fn parse_compile_entry(entry: &CompileEntry) -> Result<Option<ClangCommand>> {
         let mut tokens = TokenStream::new(entry.command.split(' '));
 
         // check the header
@@ -128,22 +128,31 @@ impl DepLLVMTestSuite {
 
         let mut sub_tokens = TokenStream::new(token.split('/'));
         let sub_token = sub_tokens.prev_expect_token()?;
-        let _args = match sub_token {
-            "clang" => ClangArg::consume(tokens)?,
-            "clang++" => ClangArg::consume(tokens)?,
+        let clang_cmd = match sub_token {
+            "clang" => ClangCommand::new(false, tokens)?,
+            "clang++" => ClangCommand::new(true, tokens)?,
             _ => bail!("unrecognized compiler"),
         };
         sub_tokens.prev_expect_literal("bin")?;
 
-        Ok(Some(()))
+        Ok(Some(clang_cmd))
     }
 
     fn parse_compile_database(path_artifact: &Path) -> Result<()> {
         let comp_db = CompileDB::new(&path_artifact.join("compile_commands.json"))?;
+
+        // collect commands
+        let mut commands = vec![];
         for entry in comp_db.entries {
-            Self::parse_compile_entry(&entry)
+            let cmd_opt = Self::parse_compile_entry(&entry)
                 .map_err(|e| anyhow!("failed to parse '{}': {}", entry.command, e))?;
+            if let Some(cmd) = cmd_opt {
+                commands.push(cmd);
+            }
         }
+
+        // construct build hierarchy
+        // TODO
         Ok(())
     }
 }

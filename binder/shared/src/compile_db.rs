@@ -247,12 +247,19 @@ impl ClangArg {
         };
         Ok(Some(arg))
     }
+}
 
-    pub fn consume(mut stream: TokenStream) -> Result<Vec<Self>> {
+pub struct ClangCommand {
+    is_cpp: bool,
+    args: Vec<ClangArg>,
+}
+
+impl ClangCommand {
+    pub fn new(is_cpp: bool, mut stream: TokenStream) -> Result<Self> {
         let mut args = vec![];
-        while let Some(arg) = Self::try_parse(&mut stream)? {
+        while let Some(arg) = ClangArg::try_parse(&mut stream)? {
             args.push(arg);
         }
-        Ok(args)
+        Ok(Self { is_cpp, args })
     }
 }
