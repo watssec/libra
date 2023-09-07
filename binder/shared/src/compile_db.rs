@@ -39,12 +39,24 @@ impl<'a> TokenStream<'a> {
         Self { tokens }
     }
 
-    pub fn next_token_or_end(&mut self) -> Option<&'a str> {
-        self.tokens.next()
+    pub fn next_or_end(&mut self) -> Option<&'a str> {
+        loop {
+            match self.tokens.next() {
+                None => return None,
+                Some("") => continue,
+                Some(v) => return Some(v),
+            }
+        }
     }
 
-    pub fn prev_token_or_end(&mut self) -> Option<&'a str> {
-        self.tokens.next_back()
+    pub fn prev_or_end(&mut self) -> Option<&'a str> {
+        loop {
+            match self.tokens.next_back() {
+                None => return None,
+                Some("") => continue,
+                Some(v) => return Some(v),
+            }
+        }
     }
 
     fn expect_token(item: Option<&'a str>) -> Result<&'a str> {
@@ -55,11 +67,11 @@ impl<'a> TokenStream<'a> {
     }
 
     pub fn next_expect_token(&mut self) -> Result<&'a str> {
-        Self::expect_token(self.tokens.next())
+        Self::expect_token(self.next_or_end())
     }
 
     pub fn prev_expect_token(&mut self) -> Result<&'a str> {
-        Self::expect_token(self.tokens.next_back())
+        Self::expect_token(self.prev_or_end())
     }
 
     fn expect_literal(item: Option<&'a str>, exp: &str) -> Result<()> {
@@ -187,7 +199,7 @@ impl ClangArg {
     }
 
     fn try_parse(stream: &mut TokenStream) -> Result<Option<Self>> {
-        let arg = match stream.next_token_or_end() {
+        let arg = match stream.next_or_end() {
             None => return Ok(None),
             Some(token) => {
                 if !token.starts_with('-') {
@@ -286,6 +298,16 @@ impl ClangCommand {
             args.push(arg);
         }
         Ok(Self { is_cpp, args })
+    }
+
+    pub fn inputs(&self) -> Vec<&str> {
+        self.args
+            .iter()
+            .filter_map(|arg| match arg {
+                ClangArg::Input(v) => Some(v.as_str()),
+                _ => None,
+            })
+            .collect()
     }
 }
 

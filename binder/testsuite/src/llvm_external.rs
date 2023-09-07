@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -109,10 +110,12 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
 
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
     fn run(_repo: GitRepo, resolver: ResolverLLVMExternal) -> Result<()> {
-        // lit test discovery
-        Self::lit_test_discovery(&resolver)?;
         // parse compilation database
-        Self::parse_compile_database(&resolver)?;
+        let commands = Self::parse_compile_database(&resolver)?;
+
+        // lit test discovery
+        Self::lit_test_discovery(&resolver, &commands)?;
+
         Ok(())
     }
 }
@@ -159,25 +162,36 @@ impl DepLLVMExternal {
         Ok(Some(clang_cmd))
     }
 
-    fn parse_compile_database(resolver: &ResolverLLVMExternal) -> Result<()> {
+    fn parse_compile_database(
+        resolver: &ResolverLLVMExternal,
+    ) -> Result<BTreeMap<String, ClangCommand>> {
         let comp_db = CompileDB::new(&resolver.path_compile_db)?;
 
-        // collect commands
-        let mut commands = vec![];
+        // collect commands into a map
+        let mut commands = BTreeMap::new();
         for entry in comp_db.entries {
             let cmd_opt = Self::parse_compile_entry(&entry)
                 .map_err(|e| anyhow!("failed to parse '{}': {}", entry.command, e))?;
             if let Some(cmd) = cmd_opt {
-                commands.push(cmd);
+                let inputs = cmd.inputs();
+                // NOTE: this is true as we test on single-source only
+                if inputs.len() != 1 {
+                    bail!("expect one and only one input: {}", cmd);
+                }
+                let input = inputs.into_iter().next().unwrap().to_string();
+                match commands.insert(input, cmd) {
+                    None => (),
+                    Some(existing) => bail!("same input is used in two tests: {}", existing),
+                }
             }
         }
-
-        // construct build hierarchy
-        // TODO
-        Ok(())
+        Ok(commands)
     }
 
-    fn lit_test_discovery(resolver: &ResolverLLVMExternal) -> Result<()> {
+    fn lit_test_discovery(
+        resolver: &ResolverLLVMExternal,
+        commands: &BTreeMap<String, ClangCommand>,
+    ) -> Result<()> {
         // locate the lit tool
         let (_, pkg_llvm) = ResolverLLVM::seek()?;
         let bin_lit = pkg_llvm.path_build().join("bin").join("llvm-lit");
