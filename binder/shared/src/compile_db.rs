@@ -287,27 +287,54 @@ impl Display for ClangArg {
 }
 
 impl ClangArg {
-    fn as_arg_for_libra(&self) -> Option<String> {
-        let arg = match self {
-            Self::ModeCompile => "-c".into(),
-            Self::Standard(v) => format!("-std={}", v),
-            Self::Define(v) => format!("-D{}", v),
-            Self::Include(v) => format!("-I{}", v),
-            Self::IncludeSysroot(v) => format!("-isysroot {}", v),
-            Self::Optimization(_) => return None,
-            Self::Arch(v) => format!("-arch {}", v),
-            Self::MachineArch(v) => format!("-march={}", v),
-            Self::Debug => return None,
-            Self::Flag(k, None) => format!("-f{}", k),
-            Self::Flag(k, Some(v)) => format!("-f{}={}", k, v),
-            Self::Warning(k, None) => format!("-W{}", k),
-            Self::Warning(k, Some(v)) => format!("-W{}={}", k, v),
-            Self::NoWarnings => "-w".into(),
-            Self::POSIXThread => "-pthread".into(),
-            Self::Output(_) => return None,
-            Self::Input(_) => return None,
-        };
-        Some(arg)
+    fn accumulate_arg_for_libra(&self, args: &mut Vec<String>) {
+        match self {
+            Self::ModeCompile => {
+                args.push("-c".into());
+            }
+            Self::Standard(v) => {
+                args.push(format!("-std={}", v));
+            }
+            Self::Define(v) => {
+                args.push(format!("-D{}", v));
+            }
+            Self::Include(v) => {
+                args.push(format!("-I{}", v));
+            }
+            Self::IncludeSysroot(v) => {
+                args.push("-isysroot".into());
+                args.push(v.to_string());
+            }
+            Self::Optimization(_) => (),
+            Self::Arch(v) => {
+                args.push("-arch".to_string());
+                args.push(v.to_string());
+            }
+            Self::MachineArch(v) => {
+                args.push(format!("-march={}", v));
+            }
+            Self::Debug => (),
+            Self::Flag(k, None) => {
+                args.push(format!("-f{}", k));
+            }
+            Self::Flag(k, Some(v)) => {
+                args.push(format!("-f{}={}", k, v));
+            }
+            Self::Warning(k, None) => {
+                args.push(format!("-W{}", k));
+            }
+            Self::Warning(k, Some(v)) => {
+                args.push(format!("-W{}={}", k, v));
+            }
+            Self::NoWarnings => {
+                args.push("-w".into());
+            }
+            Self::POSIXThread => {
+                args.push("-pthread".into());
+            }
+            Self::Output(_) => (),
+            Self::Input(_) => (),
+        }
     }
 }
 
@@ -351,10 +378,11 @@ impl ClangCommand {
     }
 
     pub fn gen_args_for_libra(&self) -> Vec<String> {
-        self.args
-            .iter()
-            .filter_map(|arg| arg.as_arg_for_libra())
-            .collect()
+        let mut accumulated = vec![];
+        for arg in &self.args {
+            arg.accumulate_arg_for_libra(&mut accumulated);
+        }
+        accumulated
     }
 }
 
