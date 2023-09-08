@@ -132,10 +132,24 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
                 .map(|test| test.run_libra(&ctxt, &workdir))
                 .collect::<Result<_>>()?
         } else {
-            test_cases
-                .into_iter()
-                .map(|test| test.run_libra(&ctxt, &workdir))
-                .collect::<Result<_>>()?
+            // serial execution will halt on first failure caused by potential bugs
+            let mut results = vec![];
+            for test in test_cases {
+                let output = test.run_libra(&ctxt, &workdir)?;
+                // filter errors to halt on first failure caused by potential bugs
+                if let Some((_, Err(err))) = output.as_ref() {
+                    match err {
+                        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
+                        EngineError::LLVMLoadingError(reason)
+                        | EngineError::InvalidAssumption(reason)
+                        | EngineError::InvariantViolation(reason) => {
+                            bail!("potential bug: {}", reason);
+                        }
+                    }
+                }
+                results.push(output);
+            }
+            results
         };
 
         // filter the results
