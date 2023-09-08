@@ -28,10 +28,7 @@ fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
     Ok(vec![
         format!("-DCMAKE_C_COMPILER={}", ctxt.path_llvm(["bin", "clang"])?),
         format!("-C{}", profile),
-        format!(
-            "-DTEST_SUITE_SUBDIRS={}",
-            ["SingleSource", "Bitcode"].join(";")
-        ),
+        "-DTEST_SUITE_SUBDIRS=SingleSource".to_string(),
     ])
 }
 
@@ -121,7 +118,7 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
 }
 
 impl DepLLVMExternal {
-    fn parse_compile_entry(entry: &CompileEntry) -> Result<Option<ClangCommand>> {
+    fn parse_compile_entry(entry: &CompileEntry) -> Result<Option<(String, ClangCommand)>> {
         let mut tokens = TokenStream::new(entry.command.split(' '));
 
         // check the header
@@ -152,14 +149,72 @@ impl DepLLVMExternal {
 
         let mut sub_tokens = TokenStream::new(token.split('/'));
         let sub_token = sub_tokens.prev_expect_token()?;
-        let clang_cmd = match sub_token {
+        let cmd = match sub_token {
             "clang" => ClangCommand::new(false, tokens)?,
             "clang++" => ClangCommand::new(true, tokens)?,
             _ => bail!("unrecognized compiler"),
         };
         sub_tokens.prev_expect_literal("bin")?;
 
-        Ok(Some(clang_cmd))
+        // make sure the cmd entry conforms to our expectations
+        let outputs = cmd.outputs();
+        if outputs.len() != 1 {
+            bail!("expect one and only one output");
+        }
+
+        // extract the marker (from the output side)
+        let path = Path::new(outputs.into_iter().next().unwrap());
+
+        let mut seen_cmakefiles = false;
+        let mut seen_output_dir = false;
+        let mut path_output_trimmed = PathBuf::new();
+        for token in path {
+            if token == "CMakeFiles" {
+                seen_cmakefiles = true;
+                continue;
+            }
+            let segment = Path::new(token);
+            if seen_cmakefiles {
+                if segment.extension().map_or(true, |ext| ext != "dir") {
+                    bail!("no CMakeFiles/<target>.dir/ in output path");
+                }
+                seen_cmakefiles = false;
+                seen_output_dir = true;
+                continue;
+            }
+            path_output_trimmed.push(segment);
+        }
+        if !seen_output_dir {
+            bail!("no CMakeFiles/<target>.dir/ in output path");
+        }
+
+        // tweak the extension (clear .o, clear whatever it is, and reset to .test)
+        if path_output_trimmed
+            .extension()
+            .map_or(true, |ext| ext != "o")
+        {
+            bail!("output path not ending with .o");
+        }
+        path_output_trimmed.set_extension("");
+        path_output_trimmed.set_extension("test");
+
+        // cross-comparison
+        let inputs = cmd.inputs();
+        // NOTE: this is true as we test on single-source only
+        if inputs.len() != 1 {
+            bail!("expect one and only one input");
+        }
+        let path_input = Path::new(inputs.into_iter().next().unwrap());
+        if path_input.with_extension("test") != path_output_trimmed {
+            bail!("unable to cross-check input-output marker");
+        }
+
+        // return both
+        let mark = path_output_trimmed
+            .into_os_string()
+            .into_string()
+            .map_err(|_| anyhow!("non-ascii path"))?;
+        Ok(Some((mark, cmd)))
     }
 
     fn parse_compile_database(
@@ -170,18 +225,13 @@ impl DepLLVMExternal {
         // collect commands into a map
         let mut commands = BTreeMap::new();
         for entry in comp_db.entries {
-            let cmd_opt = Self::parse_compile_entry(&entry)
+            let entry_opt = Self::parse_compile_entry(&entry)
                 .map_err(|e| anyhow!("failed to parse '{}': {}", entry.command, e))?;
-            if let Some(cmd) = cmd_opt {
-                let inputs = cmd.inputs();
-                // NOTE: this is true as we test on single-source only
-                if inputs.len() != 1 {
-                    bail!("expect one and only one input: {}", cmd);
-                }
-                let input = inputs.into_iter().next().unwrap().to_string();
-                match commands.insert(input, cmd) {
+            if let Some((mark, cmd)) = entry_opt {
+                println!("{}", mark);
+                match commands.insert(mark, cmd) {
                     None => (),
-                    Some(existing) => bail!("same input is used in two tests: {}", existing),
+                    Some(existing) => bail!("same output is produced twice: {}", existing),
                 }
             }
         }

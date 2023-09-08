@@ -300,6 +300,16 @@ impl ClangCommand {
         Ok(Self { is_cpp, args })
     }
 
+    pub fn outputs(&self) -> Vec<&str> {
+        self.args
+            .iter()
+            .filter_map(|arg| match arg {
+                ClangArg::Output(v) => Some(v.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn inputs(&self) -> Vec<&str> {
         self.args
             .iter()
