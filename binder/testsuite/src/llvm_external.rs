@@ -107,11 +107,9 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
 
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
     fn run(_repo: GitRepo, resolver: ResolverLLVMExternal) -> Result<()> {
-        // parse compilation database
         let commands = Self::parse_compile_database(&resolver)?;
-
-        // lit test discovery
-        Self::lit_test_discovery(&resolver, &commands)?;
+        let test_cases = Self::lit_test_discovery(&resolver, commands)?;
+        println!("{} test cases discovered", test_cases.len());
 
         Ok(())
     }
@@ -178,35 +176,15 @@ impl DepLLVMExternal {
                 if segment.extension().map_or(true, |ext| ext != "dir") {
                     bail!("no CMakeFiles/<target>.dir/ in output path");
                 }
-                seen_cmakefiles = false;
+
                 seen_output_dir = true;
-                continue;
+                path_output_trimmed.push(segment.with_extension("test"));
+                break;
             }
             path_output_trimmed.push(segment);
         }
         if !seen_output_dir {
             bail!("no CMakeFiles/<target>.dir/ in output path");
-        }
-
-        // tweak the extension (clear .o, clear whatever it is, and reset to .test)
-        if path_output_trimmed
-            .extension()
-            .map_or(true, |ext| ext != "o")
-        {
-            bail!("output path not ending with .o");
-        }
-        path_output_trimmed.set_extension("");
-        path_output_trimmed.set_extension("test");
-
-        // cross-comparison
-        let inputs = cmd.inputs();
-        // NOTE: this is true as we test on single-source only
-        if inputs.len() != 1 {
-            bail!("expect one and only one input");
-        }
-        let path_input = Path::new(inputs.into_iter().next().unwrap());
-        if path_input.with_extension("test") != path_output_trimmed {
-            bail!("unable to cross-check input-output marker");
         }
 
         // return both
@@ -228,7 +206,6 @@ impl DepLLVMExternal {
             let entry_opt = Self::parse_compile_entry(&entry)
                 .map_err(|e| anyhow!("failed to parse '{}': {}", entry.command, e))?;
             if let Some((mark, cmd)) = entry_opt {
-                println!("{}", mark);
                 match commands.insert(mark, cmd) {
                     None => (),
                     Some(existing) => bail!("same output is produced twice: {}", existing),
@@ -240,8 +217,8 @@ impl DepLLVMExternal {
 
     fn lit_test_discovery(
         resolver: &ResolverLLVMExternal,
-        commands: &BTreeMap<String, ClangCommand>,
-    ) -> Result<()> {
+        mut commands: BTreeMap<String, ClangCommand>,
+    ) -> Result<Vec<LLVMExternalTestCase>> {
         // locate the lit tool
         let (_, pkg_llvm) = ResolverLLVM::seek()?;
         let bin_lit = pkg_llvm.path_build().join("bin").join("llvm-lit");
@@ -273,13 +250,20 @@ impl DepLLVMExternal {
         }
 
         // parse the result
+        let mut result = vec![];
         for line in lines {
             let mut tokens = line.trim().split(" :: ");
+
             let ty = tokens.next().ok_or_else(|| anyhow!("expect test type"))?;
             if ty != "test-suite" {
                 bail!("unexpected test type: {}", ty);
             }
+
             let name = tokens.next().ok_or_else(|| anyhow!("expect test name"))?;
+            let command = match commands.remove(name) {
+                None => bail!("test not in compile db: {}", name),
+                Some(cmd) => cmd,
+            };
 
             // check existence
             let path_test = resolver.path_artifact.join(name);
@@ -288,9 +272,20 @@ impl DepLLVMExternal {
             }
 
             // TODO
-            println!("{}", name);
+            let case = LLVMExternalTestCase {
+                name: name.to_string(),
+                path: path_test,
+                command,
+            };
+            result.push(case);
         }
 
-        Ok(())
+        Ok(result)
     }
+}
+
+struct LLVMExternalTestCase {
+    name: String,
+    path: PathBuf,
+    command: ClangCommand,
 }
