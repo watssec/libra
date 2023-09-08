@@ -139,7 +139,7 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
 
         let (vec_success, vec_failure): (Vec<_>, Vec<_>) = results
             .into_iter()
-            .partition(|r| matches!(r, LLVMTestResult::Success));
+            .partition(|(_, r)| matches!(r, LLVMTestResult::Success));
         info!(
             "Result: success {} vs failure {}",
             vec_success.len(),
