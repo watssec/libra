@@ -3,8 +3,14 @@ use std::{env, fs};
 
 use anyhow::{bail, Result};
 use libra_engine::flow::shared::Context;
+use log::debug;
 
 use libra_shared::compile_db::ClangCommand;
+
+pub enum LLVMTestResult {
+    Success,
+    Failure(String),
+}
 
 pub struct LLVMTestCase {
     name: String,
@@ -21,11 +27,11 @@ impl LLVMTestCase {
         }
     }
 
-    /// Run the test case through libra workflow
-    pub fn run_libra(&self, ctxt: &Context, workdir: &Path) -> Result<Option<()>> {
+    /// Run the test case through libra workflow (internal)
+    fn run_libra_internal(&self, ctxt: &Context, workdir: &Path) -> Result<Option<PathBuf>> {
         let Self {
             name,
-            path: _,
+            path,
             command,
         } = self;
 
@@ -42,6 +48,9 @@ impl LLVMTestCase {
         }
         let input = inputs.into_iter().next().unwrap();
 
+        // report progress
+        debug!("running test case: {}", name);
+
         // prepare output directory
         let output_dir = workdir.join(name);
         fs::create_dir_all(&output_dir)?;
@@ -56,6 +65,14 @@ impl LLVMTestCase {
 
         // clean-up
         env::set_current_dir(cursor)?;
-        Ok(Some(()))
+        Ok(Some(path.to_path_buf()))
+    }
+
+    pub fn run_libra(&self, ctxt: &Context, workdir: &Path) -> Option<LLVMTestResult> {
+        match self.run_libra_internal(ctxt, workdir) {
+            Ok(None) => None,
+            Ok(Some(_)) => Some(LLVMTestResult::Success),
+            Err(e) => Some(LLVMTestResult::Failure(e.to_string())),
+        }
     }
 }

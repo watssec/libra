@@ -23,6 +23,7 @@ lazy_static! {
                 .join(if *DOCERIZED { "docker" } else { "native" }),
         }
     };
+    pub static ref PARALLEL: bool = matches!(env::var("LIBRA_PARALLEL"), Ok(val) if val == "1");
 }
 
 // platform-specific constants

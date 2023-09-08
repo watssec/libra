@@ -1,20 +1,25 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
 use log::info;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 
 use libra_builder::ResolverLLVM;
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{ClangCommand, CompileDB, CompileEntry, TokenStream};
+use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
 use crate::common::TestSuite;
-use crate::llvm_lit::LLVMTestCase;
+use crate::llvm_lit::{LLVMTestCase, LLVMTestResult};
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
+static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
 
 /// Get baseline cmake command
 fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
@@ -112,6 +117,34 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
         let commands = Self::parse_compile_database(&resolver)?;
         let test_cases = Self::lit_test_discovery(&resolver, commands)?;
         info!("Number of test cases discovered: {}", test_cases.len());
+
+        // prepare te environment
+        let ctxt = Context::new()?;
+        let mut workdir = PATH_STUDIO.to_path_buf();
+        workdir.extend(PATH_WORKSPACE);
+        fs::create_dir_all(&workdir)?;
+
+        // run the tests
+        let results: Vec<_> = if *PARALLEL {
+            test_cases
+                .into_par_iter()
+                .filter_map(|test| test.run_libra(&ctxt, &workdir))
+                .collect()
+        } else {
+            test_cases
+                .into_iter()
+                .filter_map(|test| test.run_libra(&ctxt, &workdir))
+                .collect()
+        };
+
+        let (vec_success, vec_failure): (Vec<_>, Vec<_>) = results
+            .into_iter()
+            .partition(|r| matches!(r, LLVMTestResult::Success));
+        info!(
+            "Result: success {} vs failure {}",
+            vec_success.len(),
+            vec_failure.len()
+        );
 
         Ok(())
     }
