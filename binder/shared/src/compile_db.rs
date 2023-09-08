@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::Split;
 
 use anyhow::{bail, Result};
@@ -286,18 +286,48 @@ impl Display for ClangArg {
     }
 }
 
+impl ClangArg {
+    fn as_arg_for_libra(&self) -> Option<String> {
+        let arg = match self {
+            Self::ModeCompile => "-c".into(),
+            Self::Standard(v) => format!("-std={}", v),
+            Self::Define(v) => format!("-D{}", v),
+            Self::Include(v) => format!("-I{}", v),
+            Self::IncludeSysroot(v) => format!("-isysroot {}", v),
+            Self::Optimization(_) => return None,
+            Self::Arch(v) => format!("-arch {}", v),
+            Self::MachineArch(v) => format!("-march={}", v),
+            Self::Debug => return None,
+            Self::Flag(k, None) => format!("-f{}", k),
+            Self::Flag(k, Some(v)) => format!("-f{}={}", k, v),
+            Self::Warning(k, None) => format!("-W{}", k),
+            Self::Warning(k, Some(v)) => format!("-W{}={}", k, v),
+            Self::NoWarnings => "-w".into(),
+            Self::POSIXThread => "-pthread".into(),
+            Self::Output(_) => return None,
+            Self::Input(_) => return None,
+        };
+        Some(arg)
+    }
+}
+
 pub struct ClangCommand {
-    is_cpp: bool,
+    pub is_cpp: bool,
+    pub workdir: PathBuf,
     args: Vec<ClangArg>,
 }
 
 impl ClangCommand {
-    pub fn new(is_cpp: bool, mut stream: TokenStream) -> Result<Self> {
+    pub fn new(is_cpp: bool, workdir: PathBuf, mut stream: TokenStream) -> Result<Self> {
         let mut args = vec![];
         while let Some(arg) = ClangArg::try_parse(&mut stream)? {
             args.push(arg);
         }
-        Ok(Self { is_cpp, args })
+        Ok(Self {
+            is_cpp,
+            workdir,
+            args,
+        })
     }
 
     pub fn outputs(&self) -> Vec<&str> {
@@ -319,11 +349,23 @@ impl ClangCommand {
             })
             .collect()
     }
+
+    pub fn gen_args_for_libra(&self) -> Vec<String> {
+        self.args
+            .iter()
+            .filter_map(|arg| arg.as_arg_for_libra())
+            .collect()
+    }
 }
 
 impl Display for ClangCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Self { is_cpp, args } = self;
+        let Self {
+            is_cpp,
+            workdir: _,
+            args,
+        } = self;
+
         let mut tokens = vec![if *is_cpp { "clang++" } else { "clang" }.to_string()];
         tokens.extend(args.iter().map(|arg| arg.to_string()));
         write!(f, "{}", tokens.join(" "))

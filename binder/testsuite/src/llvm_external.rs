@@ -3,14 +3,16 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
-use libra_builder::ResolverLLVM;
+use log::info;
 
+use libra_builder::ResolverLLVM;
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{ClangCommand, CompileDB, CompileEntry, TokenStream};
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
 use crate::common::TestSuite;
+use crate::llvm_lit::LLVMTestCase;
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 
@@ -109,7 +111,7 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
     fn run(_repo: GitRepo, resolver: ResolverLLVMExternal) -> Result<()> {
         let commands = Self::parse_compile_database(&resolver)?;
         let test_cases = Self::lit_test_discovery(&resolver, commands)?;
-        println!("{} test cases discovered", test_cases.len());
+        info!("Number of test cases discovered: {}", test_cases.len());
 
         Ok(())
     }
@@ -117,6 +119,7 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
 
 impl DepLLVMExternal {
     fn parse_compile_entry(entry: &CompileEntry) -> Result<Option<(String, ClangCommand)>> {
+        let workdir = PathBuf::from(&entry.directory);
         let mut tokens = TokenStream::new(entry.command.split(' '));
 
         // check the header
@@ -148,8 +151,8 @@ impl DepLLVMExternal {
         let mut sub_tokens = TokenStream::new(token.split('/'));
         let sub_token = sub_tokens.prev_expect_token()?;
         let cmd = match sub_token {
-            "clang" => ClangCommand::new(false, tokens)?,
-            "clang++" => ClangCommand::new(true, tokens)?,
+            "clang" => ClangCommand::new(false, workdir, tokens)?,
+            "clang++" => ClangCommand::new(true, workdir, tokens)?,
             _ => bail!("unrecognized compiler"),
         };
         sub_tokens.prev_expect_literal("bin")?;
@@ -218,7 +221,7 @@ impl DepLLVMExternal {
     fn lit_test_discovery(
         resolver: &ResolverLLVMExternal,
         mut commands: BTreeMap<String, ClangCommand>,
-    ) -> Result<Vec<LLVMExternalTestCase>> {
+    ) -> Result<Vec<LLVMTestCase>> {
         // locate the lit tool
         let (_, pkg_llvm) = ResolverLLVM::seek()?;
         let bin_lit = pkg_llvm.path_build().join("bin").join("llvm-lit");
@@ -271,21 +274,10 @@ impl DepLLVMExternal {
                 bail!("test marker does not exist: {}", name);
             }
 
-            // TODO
-            let case = LLVMExternalTestCase {
-                name: name.to_string(),
-                path: path_test,
-                command,
-            };
-            result.push(case);
+            // create the test case
+            result.push(LLVMTestCase::new(name.to_string(), path_test, command));
         }
 
         Ok(result)
     }
-}
-
-struct LLVMExternalTestCase {
-    name: String,
-    path: PathBuf,
-    command: ClangCommand,
 }
