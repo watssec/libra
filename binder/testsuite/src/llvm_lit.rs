@@ -5,18 +5,13 @@ use anyhow::{bail, Result};
 use libra_engine::error::{EngineError, EngineResult};
 use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use libra_engine::flow::shared::Context;
-use log::{debug, warn};
+use log::debug;
 
 use libra_shared::compile_db::ClangCommand;
 
-pub enum LLVMTestResult {
-    Success,
-    Failure(String),
-}
-
 pub struct LLVMTestCase {
     name: String,
-    path: PathBuf,
+    _path: PathBuf,
     command: ClangCommand,
 }
 
@@ -24,20 +19,20 @@ impl LLVMTestCase {
     pub fn new(name: String, path: PathBuf, command: ClangCommand) -> Self {
         Self {
             name,
-            path,
+            _path: path,
             command,
         }
     }
 
     /// Run the test case through libra workflow (internal)
-    fn run_libra_internal(
+    pub fn run_libra(
         &self,
         ctxt: &Context,
         workdir: &Path,
-    ) -> Result<Option<EngineResult<()>>> {
+    ) -> Result<Option<(String, EngineResult<()>)>> {
         let Self {
             name,
-            path: _,
+            _path: _,
             command,
         } = self;
 
@@ -70,26 +65,7 @@ impl LLVMTestCase {
 
         // clean-up
         env::set_current_dir(cursor)?;
-        Ok(Some(result))
-    }
-
-    pub fn run_libra(&self, ctxt: &Context, workdir: &Path) -> Option<(String, LLVMTestResult)> {
-        match self.run_libra_internal(ctxt, workdir) {
-            Ok(None) => None,
-            Ok(Some(_)) => Some((self.name.to_string(), LLVMTestResult::Success)),
-            Err(e) => {
-                warn!(
-                    "test {} with path {} failed: {}",
-                    self.name,
-                    self.path.to_string_lossy(),
-                    e
-                );
-                Some((
-                    self.name.to_string(),
-                    LLVMTestResult::Failure(e.to_string()),
-                ))
-            }
-        }
+        Ok(Some((name.to_string(), result)))
     }
 }
 

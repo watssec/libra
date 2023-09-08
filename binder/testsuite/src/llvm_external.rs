@@ -9,6 +9,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
 use libra_builder::ResolverLLVM;
+use libra_engine::error::EngineError;
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{ClangCommand, CompileDB, CompileEntry, TokenStream};
 use libra_shared::config::{PARALLEL, PATH_STUDIO};
@@ -16,7 +17,7 @@ use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
 use crate::common::TestSuite;
-use crate::llvm_lit::{LLVMTestCase, LLVMTestResult};
+use crate::llvm_lit::LLVMTestCase;
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
@@ -125,27 +126,67 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
         fs::create_dir_all(&workdir)?;
 
         // run the tests
-        let results: Vec<_> = if *PARALLEL {
+        let consolidated: Vec<_> = if *PARALLEL {
             test_cases
                 .into_par_iter()
-                .filter_map(|test| test.run_libra(&ctxt, &workdir))
-                .collect()
+                .map(|test| test.run_libra(&ctxt, &workdir))
+                .collect::<Result<_>>()?
         } else {
             test_cases
                 .into_iter()
-                .filter_map(|test| test.run_libra(&ctxt, &workdir))
-                .collect()
+                .map(|test| test.run_libra(&ctxt, &workdir))
+                .collect::<Result<_>>()?
         };
 
-        let (vec_success, vec_failure): (Vec<_>, Vec<_>) = results
-            .into_iter()
-            .partition(|(_, r)| matches!(r, LLVMTestResult::Success));
-        info!(
-            "Result: success {} vs failure {}",
-            vec_success.len(),
-            vec_failure.len()
-        );
+        // filter the results
+        let executed: BTreeMap<_, _> = consolidated.into_iter().flatten().collect();
+        info!("Number of test cases executed: {}", executed.len());
 
+        // split the results
+        let mut result_pass = vec![];
+        let mut result_loading = vec![];
+        let mut result_invariant = vec![];
+        let mut result_assumption = vec![];
+        let mut result_unsupported = BTreeMap::new();
+        let mut result_uncompilable = vec![];
+
+        for (name, result) in executed {
+            match result {
+                Ok(_) => {
+                    result_pass.push(name);
+                }
+                // potential setup issue
+                Err(EngineError::CompilationError(_)) => {
+                    result_uncompilable.push(name);
+                }
+                // known issues
+                Err(EngineError::NotSupportedYet(reason)) => {
+                    result_unsupported
+                        .entry(reason)
+                        .or_insert_with(Vec::new)
+                        .push(name);
+                }
+                // potential bugs with the oracle
+                Err(EngineError::LLVMLoadingError(_)) => {
+                    result_loading.push(name);
+                }
+                // potential bugs with the backend
+                Err(EngineError::InvariantViolation(_)) => {
+                    result_invariant.push(name);
+                }
+                Err(EngineError::InvalidAssumption(_)) => {
+                    result_assumption.push(name);
+                }
+            }
+        }
+
+        // summarize the result
+        info!("passed: {}", result_pass.len());
+        info!("failed [compile]: {}", result_uncompilable.len());
+        info!("failed [loading]: {}", result_loading.len());
+        info!("failed [invariant]: {}", result_invariant.len());
+        info!("failed [assumption]: {}", result_assumption.len());
+        info!("failed [unsupported]: {}", result_unsupported.len());
         Ok(())
     }
 }
