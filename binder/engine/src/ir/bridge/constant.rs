@@ -24,8 +24,13 @@ pub enum Constant {
     },
     /// Null pointer
     Null,
-    /// Vector
-    Vector { sub: Type, elements: Vec<Constant> },
+    /// Vector of integers
+    VecInt { bits: usize, elements: Vec<Integer> },
+    /// Vector of floating points
+    VecFloat {
+        bits: usize,
+        elements: Vec<Option<Rational>>,
+    },
     /// Array
     Array { sub: Type, elements: Vec<Constant> },
     /// Struct
@@ -58,15 +63,14 @@ impl Constant {
                 bits: *bits,
                 value: Some(Rational::ZERO.clone()),
             },
-            Type::Vector { element, length } => {
-                let elements = (0..*length)
-                    .map(|_| Self::default_from_type(element))
-                    .collect::<EngineResult<_>>()?;
-                Self::Vector {
-                    sub: element.as_ref().clone(),
-                    elements,
-                }
-            }
+            Type::VecInt { bits, length } => Self::VecInt {
+                bits: *bits,
+                elements: (0..*length).map(|_| Integer::ZERO).collect(),
+            },
+            Type::VecFloat { bits, length } => Self::VecFloat {
+                bits: *bits,
+                elements: (0..*length).map(|_| Some(Rational::ZERO.clone())).collect(),
+            },
             Type::Array { element, length } => {
                 let elements = (0..*length)
                     .map(|_| Self::default_from_type(element))
@@ -101,15 +105,6 @@ impl Constant {
         let value = match ty {
             Type::Int { bits } => Self::UndefInt { bits: *bits },
             Type::Float { bits } => Self::UndefFloat { bits: *bits },
-            Type::Vector { element, length } => {
-                let elements = (0..*length)
-                    .map(|_| Self::undef_from_type(element))
-                    .collect::<EngineResult<_>>()?;
-                Self::Vector {
-                    sub: element.as_ref().clone(),
-                    elements,
-                }
-            }
             Type::Array { element, length } => {
                 let elements = (0..*length)
                     .map(|_| Self::undef_from_type(element))
@@ -136,6 +131,12 @@ impl Constant {
                 )));
             }
             Type::Pointer => Self::UndefPointer,
+            Type::VecInt { .. } | Type::VecFloat { .. } => {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "trying to create undef for a vector type: {}",
+                    ty
+                )));
+            }
         };
         Ok(value)
     }
@@ -242,7 +243,7 @@ impl Constant {
             AdaptedConst::Vector { elements } => {
                 check_type(ty)?;
                 match expected_type {
-                    Type::Vector { element, length } => {
+                    Type::VecInt { bits, length } => {
                         if elements.len() != *length {
                             return Err(EngineError::InvalidAssumption(format!(
                                 "type mismatch: expect {} elements, found {}",
@@ -250,13 +251,45 @@ impl Constant {
                                 elements.len()
                             )));
                         }
-
                         let elements_new = elements
                             .iter()
-                            .map(|e| Self::convert(e, element, typing, symbols))
+                            .map(|e| {
+                                Self::convert(e, &Type::Int { bits: *bits }, typing, symbols)
+                                    .and_then(|c| match c {
+                                        Constant::Int { bits: _, value } => Ok(value),
+                                        _ => Err(EngineError::InvariantViolation(
+                                            "expect only const int for vector const".into(),
+                                        )),
+                                    })
+                            })
                             .collect::<EngineResult<_>>()?;
-                        Self::Vector {
-                            sub: element.as_ref().clone(),
+                        Self::VecInt {
+                            bits: *bits,
+                            elements: elements_new,
+                        }
+                    }
+                    Type::VecFloat { bits, length } => {
+                        if elements.len() != *length {
+                            return Err(EngineError::InvalidAssumption(format!(
+                                "type mismatch: expect {} elements, found {}",
+                                length,
+                                elements.len()
+                            )));
+                        }
+                        let elements_new = elements
+                            .iter()
+                            .map(|e| {
+                                Self::convert(e, &Type::Float { bits: *bits }, typing, symbols)
+                                    .and_then(|c| match c {
+                                        Constant::Float { bits: _, value } => Ok(value),
+                                        _ => Err(EngineError::InvariantViolation(
+                                            "expect only const float for vector const".into(),
+                                        )),
+                                    })
+                            })
+                            .collect::<EngineResult<_>>()?;
+                        Self::VecFloat {
+                            bits: *bits,
                             elements: elements_new,
                         }
                     }
@@ -279,7 +312,6 @@ impl Constant {
                                 elements.len()
                             )));
                         }
-
                         let elements_new = elements
                             .iter()
                             .map(|e| Self::convert(e, element, typing, symbols))
@@ -308,7 +340,6 @@ impl Constant {
                                 elements.len()
                             )));
                         }
-
                         let elements_new = elements
                             .iter()
                             .zip(fields.iter())
@@ -425,6 +456,12 @@ pub enum Expression {
         opcode: UnaryOpArith,
         operand: Constant,
     },
+    UnaryArithVecFloat {
+        bits: usize,
+        length: usize,
+        opcode: UnaryOpArith,
+        operand: Constant,
+    },
     // binary
     BinaryArithInt {
         bits: usize,
@@ -434,6 +471,20 @@ pub enum Expression {
     },
     BinaryArithFloat {
         bits: usize,
+        opcode: BinaryOpArith,
+        lhs: Constant,
+        rhs: Constant,
+    },
+    BinaryArithVecInt {
+        bits: usize,
+        length: usize,
+        opcode: BinaryOpArith,
+        lhs: Constant,
+        rhs: Constant,
+    },
+    BinaryArithVecFloat {
+        bits: usize,
+        length: usize,
         opcode: BinaryOpArith,
         lhs: Constant,
         rhs: Constant,
@@ -528,22 +579,42 @@ pub enum Expression {
         value: Constant,
         indices: Vec<usize>,
     },
-    GetElement {
-        elem_ty: Type,
-        bound: usize,
+    GetElementVecInt {
+        bits: usize,
+        length: usize,
         vector: Constant,
         slot: Constant,
     },
-    SetElement {
-        elem_ty: Type,
-        bound: usize,
+    GetElementVecFloat {
+        bits: usize,
+        length: usize,
+        vector: Constant,
+        slot: Constant,
+    },
+    SetElementVecInt {
+        bits: usize,
+        length: usize,
         vector: Constant,
         value: Constant,
         slot: Constant,
     },
-    ShuffleVector {
-        elem_ty: Type,
-        bound: usize,
+    SetElementVecFloat {
+        bits: usize,
+        length: usize,
+        vector: Constant,
+        value: Constant,
+        slot: Constant,
+    },
+    ShuffleVecInt {
+        bits: usize,
+        length: usize,
+        lhs: Constant,
+        rhs: Constant,
+        mask: Vec<usize>,
+    },
+    ShuffleVecFloat {
+        bits: usize,
+        length: usize,
         lhs: Constant,
         rhs: Constant,
         mask: Vec<usize>,
@@ -562,6 +633,21 @@ impl Expression {
                 assert!(result == usize::MAX.into());
                 Self::UnaryArithFloat {
                     bits,
+                    opcode,
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::UnaryArithVecFloat {
+                bits,
+                length,
+                opcode,
+                operand,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::UnaryArithVecFloat {
+                    bits,
+                    length,
                     opcode,
                     operand: operand.expect_constant()?,
                 }
@@ -591,6 +677,40 @@ impl Expression {
                 assert!(result == usize::MAX.into());
                 Self::BinaryArithFloat {
                     bits,
+                    opcode,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::BinaryArithVecInt {
+                bits,
+                length,
+                opcode,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::BinaryArithVecInt {
+                    bits,
+                    length,
+                    opcode,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::BinaryArithVecFloat {
+                bits,
+                length,
+                opcode,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::BinaryArithVecFloat {
+                    bits,
+                    length,
                     opcode,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
@@ -814,50 +934,99 @@ impl Expression {
                     indices,
                 }
             }
-            Instruction::GetElement {
-                elem_ty,
-                bound,
+            Instruction::GetElementVecInt {
+                bits,
+                length,
                 vector,
                 slot,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::GetElement {
-                    elem_ty,
-                    bound,
+                Self::GetElementVecInt {
+                    bits,
+                    length,
                     vector: vector.expect_constant()?,
                     slot: slot.expect_constant()?,
                 }
             }
-            Instruction::SetElement {
-                elem_ty,
-                bound,
+            Instruction::GetElementVecFloat {
+                bits,
+                length,
+                vector,
+                slot,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::GetElementVecFloat {
+                    bits,
+                    length,
+                    vector: vector.expect_constant()?,
+                    slot: slot.expect_constant()?,
+                }
+            }
+            Instruction::SetElementVecInt {
+                bits,
+                length,
                 vector,
                 value,
                 slot,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::SetElement {
-                    elem_ty,
-                    bound,
+                Self::SetElementVecInt {
+                    bits,
+                    length,
                     vector: vector.expect_constant()?,
                     value: value.expect_constant()?,
                     slot: slot.expect_constant()?,
                 }
             }
-            Instruction::ShuffleVector {
-                elem_ty,
-                bound,
+            Instruction::SetElementVecFloat {
+                bits,
+                length,
+                vector,
+                value,
+                slot,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::SetElementVecFloat {
+                    bits,
+                    length,
+                    vector: vector.expect_constant()?,
+                    value: value.expect_constant()?,
+                    slot: slot.expect_constant()?,
+                }
+            }
+            Instruction::ShuffleVecInt {
+                bits,
+                length,
                 lhs,
                 rhs,
                 mask,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::ShuffleVector {
-                    elem_ty,
-                    bound,
+                Self::ShuffleVecInt {
+                    bits,
+                    length,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                    mask,
+                }
+            }
+            Instruction::ShuffleVecFloat {
+                bits,
+                length,
+                lhs,
+                rhs,
+                mask,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::ShuffleVecFloat {
+                    bits,
+                    length,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
                     mask,

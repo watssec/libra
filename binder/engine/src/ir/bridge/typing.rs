@@ -16,8 +16,12 @@ enum TypeToken {
     Float {
         width: usize,
     },
-    Vector {
-        element: Box<TypeToken>,
+    VecInt {
+        width: usize,
+        length: usize,
+    },
+    VecFloat {
+        width: usize,
         length: usize,
     },
     Array {
@@ -60,9 +64,24 @@ impl TypeToken {
                 }
 
                 let element_new = Self::parse(element.as_ref(), user_defined_structs)?;
-                Self::Vector {
-                    element: Box::new(element_new),
-                    length: *length,
+                match element_new {
+                    TypeToken::Int { width } => Self::VecInt {
+                        width,
+                        length: *length,
+                    },
+                    TypeToken::Float { width } => Self::VecFloat {
+                        width,
+                        length: *length,
+                    },
+                    TypeToken::Pointer => {
+                        // TODO: a vector of pointers seems counter-intuitive
+                        return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "only int, float, and pointer type can be vector element".into(),
+                        ));
+                    }
                 }
             }
             AdaptedType::Array { element, length } => {
@@ -166,12 +185,14 @@ impl TypeToken {
 /// An adapted representation of LLVM typing system
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Type {
-    /// Bit-vector (for integer)
+    /// Integer
     Int { bits: usize },
     /// Floating point
     Float { bits: usize },
-    /// A vector with fixed size
-    Vector { element: Box<Type>, length: usize },
+    /// A vector of integers
+    VecInt { bits: usize, length: usize },
+    /// A vector of floating points
+    VecFloat { bits: usize, length: usize },
     /// An array with elements being the same type
     Array { element: Box<Type>, length: usize },
     /// A struct type, named or anonymous
@@ -199,13 +220,14 @@ impl Type {
             }
             TypeToken::Int { width } => Self::Int { bits: *width },
             TypeToken::Float { width } => Self::Float { bits: *width },
-            TypeToken::Vector { element, length } => {
-                let converted = Self::convert_token(element)?;
-                Self::Vector {
-                    element: Box::new(converted),
-                    length: *length,
-                }
-            }
+            TypeToken::VecInt { width, length } => Self::VecInt {
+                bits: *width,
+                length: *length,
+            },
+            TypeToken::VecFloat { width, length } => Self::VecFloat {
+                bits: *width,
+                length: *length,
+            },
             TypeToken::Array { element, length } => {
                 let converted = Self::convert_token(element)?;
                 Self::Array {
@@ -261,8 +283,11 @@ impl Display for Type {
             Self::Float { bits } => {
                 write!(f, "float{}", bits)
             }
-            Self::Vector { element, length } => {
-                write!(f, "{}<{}>", element, length)
+            Self::VecInt { bits, length } => {
+                write!(f, "int{}<{}>", bits, length)
+            }
+            Self::VecFloat { bits, length } => {
+                write!(f, "float{}<{}>", bits, length)
             }
             Self::Array { element, length } => {
                 write!(f, "{}[{}]", element, length)

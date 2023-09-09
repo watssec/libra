@@ -49,6 +49,13 @@ pub enum Instruction {
         operand: Value,
         result: RegisterSlot,
     },
+    UnaryArithVecFloat {
+        bits: usize,
+        length: usize,
+        opcode: UnaryOpArith,
+        operand: Value,
+        result: RegisterSlot,
+    },
     // binary
     BinaryArithInt {
         bits: usize,
@@ -59,6 +66,22 @@ pub enum Instruction {
     },
     BinaryArithFloat {
         bits: usize,
+        opcode: BinaryOpArith,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    BinaryArithVecInt {
+        bits: usize,
+        length: usize,
+        opcode: BinaryOpArith,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    BinaryArithVecFloat {
+        bits: usize,
+        length: usize,
         opcode: BinaryOpArith,
         lhs: Value,
         rhs: Value,
@@ -186,24 +209,47 @@ pub enum Instruction {
         indices: Vec<usize>,
         result: RegisterSlot,
     },
-    GetElement {
-        elem_ty: Type,
-        bound: usize,
+    GetElementVecInt {
+        bits: usize,
+        length: usize,
         vector: Value,
         slot: Value,
         result: RegisterSlot,
     },
-    SetElement {
-        elem_ty: Type,
-        bound: usize,
+    GetElementVecFloat {
+        bits: usize,
+        length: usize,
+        vector: Value,
+        slot: Value,
+        result: RegisterSlot,
+    },
+    SetElementVecInt {
+        bits: usize,
+        length: usize,
         vector: Value,
         value: Value,
         slot: Value,
         result: RegisterSlot,
     },
-    ShuffleVector {
-        elem_ty: Type,
-        bound: usize,
+    SetElementVecFloat {
+        bits: usize,
+        length: usize,
+        vector: Value,
+        value: Value,
+        slot: Value,
+        result: RegisterSlot,
+    },
+    ShuffleVecInt {
+        bits: usize,
+        length: usize,
+        lhs: Value,
+        rhs: Value,
+        mask: Vec<usize>,
+        result: RegisterSlot,
+    },
+    ShuffleVecFloat {
+        bits: usize,
+        length: usize,
         lhs: Value,
         rhs: Value,
         mask: Vec<usize>,
@@ -214,6 +260,25 @@ pub enum Instruction {
 #[derive(Eq, PartialEq, Clone)]
 pub enum UnaryOpArith {
     Neg,
+}
+
+pub enum UnaryOperator {
+    Arithmetic(UnaryOpArith, bool),
+}
+
+impl UnaryOperator {
+    pub fn parse(opcode: &str) -> EngineResult<Self> {
+        let parsed = match opcode {
+            "fneg" => Self::Arithmetic(UnaryOpArith::Neg, true),
+            _ => {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "unexpected unary opcode: {}",
+                    opcode
+                )));
+            }
+        };
+        Ok(parsed)
+    }
 }
 
 #[derive(Eq, PartialEq, Clone)]
@@ -655,64 +720,76 @@ impl<'a> Context<'a> {
             // unary
             AdaptedInst::Unary { opcode, operand } => {
                 let inst_ty = self.typing.convert(ty)?;
-                let bits = match &inst_ty {
-                    Type::Float { bits } => *bits,
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "unary operator has invalid instruction type".into(),
-                        ));
-                    }
-                };
-
                 let operand_new = self.parse_value(operand, &inst_ty)?;
-                match opcode.as_str() {
-                    "fneg" => Instruction::UnaryArithFloat {
-                        bits,
-                        opcode: UnaryOpArith::Neg,
-                        operand: operand_new,
-                        result: index.into(),
-                    },
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(format!(
-                            "unexpected unary opcode: {}",
-                            opcode
-                        )));
+                match UnaryOperator::parse(opcode)? {
+                    UnaryOperator::Arithmetic(operator, is_float_op) => {
+                        match (inst_ty, is_float_op) {
+                            (Type::Float { bits }, true) => Instruction::UnaryArithFloat {
+                                bits,
+                                opcode: operator,
+                                operand: operand_new,
+                                result: index.into(),
+                            },
+                            (Type::VecFloat { bits, length }, true) => {
+                                Instruction::UnaryArithVecFloat {
+                                    bits,
+                                    length,
+                                    opcode: operator,
+                                    operand: operand_new,
+                                    result: index.into(),
+                                }
+                            }
+                            _ => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "unary operator has invalid instruction type".into(),
+                                ));
+                            }
+                        }
                     }
                 }
             }
             // binary
             AdaptedInst::Binary { opcode, lhs, rhs } => {
                 let inst_ty = self.typing.convert(ty)?;
-                let (float, bits) = match &inst_ty {
-                    Type::Int { bits } => (false, *bits),
-                    Type::Float { bits } => (true, *bits),
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "binary operator has invalid instruction type".into(),
-                        ));
-                    }
-                };
-
                 let lhs_new = self.parse_value(lhs, &inst_ty)?;
                 let rhs_new = self.parse_value(rhs, &inst_ty)?;
-
                 match BinaryOperator::parse(opcode)? {
                     BinaryOperator::Arithmetic(operator, is_float_op) => {
-                        match (float, is_float_op) {
-                            (false, false) => Instruction::BinaryArithInt {
+                        match (inst_ty, is_float_op) {
+                            (Type::Int { bits }, false) => Instruction::BinaryArithInt {
                                 bits,
                                 opcode: operator,
                                 lhs: lhs_new,
                                 rhs: rhs_new,
                                 result: index.into(),
                             },
-                            (true, true) => Instruction::BinaryArithFloat {
+                            (Type::Float { bits }, true) => Instruction::BinaryArithFloat {
                                 bits,
                                 opcode: operator,
                                 lhs: lhs_new,
                                 rhs: rhs_new,
                                 result: index.into(),
                             },
+                            (Type::VecInt { bits, length }, false) => {
+                                Instruction::BinaryArithVecInt {
+                                    bits,
+                                    length,
+                                    opcode: operator,
+                                    lhs: lhs_new,
+                                    rhs: rhs_new,
+                                    result: index.into(),
+                                }
+                            }
+                            (Type::VecFloat { bits, length }, true) => {
+                                Instruction::BinaryArithVecFloat {
+                                    bits,
+                                    length,
+                                    opcode: operator,
+                                    lhs: lhs_new,
+                                    rhs: rhs_new,
+                                    result: index.into(),
+                                }
+                            }
                             _ => {
                                 return Err(EngineError::InvalidAssumption(
                                     "value type and arithmetic operation type mismatch".into(),
@@ -721,11 +798,14 @@ impl<'a> Context<'a> {
                         }
                     }
                     BinaryOperator::Bitwise(operator) => {
-                        if float {
-                            return Err(EngineError::InvalidAssumption(
-                                "value type and bitwise operation type mismatch".into(),
-                            ));
-                        }
+                        let bits = match inst_ty {
+                            Type::Int { bits } => bits,
+                            _ => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "value type and bitwise operation type mismatch".into(),
+                                ));
+                            }
+                        };
                         Instruction::BinaryBitwise {
                             bits,
                             opcode: operator,
@@ -735,11 +815,14 @@ impl<'a> Context<'a> {
                         }
                     }
                     BinaryOperator::Shift(operator) => {
-                        if float {
-                            return Err(EngineError::InvalidAssumption(
-                                "value type and shift operation type mismatch".into(),
-                            ));
-                        }
+                        let bits = match inst_ty {
+                            Type::Int { bits } => bits,
+                            _ => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "value type and shift operation type mismatch".into(),
+                                ));
+                            }
+                        };
                         Instruction::BinaryShift {
                             bits,
                             opcode: operator,
@@ -1275,31 +1358,36 @@ impl<'a> Context<'a> {
             } => {
                 let src_ty = self.typing.convert(vec_ty)?;
                 let dst_ty = self.typing.convert(ty)?;
-
-                let bound = match &src_ty {
-                    Type::Vector { element, length } => {
-                        if element.as_ref() != &dst_ty {
-                            return Err(EngineError::InvalidAssumption(
-                                "GetElement destination type mismatch".into(),
-                            ));
+                let vector_new = self.parse_value(vector, &src_ty)?;
+                let slot_new = self.parse_value_int32_or_int64(slot)?;
+                match (src_ty, dst_ty) {
+                    (Type::VecInt { bits, length }, Type::Int { bits: bits_element })
+                        if bits == bits_element =>
+                    {
+                        Instruction::GetElementVecInt {
+                            bits,
+                            length,
+                            vector: vector_new,
+                            slot: slot_new,
+                            result: index.into(),
                         }
-                        *length
+                    }
+                    (Type::VecFloat { bits, length }, Type::Float { bits: bits_element })
+                        if bits == bits_element =>
+                    {
+                        Instruction::GetElementVecFloat {
+                            bits,
+                            length,
+                            vector: vector_new,
+                            slot: slot_new,
+                            result: index.into(),
+                        }
                     }
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "GetElement should target a vector type".into(),
+                            "GetElement source and element type mismatch".into(),
                         ));
                     }
-                };
-
-                let vector_new = self.parse_value(vector, &src_ty)?;
-                let slot_new = self.parse_value_int32_or_int64(slot)?;
-                Instruction::GetElement {
-                    elem_ty: dst_ty,
-                    bound,
-                    vector: vector_new,
-                    slot: slot_new,
-                    result: index.into(),
                 }
             }
             AdaptedInst::SetElement {
@@ -1308,25 +1396,37 @@ impl<'a> Context<'a> {
                 slot,
             } => {
                 let src_ty = self.typing.convert(ty)?;
-                let (dst_ty, bound) = match &src_ty {
-                    Type::Vector { element, length } => (element.as_ref().clone(), *length),
+                let vector_new = self.parse_value(vector, &src_ty)?;
+                let slot_new = self.parse_value_int32_or_int64(slot)?;
+
+                match src_ty {
+                    Type::VecInt { bits, length } => {
+                        let value_new = self.parse_value(value, &Type::Int { bits })?;
+                        Instruction::SetElementVecInt {
+                            bits,
+                            length,
+                            vector: vector_new,
+                            slot: slot_new,
+                            value: value_new,
+                            result: index.into(),
+                        }
+                    }
+                    Type::VecFloat { bits, length } => {
+                        let value_new = self.parse_value(value, &Type::Float { bits })?;
+                        Instruction::SetElementVecFloat {
+                            bits,
+                            length,
+                            vector: vector_new,
+                            slot: slot_new,
+                            value: value_new,
+                            result: index.into(),
+                        }
+                    }
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "GetElement should target a vector type".into(),
+                            "SetElement source and element type mismatch".into(),
                         ));
                     }
-                };
-
-                let vector_new = self.parse_value(vector, &src_ty)?;
-                let value_new = self.parse_value(value, &dst_ty)?;
-                let slot_new = self.parse_value_int32_or_int64(slot)?;
-                Instruction::SetElement {
-                    elem_ty: dst_ty,
-                    bound,
-                    vector: vector_new,
-                    slot: slot_new,
-                    value: value_new,
-                    result: index.into(),
                 }
             }
             AdaptedInst::ShuffleVector { lhs, rhs, mask } => {
@@ -1334,46 +1434,67 @@ impl<'a> Context<'a> {
                 let rhs_ty = self.typing.convert(rhs.get_type())?;
                 let dst_ty = self.typing.convert(ty)?;
 
-                // type checking
-                let (elem_ty, bound) = match (&lhs_ty, &rhs_ty, &dst_ty) {
+                let lhs_new = self.parse_value(lhs, &lhs_ty)?;
+                let rhs_new = self.parse_value(rhs, &rhs_ty)?;
+
+                match (&lhs_ty, &rhs_ty, dst_ty) {
                     (
-                        Type::Vector {
-                            element: element_lhs,
+                        Type::VecInt {
+                            bits: bits_lhs,
                             length: _,
                         },
-                        Type::Vector {
-                            element: element_rhs,
+                        Type::VecInt {
+                            bits: bits_rhs,
                             length: _,
                         },
-                        Type::Vector {
-                            element: element_dst,
-                            length: bound,
-                        },
+                        Type::VecInt { bits, length },
                     ) => {
-                        if element_lhs != element_dst || element_rhs != element_dst {
+                        if *bits_lhs != bits || *bits_rhs != bits {
                             return Err(EngineError::InvalidAssumption(
                                 "ShuffleVector 3-way type mismatch".into(),
                             ));
                         }
                         // TODO: check relation with mask
-                        (element_dst.as_ref().clone(), *bound)
+                        Instruction::ShuffleVecInt {
+                            bits,
+                            length,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            mask: mask.clone(),
+                            result: index.into(),
+                        }
+                    }
+                    (
+                        Type::VecFloat {
+                            bits: bits_lhs,
+                            length: _,
+                        },
+                        Type::VecFloat {
+                            bits: bits_rhs,
+                            length: _,
+                        },
+                        Type::VecFloat { bits, length },
+                    ) => {
+                        if *bits_lhs != bits || *bits_rhs != bits {
+                            return Err(EngineError::InvalidAssumption(
+                                "ShuffleVector 3-way type mismatch".into(),
+                            ));
+                        }
+                        // TODO: check relation with mask
+                        Instruction::ShuffleVecFloat {
+                            bits,
+                            length,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            mask: mask.clone(),
+                            result: index.into(),
+                        }
                     }
                     _ => {
                         return Err(EngineError::InvalidAssumption(
                             "ShuffleVector should involve only vector types".into(),
                         ));
                     }
-                };
-
-                let lhs_new = self.parse_value(lhs, &lhs_ty)?;
-                let rhs_new = self.parse_value(rhs, &rhs_ty)?;
-                Instruction::ShuffleVector {
-                    elem_ty,
-                    bound,
-                    lhs: lhs_new,
-                    rhs: rhs_new,
-                    mask: mask.clone(),
-                    result: index.into(),
                 }
             }
             // concurrency
