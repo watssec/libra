@@ -151,7 +151,7 @@ impl Summary {
 }
 
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
-    fn run(resolver: ResolverLLVMExternal, force: bool) -> Result<()> {
+    fn run(resolver: ResolverLLVMExternal, force: bool, filter: Vec<String>) -> Result<()> {
         // prepare te environment
         let mut workdir = PATH_STUDIO.to_path_buf();
         workdir.extend(PATH_WORKSPACE);
@@ -171,7 +171,7 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
 
         // run the tests
         let ctxt = Context::new()?;
-        let consolidated: Vec<_> = if *PARALLEL {
+        let consolidated: Vec<_> = if *PARALLEL && filter.is_empty() {
             test_cases
                 .into_par_iter()
                 .map(|test| test.run_libra(&ctxt, &workdir))
@@ -180,8 +180,15 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
             // serial execution will halt on first failure caused by potential bugs
             let mut results = vec![];
             for test in test_cases {
+                // apply filter if necessary
+                if !filter.is_empty() && !filter.contains(&test.name) {
+                    continue;
+                }
+
+                // actual execution
                 let output = test.run_libra(&ctxt, &workdir)?;
-                // filter errors to halt on first failure caused by potential bugs
+
+                // check errors to halt on first failure caused by potential bugs
                 if let Some((_, Err(err))) = output.as_ref() {
                     match err {
                         EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),

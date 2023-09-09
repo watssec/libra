@@ -28,6 +28,10 @@ enum Command {
         /// Force the execution to proceed
         #[structopt(short, long)]
         force: bool,
+
+        /// Run selective test cases only
+        #[structopt(short, long)]
+        selection: Vec<String>,
     },
 }
 
@@ -77,9 +81,9 @@ fn run_internal<R: Resolver, T: Dependency<R> + TestSuite<R>>(command: Command) 
         Command::Build { force } => {
             state.build(force)?;
         }
-        Command::Run { force } => {
+        Command::Run { force, selection } => {
             let (_, resolver) = state.into_source_and_artifact()?;
-            T::run(resolver, force)?;
+            T::run(resolver, force, selection)?;
         }
     }
     Ok(())

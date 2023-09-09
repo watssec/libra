@@ -10,7 +10,7 @@ use log::debug;
 use libra_shared::compile_db::ClangCommand;
 
 pub struct LLVMTestCase {
-    name: String,
+    pub name: String,
     _path: PathBuf,
     command: ClangCommand,
 }
