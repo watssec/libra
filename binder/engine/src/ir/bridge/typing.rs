@@ -10,10 +10,12 @@ use crate::ir::bridge::shared::Identifier;
 #[derive(Eq, PartialEq)]
 enum TypeToken {
     Void,
-    Bitvec {
+    Int {
         width: usize,
     },
-    // TODO: floating point types
+    Float {
+        width: usize,
+    },
     Array {
         element: Box<TypeToken>,
         length: usize,
@@ -38,9 +40,10 @@ impl TypeToken {
 
         let converted = match ty {
             AdaptedType::Void => Self::Void,
-            AdaptedType::Int { width } => Self::Bitvec { width: *width },
-            AdaptedType::Float { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint));
+            AdaptedType::Int { width } => Self::Int { width: *width },
+            AdaptedType::Float { width, name: _ } => {
+                // TODO: differentiate the name
+                Self::Float { width: *width }
             }
             AdaptedType::Array { element, length } => {
                 let element_new = Self::parse(element.as_ref(), user_defined_structs)?;
@@ -148,8 +151,10 @@ impl TypeToken {
 /// An adapted representation of LLVM typing system
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Type {
-    /// Bit-vector
-    Bitvec { bits: usize },
+    /// Bit-vector (for integer)
+    Int { bits: usize },
+    /// Floating point
+    Float { bits: usize },
     /// An array with elements being the same type
     Array { element: Box<Type>, length: usize },
     /// A struct type, named or anonymous
@@ -174,7 +179,8 @@ impl Type {
                     "unexpected void type".into(),
                 ));
             }
-            TypeToken::Bitvec { width } => Self::Bitvec { bits: *width },
+            TypeToken::Int { width } => Self::Int { bits: *width },
+            TypeToken::Float { width } => Self::Float { bits: *width },
             TypeToken::Array { element, length } => {
                 let converted = Self::convert_token(element)?;
                 Self::Array {
@@ -219,8 +225,11 @@ impl Type {
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Bitvec { bits } => {
+            Self::Int { bits } => {
                 write!(f, "int{}", bits)
+            }
+            Self::Float { bits } => {
+                write!(f, "float{}", bits)
             }
             Self::Array { element, length } => {
                 write!(f, "{}[{}]", element, length)

@@ -1,5 +1,3 @@
-use num_traits::ToPrimitive;
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::{EngineError, EngineResult, Unsupported};
@@ -40,36 +38,73 @@ pub enum Instruction {
         args: Vec<Value>,
         result: Option<(Type, RegisterSlot)>,
     },
-    // binary
-    Binary {
+    // unary
+    UnaryArithFloat {
         bits: usize,
-        opcode: BinaryOperator,
+        opcode: UnaryOpArith,
+        operand: Value,
+        result: RegisterSlot,
+    },
+    // binary
+    BinaryArithInt {
+        bits: usize,
+        opcode: BinaryOpArith,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    BinaryArithFloat {
+        bits: usize,
+        opcode: BinaryOpArith,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    BinaryBitwise {
+        bits: usize,
+        opcode: BinaryOpBitwise,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    BinaryShift {
+        bits: usize,
+        opcode: BinaryOpShift,
         lhs: Value,
         rhs: Value,
         result: RegisterSlot,
     },
     // compare
-    Compare {
-        bits: Option<usize>, // some for bitvec and none for pointer
+    CompareInt {
+        bits: usize,
+        predicate: ComparePredicate,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    CompareFloat {
+        bits: usize,
+        predicate: ComparePredicate,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    ComparePtr {
         predicate: ComparePredicate,
         lhs: Value,
         rhs: Value,
         result: RegisterSlot,
     },
     // cast
-    CastBitvec {
+    CastInt {
         bits_from: usize,
         bits_into: usize,
         operand: Value,
         result: RegisterSlot,
     },
-    CastPtrToBitvec {
-        bits_into: usize,
-        operand: Value,
-        result: RegisterSlot,
-    },
-    CastBitvecToPtr {
+    CastFloat {
         bits_from: usize,
+        bits_into: usize,
         operand: Value,
         result: RegisterSlot,
     },
@@ -77,9 +112,34 @@ pub enum Instruction {
         operand: Value,
         result: RegisterSlot,
     },
+    CastFloatToInt {
+        bits_from: usize,
+        bits_into: usize,
+        operand: Value,
+        result: RegisterSlot,
+    },
+    CastIntToFloat {
+        bits_from: usize,
+        bits_into: usize,
+        operand: Value,
+        result: RegisterSlot,
+    },
+    CastPtrToInt {
+        bits_into: usize,
+        operand: Value,
+        result: RegisterSlot,
+    },
+    CastIntToPtr {
+        bits_from: usize,
+        operand: Value,
+        result: RegisterSlot,
+    },
     // freeze
     FreezePtr,
-    FreezeBitvec {
+    FreezeInt {
+        bits: usize,
+    },
+    FreezeFloat {
         bits: usize,
     },
     FreezeNop {
@@ -125,35 +185,56 @@ pub enum Instruction {
 }
 
 #[derive(Eq, PartialEq, Clone)]
-pub enum BinaryOperator {
+pub enum UnaryOpArith {
+    Neg,
+}
+
+#[derive(Eq, PartialEq, Clone)]
+pub enum BinaryOpArith {
     Add,
     Sub,
     Mul,
     Div,
     Mod,
-    Shl,
-    Shr,
+}
+
+#[derive(Eq, PartialEq, Clone)]
+pub enum BinaryOpBitwise {
     And,
     Or,
     Xor,
 }
 
+#[derive(Eq, PartialEq, Clone)]
+pub enum BinaryOpShift {
+    Shl,
+    Shr,
+}
+
+pub enum BinaryOperator {
+    Arithmetic(BinaryOpArith, bool),
+    Bitwise(BinaryOpBitwise),
+    Shift(BinaryOpShift),
+}
+
 impl BinaryOperator {
     pub fn parse(opcode: &str) -> EngineResult<Self> {
         let parsed = match opcode {
-            "add" => Self::Add,
-            "sub" => Self::Sub,
-            "mul" => Self::Mul,
-            "udiv" | "sdiv" => Self::Div,
-            "urem" | "srem" => Self::Mod,
-            "shl" => Self::Shl,
-            "lshr" | "ashr" => Self::Shr,
-            "and" => Self::And,
-            "or" => Self::Or,
-            "xor" => Self::Xor,
-            "fadd" | "fsub" | "fmul" | "fdiv" | "frem" => {
-                return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint))
-            }
+            "add" => Self::Arithmetic(BinaryOpArith::Add, false),
+            "sub" => Self::Arithmetic(BinaryOpArith::Sub, false),
+            "mul" => Self::Arithmetic(BinaryOpArith::Mul, false),
+            "udiv" | "sdiv" => Self::Arithmetic(BinaryOpArith::Div, false),
+            "urem" | "srem" => Self::Arithmetic(BinaryOpArith::Mod, false),
+            "fadd" => Self::Arithmetic(BinaryOpArith::Add, true),
+            "fsub" => Self::Arithmetic(BinaryOpArith::Sub, true),
+            "fmul" => Self::Arithmetic(BinaryOpArith::Mul, true),
+            "fdiv" => Self::Arithmetic(BinaryOpArith::Div, true),
+            "frem" => Self::Arithmetic(BinaryOpArith::Mod, true),
+            "shl" => Self::Shift(BinaryOpShift::Shl),
+            "lshr" | "ashr" => Self::Shift(BinaryOpShift::Shr),
+            "and" => Self::Bitwise(BinaryOpBitwise::And),
+            "or" => Self::Bitwise(BinaryOpBitwise::Or),
+            "xor" => Self::Bitwise(BinaryOpBitwise::Xor),
             _ => {
                 return Err(EngineError::InvalidAssumption(format!(
                     "unexpected binary opcode: {}",
@@ -176,16 +257,21 @@ pub enum ComparePredicate {
 }
 
 impl ComparePredicate {
-    pub fn parse(opcode: &str) -> EngineResult<Self> {
+    pub fn parse(opcode: &str) -> EngineResult<(Self, bool)> {
         let parsed = match opcode {
-            "i_eq" => Self::EQ,
-            "i_ne" => Self::NE,
-            "i_ugt" | "i_sgt" => Self::GT,
-            "i_uge" | "i_sge" => Self::GE,
-            "i_ult" | "i_slt" => Self::LT,
-            "i_ule" | "i_sle" => Self::LE,
-            "f_f" | "f_oeq" | "f_ogt" | "f_oge" | "f_olt" | "f_ole" | "f_one" | "f_ord"
-            | "f_uno" | "f_ueq" | "f_ugt" | "f_uge" | "f_ult" | "f_ule" | "f_une" | "f_t" => {
+            "i_eq" => (Self::EQ, false),
+            "i_ne" => (Self::NE, false),
+            "i_ugt" | "i_sgt" => (Self::GT, false),
+            "i_uge" | "i_sge" => (Self::GE, false),
+            "i_ult" | "i_slt" => (Self::LT, false),
+            "i_ule" | "i_sle" => (Self::LE, false),
+            "f_oeq" | "f_ueq" => (Self::EQ, true),
+            "f_one" | "f_une" => (Self::NE, true),
+            "f_ogt" | "f_ugt" => (Self::GT, true),
+            "f_oge" | "f_uge" => (Self::GE, true),
+            "f_olt" | "f_ult" => (Self::LT, true),
+            "f_ole" | "f_ule" => (Self::LE, true),
+            "f_f" | "f_ord" | "f_uno" | "f_t" => {
                 return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint))
             }
             _ => {
@@ -312,9 +398,9 @@ impl<'a> Context<'a> {
     pub fn parse_value_bv32_or_bv64(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
         match val.get_type() {
             adapter::typing::Type::Int { width: 32 } => {
-                self.parse_value(val, &Type::Bitvec { bits: 32 })
+                self.parse_value(val, &Type::Int { bits: 32 })
             }
-            _ => self.parse_value(val, &Type::Bitvec { bits: 64 }),
+            _ => self.parse_value(val, &Type::Int { bits: 64 }),
         }
     }
 
@@ -354,7 +440,7 @@ impl<'a> Context<'a> {
                 let base_type = self.typing.convert(allocated_type)?;
                 let size_new = match size.as_ref() {
                     None => None,
-                    Some(val) => Some(self.parse_value(val, &Type::Bitvec { bits: 64 })?),
+                    Some(val) => Some(self.parse_value(val, &Type::Int { bits: 64 })?),
                 };
                 Instruction::Alloca {
                     base_type,
@@ -523,37 +609,101 @@ impl<'a> Context<'a> {
                 return Err(EngineError::NotSupportedYet(Unsupported::InlineAssembly));
             }
             // unary
-            AdaptedInst::Unary { opcode, operand: _ } => match opcode.as_str() {
-                "fneg" => {
-                    return Err(EngineError::NotSupportedYet(Unsupported::FloatingPoint));
-                }
-                _ => {
-                    return Err(EngineError::InvalidAssumption(format!(
-                        "unexpected unary opcode: {}",
-                        opcode
-                    )));
-                }
-            },
-            // binary
-            AdaptedInst::Binary { opcode, lhs, rhs } => {
+            AdaptedInst::Unary { opcode, operand } => {
                 let inst_ty = self.typing.convert(ty)?;
                 let bits = match &inst_ty {
-                    Type::Bitvec { bits } => *bits,
+                    Type::Float { bits } => *bits,
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "binary operator has non-bitvec instruction type".into(),
+                            "unary operator has invalid instruction type".into(),
                         ));
                     }
                 };
-                let opcode_parsed = BinaryOperator::parse(opcode)?;
+
+                let operand_new = self.parse_value(operand, &inst_ty)?;
+                match opcode.as_str() {
+                    "fneg" => Instruction::UnaryArithFloat {
+                        bits,
+                        opcode: UnaryOpArith::Neg,
+                        operand: operand_new,
+                        result: index.into(),
+                    },
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(format!(
+                            "unexpected unary opcode: {}",
+                            opcode
+                        )));
+                    }
+                }
+            }
+            // binary
+            AdaptedInst::Binary { opcode, lhs, rhs } => {
+                let inst_ty = self.typing.convert(ty)?;
+                let (float, bits) = match &inst_ty {
+                    Type::Int { bits } => (false, *bits),
+                    Type::Float { bits } => (true, *bits),
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "binary operator has invalid instruction type".into(),
+                        ));
+                    }
+                };
+
                 let lhs_new = self.parse_value(lhs, &inst_ty)?;
                 let rhs_new = self.parse_value(rhs, &inst_ty)?;
-                Instruction::Binary {
-                    bits,
-                    opcode: opcode_parsed,
-                    lhs: lhs_new,
-                    rhs: rhs_new,
-                    result: index.into(),
+
+                match BinaryOperator::parse(opcode)? {
+                    BinaryOperator::Arithmetic(operator, is_float_op) => {
+                        match (float, is_float_op) {
+                            (false, false) => Instruction::BinaryArithInt {
+                                bits,
+                                opcode: operator,
+                                lhs: lhs_new,
+                                rhs: rhs_new,
+                                result: index.into(),
+                            },
+                            (true, true) => Instruction::BinaryArithFloat {
+                                bits,
+                                opcode: operator,
+                                lhs: lhs_new,
+                                rhs: rhs_new,
+                                result: index.into(),
+                            },
+                            _ => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "value type and arithmetic operation type mismatch".into(),
+                                ));
+                            }
+                        }
+                    }
+                    BinaryOperator::Bitwise(operator) => {
+                        if float {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and bitwise operation type mismatch".into(),
+                            ));
+                        }
+                        Instruction::BinaryBitwise {
+                            bits,
+                            opcode: operator,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
+                        }
+                    }
+                    BinaryOperator::Shift(operator) => {
+                        if float {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and shift operation type mismatch".into(),
+                            ));
+                        }
+                        Instruction::BinaryShift {
+                            bits,
+                            opcode: operator,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
+                        }
+                    }
                 }
             }
             // comparison
@@ -565,7 +715,7 @@ impl<'a> Context<'a> {
             } => {
                 let inst_ty = self.typing.convert(ty)?;
                 match &inst_ty {
-                    Type::Bitvec { bits } => {
+                    Type::Int { bits } => {
                         if *bits != 1 {
                             return Err(EngineError::InvalidAssumption(
                                 "compare inst has non-bool instruction type".into(),
@@ -574,29 +724,63 @@ impl<'a> Context<'a> {
                     }
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "compare inst has non-bitvec instruction type".into(),
+                            "compare inst has non-1-bit instruction type".into(),
                         ));
                     }
                 };
+
                 let operand_ty = self.typing.convert(operand_type)?;
-                let bits = match &operand_ty {
-                    Type::Bitvec { bits } => Some(*bits),
-                    Type::Pointer => None,
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "compare inst has operand type that is neither bitvec or ptr".into(),
-                        ));
-                    }
-                };
-                let predicate_parsed = ComparePredicate::parse(predicate)?;
                 let lhs_new = self.parse_value(lhs, &operand_ty)?;
                 let rhs_new = self.parse_value(rhs, &operand_ty)?;
-                Instruction::Compare {
-                    bits,
-                    predicate: predicate_parsed,
-                    lhs: lhs_new,
-                    rhs: rhs_new,
-                    result: index.into(),
+
+                let (predicate_parsed, is_float_op) = ComparePredicate::parse(predicate)?;
+                match operand_ty {
+                    Type::Int { bits } => {
+                        if is_float_op {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and compare type mismatch".into(),
+                            ));
+                        }
+                        Instruction::CompareInt {
+                            bits,
+                            predicate: predicate_parsed,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
+                        }
+                    }
+                    Type::Float { bits } => {
+                        if !is_float_op {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and compare type mismatch".into(),
+                            ));
+                        }
+                        Instruction::CompareFloat {
+                            bits,
+                            predicate: predicate_parsed,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
+                        }
+                    }
+                    Type::Pointer => {
+                        if is_float_op {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and compare type mismatch".into(),
+                            ));
+                        }
+                        Instruction::ComparePtr {
+                            predicate: predicate_parsed,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "compare inst has operand type that is int, float, nor ptr".into(),
+                        ));
+                    }
                 }
             }
             // casts
@@ -619,8 +803,8 @@ impl<'a> Context<'a> {
                 let operand_new = self.parse_value(operand, &src_ty_new)?;
                 match opcode.as_str() {
                     "trunc" | "zext" | "sext" => match (src_ty_new, dst_ty_new) {
-                        (Type::Bitvec { bits: bits_from }, Type::Bitvec { bits: bits_into }) => {
-                            Instruction::CastBitvec {
+                        (Type::Int { bits: bits_from }, Type::Int { bits: bits_into }) => {
+                            Instruction::CastInt {
                                 bits_from,
                                 bits_into,
                                 operand: operand_new,
@@ -629,59 +813,22 @@ impl<'a> Context<'a> {
                         }
                         _ => {
                             return Err(EngineError::InvalidAssumption(
-                                "expect bitvec type for bitvec cast".into(),
+                                "expect int type for int cast".into(),
                             ));
                         }
                     },
-                    "ptr_to_int" => match (src_ty_new, dst_ty_new) {
-                        (Type::Pointer, Type::Bitvec { bits: bits_into }) => {
-                            match src_address_space {
-                                None => {
-                                    return Err(EngineError::InvalidAssumption(
-                                        "expect (src address_space) for ptr_to_int cast".into(),
-                                    ));
-                                }
-                                Some(0) => Instruction::CastPtrToBitvec {
-                                    bits_into,
-                                    operand: operand_new,
-                                    result: index.into(),
-                                },
-                                Some(_) => {
-                                    return Err(EngineError::NotSupportedYet(
-                                        Unsupported::PointerAddressSpace,
-                                    ));
-                                }
+                    "fp_trunc" | "fp_ext" => match (src_ty_new, dst_ty_new) {
+                        (Type::Float { bits: bits_from }, Type::Float { bits: bits_into }) => {
+                            Instruction::CastFloat {
+                                bits_from,
+                                bits_into,
+                                operand: operand_new,
+                                result: index.into(),
                             }
                         }
                         _ => {
                             return Err(EngineError::InvalidAssumption(
-                                "expect (ptr, bitvec) for ptr_to_int cast".into(),
-                            ));
-                        }
-                    },
-                    "int_to_ptr" => match (src_ty_new, dst_ty_new) {
-                        (Type::Bitvec { bits: bits_from }, Type::Pointer) => {
-                            match dst_address_space {
-                                None => {
-                                    return Err(EngineError::InvalidAssumption(
-                                        "expect (dst address_space) for int_to_ptr cast".into(),
-                                    ));
-                                }
-                                Some(0) => Instruction::CastBitvecToPtr {
-                                    bits_from,
-                                    operand: operand_new,
-                                    result: index.into(),
-                                },
-                                Some(_) => {
-                                    return Err(EngineError::NotSupportedYet(
-                                        Unsupported::PointerAddressSpace,
-                                    ));
-                                }
-                            }
-                        }
-                        _ => {
-                            return Err(EngineError::InvalidAssumption(
-                                "expect (bitvec, ptr) for int_to_ptr cast".into(),
+                                "expect float type for float cast".into(),
                             ));
                         }
                     },
@@ -701,6 +848,84 @@ impl<'a> Context<'a> {
                             Unsupported::PointerAddressSpace,
                         ));
                     }
+                    "fp_to_ui" | "fp_to_si" => match (src_ty_new, dst_ty_new) {
+                        (Type::Float { bits: bits_from }, Type::Int { bits: bits_into }) => {
+                            Instruction::CastFloatToInt {
+                                bits_from,
+                                bits_into,
+                                operand: operand_new,
+                                result: index.into(),
+                            }
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect float and int for fp_to_ui/si cast".into(),
+                            ));
+                        }
+                    },
+                    "ui_to_fp" | "si_to_fp" => match (src_ty_new, dst_ty_new) {
+                        (Type::Int { bits: bits_from }, Type::Float { bits: bits_into }) => {
+                            Instruction::CastIntToFloat {
+                                bits_from,
+                                bits_into,
+                                operand: operand_new,
+                                result: index.into(),
+                            }
+                        }
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect and and flow for ui/si_to_fo cast".into(),
+                            ));
+                        }
+                    },
+                    "ptr_to_int" => match (src_ty_new, dst_ty_new) {
+                        (Type::Pointer, Type::Int { bits: bits_into }) => match src_address_space {
+                            None => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "expect (src address_space) for ptr_to_int cast".into(),
+                                ));
+                            }
+                            Some(0) => Instruction::CastPtrToInt {
+                                bits_into,
+                                operand: operand_new,
+                                result: index.into(),
+                            },
+                            Some(_) => {
+                                return Err(EngineError::NotSupportedYet(
+                                    Unsupported::PointerAddressSpace,
+                                ));
+                            }
+                        },
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect (ptr, int) for ptr_to_int cast".into(),
+                            ));
+                        }
+                    },
+                    "int_to_ptr" => match (src_ty_new, dst_ty_new) {
+                        (Type::Int { bits: bits_from }, Type::Pointer) => match dst_address_space {
+                            None => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "expect (dst address_space) for int_to_ptr cast".into(),
+                                ));
+                            }
+                            Some(0) => Instruction::CastIntToPtr {
+                                bits_from,
+                                operand: operand_new,
+                                result: index.into(),
+                            },
+                            Some(_) => {
+                                return Err(EngineError::NotSupportedYet(
+                                    Unsupported::PointerAddressSpace,
+                                ));
+                            }
+                        },
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "expect (int, ptr) for int_to_ptr cast".into(),
+                            ));
+                        }
+                    },
                     _ => {
                         return Err(EngineError::InvalidAssumption(format!(
                             "unexpected cast opcode: {}",
@@ -714,8 +939,9 @@ impl<'a> Context<'a> {
                 let inst_ty = self.typing.convert(ty)?;
                 let operand_new = self.parse_value(operand, &inst_ty)?;
                 match operand_new {
-                    Value::Constant(Constant::UndefBitvec { bits }) => {
-                        Instruction::FreezeBitvec { bits }
+                    Value::Constant(Constant::UndefInt { bits }) => Instruction::FreezeInt { bits },
+                    Value::Constant(Constant::UndefFloat { bits }) => {
+                        Instruction::FreezeFloat { bits }
                     }
                     Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
                     // TODO(mengxu): freeze instruction should only be possible on undef,
@@ -766,9 +992,9 @@ impl<'a> Context<'a> {
                 for idx in indices.iter().skip(1) {
                     let next_cur_ty = match cur_ty {
                         Type::Struct { name: _, fields } => {
-                            let idx_new = self.parse_value(idx, &Type::Bitvec { bits: 32 })?;
+                            let idx_new = self.parse_value(idx, &Type::Int { bits: 32 })?;
                             let field_offset = match &idx_new {
-                                Value::Constant(Constant::Bitvec {
+                                Value::Constant(Constant::Int {
                                     bits: _,
                                     value: field_offset,
                                 }) => match field_offset.to_usize() {
@@ -829,7 +1055,7 @@ impl<'a> Context<'a> {
                 then_value,
                 else_value,
             } => {
-                let cond_new = self.parse_value(cond, &Type::Bitvec { bits: 1 })?;
+                let cond_new = self.parse_value(cond, &Type::Int { bits: 1 })?;
                 let inst_ty = self.typing.convert(ty)?;
                 let then_value_new = self.parse_value(then_value, &inst_ty)?;
                 let else_value_new = self.parse_value(else_value, &inst_ty)?;
@@ -1041,10 +1267,10 @@ impl<'a> Context<'a> {
                     }
                 }
                 Some(val) => {
-                    let cond_new = self.parse_value(val, &Type::Bitvec { bits: 1 })?;
+                    let cond_new = self.parse_value(val, &Type::Int { bits: 1 })?;
                     if targets.len() != 2 {
                         return Err(EngineError::InvalidAssumption(
-                            "conditinal branch should have exactly two targets".into(),
+                            "conditional branch should have exactly two targets".into(),
                         ));
                     }
                     #[allow(clippy::get_first)] // for symmetry
@@ -1074,9 +1300,9 @@ impl<'a> Context<'a> {
                 default,
             } => {
                 let cond_ty_new = self.typing.convert(cond_ty)?;
-                if !matches!(cond_ty_new, Type::Bitvec { .. }) {
+                if !matches!(cond_ty_new, Type::Int { .. }) {
                     return Err(EngineError::InvalidAssumption(
-                        "switch condition must be bitvec".into(),
+                        "switch condition must be int".into(),
                     ));
                 }
                 let cond_new = self.parse_value(cond, &cond_ty_new)?;
@@ -1092,7 +1318,7 @@ impl<'a> Context<'a> {
                     let case_val =
                         Constant::convert(&case.value, &cond_ty_new, self.typing, self.symbols)?;
                     let label_val = match case_val {
-                        Constant::Bitvec {
+                        Constant::Int {
                             bits: _,
                             value: label_val,
                         } => match label_val.to_u64() {
