@@ -1062,77 +1062,101 @@ impl<'a> Context<'a> {
                             ));
                         }
                     },
-                    "bitcast" => match (src_ty_new, dst_ty_new) {
-                        (Type::Pointer, Type::Pointer) => Instruction::CastPtr {
-                            operand: operand_new,
-                            result: index.into(),
-                        },
-                        // TODO (mengxu): some of the float to int casts are also represented
-                        // as bitcasts, such as:
-                        // - %0 = bitcast float %value to i32
-                        // - %0 = bitcast double %value to i64
-                        (Type::Float { bits: bits_from }, Type::Int { bits: bits_into })
-                            if bits_from == bits_into =>
-                        {
-                            Instruction::CastFloatToInt {
-                                bits_from,
-                                bits_into,
+                    "bitcast" => {
+                        match (src_ty_new, dst_ty_new) {
+                            (Type::Pointer, Type::Pointer) => Instruction::CastPtr {
                                 operand: operand_new,
                                 result: index.into(),
+                            },
+                            // TODO (mengxu): some of the float to int casts are also represented
+                            // as bitcasts, such as:
+                            // - %0 = bitcast float %value to i32
+                            // - %0 = bitcast double %value to i64
+                            (Type::Float { bits: bits_from }, Type::Int { bits: bits_into })
+                                if bits_from == bits_into =>
+                            {
+                                Instruction::CastFloatToInt {
+                                    bits_from,
+                                    bits_into,
+                                    operand: operand_new,
+                                    result: index.into(),
+                                }
+                            }
+                            (Type::Int { bits: bits_from }, Type::Float { bits: bits_into })
+                                if bits_from == bits_into =>
+                            {
+                                Instruction::CastIntToFloat {
+                                    bits_from,
+                                    bits_into,
+                                    operand: operand_new,
+                                    result: index.into(),
+                                }
+                            }
+                            (
+                                Type::VecFloat {
+                                    bits: bits_from,
+                                    length: length_from,
+                                },
+                                Type::VecInt {
+                                    bits: bits_into,
+                                    length: length_into,
+                                },
+                            ) if bits_from == bits_into && length_from == length_into => {
+                                Instruction::CastVecFloatToVecInt {
+                                    bits_from,
+                                    bits_into,
+                                    length: length_into,
+                                    operand: operand_new,
+                                    result: index.into(),
+                                }
+                            }
+                            (
+                                Type::VecInt {
+                                    bits: bits_from,
+                                    length: length_from,
+                                },
+                                Type::VecFloat {
+                                    bits: bits_into,
+                                    length: length_into,
+                                },
+                            ) if bits_from == bits_into && length_from == length_into => {
+                                Instruction::CastVecIntToVecFloat {
+                                    bits_from,
+                                    bits_into,
+                                    length: length_into,
+                                    operand: operand_new,
+                                    result: index.into(),
+                                }
+                            }
+                            // other cases
+                            (t_from, t_into) => {
+                                let total_bits_from = match t_from {
+                                    Type::Int { bits } | Type::Float { bits } => Some(bits),
+                                    Type::VecInt { bits, length }
+                                    | Type::VecFloat { bits, length } => Some(bits * length),
+                                    _ => None,
+                                };
+                                let total_bits_into = match t_into {
+                                    Type::Int { bits } | Type::Float { bits } => Some(bits),
+                                    Type::VecInt { bits, length }
+                                    | Type::VecFloat { bits, length } => Some(bits * length),
+                                    _ => None,
+                                };
+                                match (total_bits_from, total_bits_into) {
+                                    (Some(b1), Some(b2)) if b1 == b2 => {
+                                        return Err(EngineError::NotSupportedYet(
+                                            Unsupported::VectorBitcast,
+                                        ));
+                                    }
+                                    _ => {
+                                        return Err(EngineError::InvalidAssumption(
+                                            "expect ptr type for bitcast".into(),
+                                        ));
+                                    }
+                                }
                             }
                         }
-                        (Type::Int { bits: bits_from }, Type::Float { bits: bits_into })
-                            if bits_from == bits_into =>
-                        {
-                            Instruction::CastIntToFloat {
-                                bits_from,
-                                bits_into,
-                                operand: operand_new,
-                                result: index.into(),
-                            }
-                        }
-                        (
-                            Type::VecFloat {
-                                bits: bits_from,
-                                length: length_from,
-                            },
-                            Type::VecInt {
-                                bits: bits_into,
-                                length: length_into,
-                            },
-                        ) if bits_from == bits_into && length_from == length_into => {
-                            Instruction::CastVecFloatToVecInt {
-                                bits_from,
-                                bits_into,
-                                length: length_into,
-                                operand: operand_new,
-                                result: index.into(),
-                            }
-                        }
-                        (
-                            Type::VecInt {
-                                bits: bits_from,
-                                length: length_from,
-                            },
-                            Type::VecFloat {
-                                bits: bits_into,
-                                length: length_into,
-                            },
-                        ) if bits_from == bits_into && length_from == length_into => {
-                            Instruction::CastVecIntToVecFloat {
-                                bits_from,
-                                bits_into,
-                                length: length_into,
-                                operand: operand_new,
-                                result: index.into(),
-                            }
-                        }
-                        _ => {
-                            return Err(EngineError::InvalidAssumption(
-                                "expect ptr type for bitcast".into(),
-                            ));
-                        }
-                    },
+                    }
                     "address_space_cast" => {
                         return Err(EngineError::NotSupportedYet(
                             Unsupported::PointerAddressSpace,

@@ -10,6 +10,7 @@ pub enum Unsupported {
     FloatingPointOrdering,
     VectorOfPointers,
     ScalableVector,
+    VectorBitcast,
     VariadicArguments,
     ArchSpecificExtension,
     ThreadLocalStorage,
@@ -44,6 +45,9 @@ impl Display for Unsupported {
             }
             Self::ScalableVector => {
                 write!(f, "scalable vector of non-fixed size")
+            }
+            Self::VectorBitcast => {
+                write!(f, "bitcast among vector and scalar")
             }
             Self::VariadicArguments => {
                 write!(f, "variadic arguments")
