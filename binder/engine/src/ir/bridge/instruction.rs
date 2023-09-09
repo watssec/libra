@@ -27,6 +27,10 @@ pub enum Instruction {
         pointer: Value,
         value: Value,
     },
+    // variadic argument
+    VariadicArg {
+        pointer: Value,
+    },
     // call
     CallDirect {
         function: Identifier,
@@ -507,8 +511,11 @@ impl<'a> Context<'a> {
                     value: value_new,
                 }
             }
-            AdaptedInst::VAArg { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::VariadicArguments));
+            AdaptedInst::VAArg { pointer } => {
+                let pointer_new = self.parse_value(pointer, &Type::Pointer)?;
+                Instruction::VariadicArg {
+                    pointer: pointer_new,
+                }
             }
             // calls
             AdaptedInst::CallDirect {
@@ -528,12 +535,25 @@ impl<'a> Context<'a> {
             } => {
                 let func_ty = self.typing.convert(target_type)?;
                 match &func_ty {
-                    Type::Function { params, ret } => {
-                        if params.len() != args.len() {
+                    Type::Function {
+                        params,
+                        variadic,
+                        ret,
+                    } => {
+                        // sanity check
+                        if *variadic {
+                            if args.len() < params.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "CallInst number of arguments mismatch (variadic)".into(),
+                                ));
+                            }
+                        } else if params.len() != args.len() {
                             return Err(EngineError::InvalidAssumption(
-                                "CallInst number of arguments mismatch".into(),
+                                "CallInst number of arguments mismatch (exact)".into(),
                             ));
                         }
+
+                        // conversion
                         let args_new: Vec<_> = params
                             .iter()
                             .zip(args.iter())
@@ -559,6 +579,7 @@ impl<'a> Context<'a> {
                             }
                         };
                         let callee_new = self.parse_value(callee, &Type::Pointer)?;
+
                         // TODO: better distinguish calls
                         if matches!(
                             repr,

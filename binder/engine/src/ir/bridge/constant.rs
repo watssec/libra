@@ -752,6 +752,7 @@ impl Expression {
             Instruction::Alloca { .. }
             | Instruction::Load { .. }
             | Instruction::Store { .. }
+            | Instruction::VariadicArg { .. }
             | Instruction::CallDirect { .. }
             | Instruction::CallIndirect { .. }
             | Instruction::FreezePtr

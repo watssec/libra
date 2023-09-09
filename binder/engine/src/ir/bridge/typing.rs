@@ -26,6 +26,7 @@ enum TypeToken {
     },
     Function {
         params: Vec<TypeToken>,
+        variadic: bool,
         ret: Box<TypeToken>,
     },
     Pointer,
@@ -99,9 +100,6 @@ impl TypeToken {
                 variadic,
                 ret,
             } => {
-                if *variadic {
-                    return Err(EngineError::NotSupportedYet(Unsupported::VariadicArguments));
-                }
                 let params_new = params
                     .iter()
                     .map(|e| Self::parse(e, user_defined_structs))
@@ -109,6 +107,7 @@ impl TypeToken {
                 let ret_new = Self::parse(ret, user_defined_structs)?;
                 Self::Function {
                     params: params_new,
+                    variadic: *variadic,
                     ret: Box::new(ret_new),
                 }
             }
@@ -165,6 +164,7 @@ pub enum Type {
     /// A function type
     Function {
         params: Vec<Type>,
+        variadic: bool,
         ret: Option<Box<Type>>,
     },
     /// An opaque pointer (i.e., any pointee type is valid)
@@ -198,7 +198,11 @@ impl Type {
                     fields: converted,
                 }
             }
-            TypeToken::Function { params, ret } => {
+            TypeToken::Function {
+                params,
+                variadic,
+                ret,
+            } => {
                 let converted = params
                     .iter()
                     .map(Self::convert_token)
@@ -213,6 +217,7 @@ impl Type {
                 };
                 Self::Function {
                     params: converted,
+                    variadic: *variadic,
                     ret: new_ret,
                 }
             }
@@ -244,12 +249,17 @@ impl Display for Type {
                     repr.join(",")
                 )
             }
-            Self::Function { params, ret } => {
+            Self::Function {
+                params,
+                variadic,
+                ret,
+            } => {
                 let repr: Vec<_> = params.iter().map(|e| e.to_string()).collect();
                 write!(
                     f,
-                    "({})->{}",
+                    "({}{})->{}",
                     repr.join(","),
+                    if *variadic { ", ..." } else { "" },
                     ret.as_ref()
                         .map_or_else(|| "void".to_string(), |t| { t.to_string() })
                 )

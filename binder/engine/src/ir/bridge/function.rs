@@ -22,6 +22,8 @@ pub struct Function {
     pub name: Identifier,
     /// parameter definitions
     pub params: Vec<Parameter>,
+    /// has variadic args
+    pub variadic: bool,
     /// return type
     pub ret: Option<Type>,
     /// body of the function (in terms of a CFG)
@@ -171,8 +173,12 @@ impl Function {
 
         // convert the signature
         let func_ty = typing.convert(ty)?;
-        let (param_tys, ret_ty) = match func_ty {
-            Type::Function { params, ret } => (params, ret.map(|e| *e)),
+        let (param_tys, variadic, ret_ty) = match func_ty {
+            Type::Function {
+                params,
+                variadic,
+                ret,
+            } => (params, variadic, ret.map(|e| *e)),
             _ => {
                 return Err(EngineError::InvalidAssumption(format!(
                     "invalid signature for function: {}",
@@ -224,6 +230,7 @@ impl Function {
         Ok(Self {
             name: ident,
             params: params_new,
+            variadic,
             ret: ret_ty,
             body,
         })
