@@ -112,17 +112,18 @@ pub enum Inst {
     GetElement {
         vec_ty: Type,
         vector: Value,
-        index: Value,
+        slot: Value,
     },
     SetElement {
+        vec_ty: Type,
         vector: Value,
         value: Value,
-        index: Value,
+        slot: Value,
     },
     ShuffleVector {
         lhs: Value,
         rhs: Value,
-        mask: Constant,
+        mask: Vec<usize>,
     },
     // concurrency
     Fence {

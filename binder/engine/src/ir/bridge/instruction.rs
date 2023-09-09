@@ -186,6 +186,29 @@ pub enum Instruction {
         indices: Vec<usize>,
         result: RegisterSlot,
     },
+    GetElement {
+        elem_ty: Type,
+        bound: usize,
+        vector: Value,
+        slot: Value,
+        result: RegisterSlot,
+    },
+    SetElement {
+        elem_ty: Type,
+        bound: usize,
+        vector: Value,
+        value: Value,
+        slot: Value,
+        result: RegisterSlot,
+    },
+    ShuffleVector {
+        elem_ty: Type,
+        bound: usize,
+        lhs: Value,
+        rhs: Value,
+        mask: Vec<usize>,
+        result: RegisterSlot,
+    },
 }
 
 #[derive(Eq, PartialEq, Clone)]
@@ -1245,10 +1268,114 @@ impl<'a> Context<'a> {
                     result: index.into(),
                 }
             }
-            AdaptedInst::GetElement { .. }
-            | AdaptedInst::SetElement { .. }
-            | AdaptedInst::ShuffleVector { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
+            AdaptedInst::GetElement {
+                vec_ty,
+                vector,
+                slot,
+            } => {
+                let src_ty = self.typing.convert(vec_ty)?;
+                let dst_ty = self.typing.convert(ty)?;
+
+                let bound = match &src_ty {
+                    Type::Vector { element, length } => {
+                        if element.as_ref() != &dst_ty {
+                            return Err(EngineError::InvalidAssumption(
+                                "GetElement destination type mismatch".into(),
+                            ));
+                        }
+                        *length
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "GetElement should target a vector type".into(),
+                        ));
+                    }
+                };
+
+                let vector_new = self.parse_value(vector, &src_ty)?;
+                let slot_new = self.parse_value(slot, &Type::Int { bits: 32 })?;
+                Instruction::GetElement {
+                    elem_ty: dst_ty,
+                    bound,
+                    vector: vector_new,
+                    slot: slot_new,
+                    result: index.into(),
+                }
+            }
+            AdaptedInst::SetElement {
+                vec_ty,
+                vector,
+                value,
+                slot,
+            } => {
+                let src_ty = self.typing.convert(vec_ty)?;
+                let (dst_ty, bound) = match &src_ty {
+                    Type::Vector { element, length } => (element.as_ref().clone(), *length),
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "GetElement should target a vector type".into(),
+                        ));
+                    }
+                };
+
+                let vector_new = self.parse_value(vector, &src_ty)?;
+                let value_new = self.parse_value(value, &dst_ty)?;
+                let slot_new = self.parse_value(slot, &Type::Int { bits: 32 })?;
+                Instruction::SetElement {
+                    elem_ty: dst_ty,
+                    bound,
+                    vector: vector_new,
+                    slot: slot_new,
+                    value: value_new,
+                    result: index.into(),
+                }
+            }
+            AdaptedInst::ShuffleVector { lhs, rhs, mask } => {
+                let lhs_ty = self.typing.convert(lhs.get_type())?;
+                let rhs_ty = self.typing.convert(rhs.get_type())?;
+                let dst_ty = self.typing.convert(ty)?;
+
+                // type checking
+                let (elem_ty, bound) = match (&lhs_ty, &rhs_ty, &dst_ty) {
+                    (
+                        Type::Vector {
+                            element: element_lhs,
+                            length: _,
+                        },
+                        Type::Vector {
+                            element: element_rhs,
+                            length: _,
+                        },
+                        Type::Vector {
+                            element: element_dst,
+                            length: bound,
+                        },
+                    ) => {
+                        if element_lhs != element_dst || element_rhs != element_dst {
+                            return Err(EngineError::InvalidAssumption(
+                                "ShuffleVector 3-way type mismatch".into(),
+                            ));
+                        }
+                        // TODO: check relation with mask
+                        (element_dst.as_ref().clone(), *bound)
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "ShuffleVector should involve only vector types".into(),
+                        ));
+                    }
+                };
+
+                let lhs_new = self.parse_value(lhs, &lhs_ty)?;
+                let rhs_new = self.parse_value(rhs, &rhs_ty)?;
+                Instruction::ShuffleVector {
+                    elem_ty,
+                    bound,
+                    lhs: lhs_new,
+                    rhs: rhs_new,
+                    mask: mask.clone(),
+                    result: index.into(),
+                }
             }
             // concurrency
             AdaptedInst::Fence { .. }

@@ -417,17 +417,7 @@ impl ClangCommand {
             arg.accumulate_arg_for_libra(&mut accumulated);
         }
 
-        // TODO: disable unsupported features
-        if self.args.iter().any(|arg| {
-            matches!(arg, ClangArg::Flag(key, None)
-                if key == "vectorize" || key == "no-vectorize")
-        }) {
-            // do nothing
-        } else {
-            accumulated.push("-fno-vectorize".to_string());
-        }
-
-        // allow libra to handle optimization
+        // allow libra to handle optimization on its own
         accumulated.push("-Xclang".to_string());
         accumulated.push("-disable-O0-optnone".to_string());
         accumulated

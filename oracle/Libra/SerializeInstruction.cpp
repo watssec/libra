@@ -633,16 +633,17 @@ json::Object FunctionSerializationContext::serialize_inst_get_element(
   json::Object result;
   result["vec_ty"] = serialize_type(*inst.getVectorOperandType());
   result["vector"] = serialize_value(*inst.getVectorOperand());
-  result["index"] = serialize_value(*inst.getIndexOperand());
+  result["slot"] = serialize_value(*inst.getIndexOperand());
   return result;
 }
 
 json::Object FunctionSerializationContext::serialize_inst_set_element(
     const InsertElementInst &inst) const {
   json::Object result;
+  result["vec_ty"] = serialize_type(*inst.getType());
   result["vector"] = serialize_value(*inst.getOperand(0));
   result["value"] = serialize_value(*inst.getOperand(1));
-  result["index"] = serialize_value(*inst.getOperand(2));
+  result["slot"] = serialize_value(*inst.getOperand(2));
   return result;
 }
 
@@ -651,7 +652,11 @@ json::Object FunctionSerializationContext::serialize_inst_shuffle_vector(
   json::Object result;
   result["lhs"] = serialize_value(*inst.getOperand(0));
   result["rhs"] = serialize_value(*inst.getOperand(1));
-  result["mask"] = serialize_constant(*inst.getShuffleMaskForBitcode());
+  json::Array mask;
+  for (const auto val : inst.getShuffleMask()) {
+    mask.push_back(val);
+  }
+  result["mask"] = std::move(mask);
   return result;
 }
 

@@ -16,6 +16,10 @@ enum TypeToken {
     Float {
         width: usize,
     },
+    Vector {
+        element: Box<TypeToken>,
+        length: usize,
+    },
     Array {
         element: Box<TypeToken>,
         length: usize,
@@ -45,6 +49,21 @@ impl TypeToken {
             AdaptedType::Float { width, name: _ } => {
                 // TODO: differentiate the name
                 Self::Float { width: *width }
+            }
+            AdaptedType::Vector {
+                element,
+                fixed,
+                length,
+            } => {
+                if !fixed {
+                    return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
+                }
+
+                let element_new = Self::parse(element.as_ref(), user_defined_structs)?;
+                Self::Vector {
+                    element: Box::new(element_new),
+                    length: *length,
+                }
             }
             AdaptedType::Array { element, length } => {
                 let element_new = Self::parse(element.as_ref(), user_defined_structs)?;
@@ -119,9 +138,6 @@ impl TypeToken {
                 }
                 Self::Pointer
             }
-            AdaptedType::Vector { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
-            }
             AdaptedType::Extension { .. } => {
                 return Err(EngineError::NotSupportedYet(
                     Unsupported::ArchSpecificExtension,
@@ -154,6 +170,8 @@ pub enum Type {
     Int { bits: usize },
     /// Floating point
     Float { bits: usize },
+    /// A vector with fixed size
+    Vector { element: Box<Type>, length: usize },
     /// An array with elements being the same type
     Array { element: Box<Type>, length: usize },
     /// A struct type, named or anonymous
@@ -181,6 +199,13 @@ impl Type {
             }
             TypeToken::Int { width } => Self::Int { bits: *width },
             TypeToken::Float { width } => Self::Float { bits: *width },
+            TypeToken::Vector { element, length } => {
+                let converted = Self::convert_token(element)?;
+                Self::Vector {
+                    element: Box::new(converted),
+                    length: *length,
+                }
+            }
             TypeToken::Array { element, length } => {
                 let converted = Self::convert_token(element)?;
                 Self::Array {
@@ -235,6 +260,9 @@ impl Display for Type {
             }
             Self::Float { bits } => {
                 write!(f, "float{}", bits)
+            }
+            Self::Vector { element, length } => {
+                write!(f, "{}<{}>", element, length)
             }
             Self::Array { element, length } => {
                 write!(f, "{}[{}]", element, length)

@@ -24,6 +24,8 @@ pub enum Constant {
     },
     /// Null pointer
     Null,
+    /// Vector
+    Vector { sub: Type, elements: Vec<Constant> },
     /// Array
     Array { sub: Type, elements: Vec<Constant> },
     /// Struct
@@ -56,6 +58,15 @@ impl Constant {
                 bits: *bits,
                 value: Some(Rational::ZERO.clone()),
             },
+            Type::Vector { element, length } => {
+                let elements = (0..*length)
+                    .map(|_| Self::default_from_type(element))
+                    .collect::<EngineResult<_>>()?;
+                Self::Vector {
+                    sub: element.as_ref().clone(),
+                    elements,
+                }
+            }
             Type::Array { element, length } => {
                 let elements = (0..*length)
                     .map(|_| Self::default_from_type(element))
@@ -90,6 +101,15 @@ impl Constant {
         let value = match ty {
             Type::Int { bits } => Self::UndefInt { bits: *bits },
             Type::Float { bits } => Self::UndefFloat { bits: *bits },
+            Type::Vector { element, length } => {
+                let elements = (0..*length)
+                    .map(|_| Self::undef_from_type(element))
+                    .collect::<EngineResult<_>>()?;
+                Self::Vector {
+                    sub: element.as_ref().clone(),
+                    elements,
+                }
+            }
             Type::Array { element, length } => {
                 let elements = (0..*length)
                     .map(|_| Self::undef_from_type(element))
@@ -219,6 +239,35 @@ impl Constant {
                 check_type(ty)?;
                 Self::default_from_type(expected_type)?
             }
+            AdaptedConst::Vector { elements } => {
+                check_type(ty)?;
+                match expected_type {
+                    Type::Vector { element, length } => {
+                        if elements.len() != *length {
+                            return Err(EngineError::InvalidAssumption(format!(
+                                "type mismatch: expect {} elements, found {}",
+                                length,
+                                elements.len()
+                            )));
+                        }
+
+                        let elements_new = elements
+                            .iter()
+                            .map(|e| Self::convert(e, element, typing, symbols))
+                            .collect::<EngineResult<_>>()?;
+                        Self::Vector {
+                            sub: element.as_ref().clone(),
+                            elements: elements_new,
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(format!(
+                            "type mismatch: expect vector, found {}",
+                            expected_type
+                        )));
+                    }
+                }
+            }
             AdaptedConst::Array { elements } => {
                 check_type(ty)?;
                 match expected_type {
@@ -247,9 +296,6 @@ impl Constant {
                         )));
                     }
                 }
-            }
-            AdaptedConst::Vector { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
             }
             AdaptedConst::Struct { elements } => {
                 check_type(ty)?;
@@ -481,6 +527,26 @@ pub enum Expression {
         aggregate: Constant,
         value: Constant,
         indices: Vec<usize>,
+    },
+    GetElement {
+        elem_ty: Type,
+        bound: usize,
+        vector: Constant,
+        slot: Constant,
+    },
+    SetElement {
+        elem_ty: Type,
+        bound: usize,
+        vector: Constant,
+        value: Constant,
+        slot: Constant,
+    },
+    ShuffleVector {
+        elem_ty: Type,
+        bound: usize,
+        lhs: Constant,
+        rhs: Constant,
+        mask: Vec<usize>,
     },
 }
 
@@ -746,6 +812,55 @@ impl Expression {
                     aggregate: aggregate.expect_constant()?,
                     value: value.expect_constant()?,
                     indices,
+                }
+            }
+            Instruction::GetElement {
+                elem_ty,
+                bound,
+                vector,
+                slot,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::GetElement {
+                    elem_ty,
+                    bound,
+                    vector: vector.expect_constant()?,
+                    slot: slot.expect_constant()?,
+                }
+            }
+            Instruction::SetElement {
+                elem_ty,
+                bound,
+                vector,
+                value,
+                slot,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::SetElement {
+                    elem_ty,
+                    bound,
+                    vector: vector.expect_constant()?,
+                    value: value.expect_constant()?,
+                    slot: slot.expect_constant()?,
+                }
+            }
+            Instruction::ShuffleVector {
+                elem_ty,
+                bound,
+                lhs,
+                rhs,
+                mask,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::ShuffleVector {
+                    elem_ty,
+                    bound,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                    mask,
                 }
             }
             // impossible cases
