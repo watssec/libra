@@ -133,12 +133,20 @@ impl Summary {
 
     pub fn show(&self) {
         println!("passed: {}", self.passed.len());
-        println!("failed [compile]: {}", self.failed_compile.len());
-        println!("failed [loading]: {}", self.failed_loading.len());
-        println!("failed [invariant]: {}", self.failed_invariant.len());
-        println!("failed [assumption]: {}", self.failed_assumption.len());
+        if !self.failed_compile.is_empty() {
+            println!("failed [compile]: {}", self.failed_compile.len());
+        }
+        if !self.failed_loading.is_empty() {
+            println!("failed [loading]: {}", self.failed_loading.len());
+        }
+        if !self.failed_invariant.is_empty() {
+            println!("failed [invariant]: {}", self.failed_invariant.len());
+        }
+        if !self.failed_assumption.is_empty() {
+            println!("failed [assumption]: {}", self.failed_assumption.len());
+        }
         println!(
-            "failed [unsupported]: {}",
+            "unsupported: {}",
             self.failed_unsupported
                 .values()
                 .map(|v| v.len())
