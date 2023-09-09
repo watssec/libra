@@ -60,7 +60,7 @@ impl TypeToken {
                 length,
             } => {
                 if !fixed {
-                    return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
+                    return Err(EngineError::NotSupportedYet(Unsupported::ScalableVector));
                 }
 
                 let element_new = Self::parse(element.as_ref(), user_defined_structs)?;
@@ -75,7 +75,7 @@ impl TypeToken {
                     },
                     TypeToken::Pointer => {
                         // TODO: a vector of pointers seems counter-intuitive
-                        return Err(EngineError::NotSupportedYet(Unsupported::Vectorization));
+                        return Err(EngineError::NotSupportedYet(Unsupported::VectorOfPointers));
                     }
                     _ => {
                         return Err(EngineError::InvalidAssumption(

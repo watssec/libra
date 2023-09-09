@@ -7,8 +7,9 @@ pub enum Unsupported {
     ModuleLevelAssembly,
     InlineAssembly,
     GlobalAlias,
-    FloatingPoint,
-    Vectorization,
+    FloatingPointOrdering,
+    VectorOfPointers,
+    ScalableVector,
     VariadicArguments,
     ArchSpecificExtension,
     ThreadLocalStorage,
@@ -35,11 +36,14 @@ impl Display for Unsupported {
             Self::GlobalAlias => {
                 write!(f, "global alias")
             }
-            Self::FloatingPoint => {
-                write!(f, "floating point")
+            Self::FloatingPointOrdering => {
+                write!(f, "floating point ordered comparison")
             }
-            Self::Vectorization => {
-                write!(f, "SIMD vectorization")
+            Self::VectorOfPointers => {
+                write!(f, "vector of pointers")
+            }
+            Self::ScalableVector => {
+                write!(f, "scalable vector of non-fixed size")
             }
             Self::VariadicArguments => {
                 write!(f, "variadic arguments")
