@@ -115,7 +115,6 @@ pub enum Inst {
         slot: Value,
     },
     SetElement {
-        vec_ty: Type,
         vector: Value,
         value: Value,
         slot: Value,

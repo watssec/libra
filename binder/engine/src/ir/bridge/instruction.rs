@@ -1293,7 +1293,7 @@ impl<'a> Context<'a> {
                 };
 
                 let vector_new = self.parse_value(vector, &src_ty)?;
-                let slot_new = self.parse_value(slot, &Type::Int { bits: 32 })?;
+                let slot_new = self.parse_value(slot, &Type::Int { bits: 64 })?;
                 Instruction::GetElement {
                     elem_ty: dst_ty,
                     bound,
@@ -1303,12 +1303,11 @@ impl<'a> Context<'a> {
                 }
             }
             AdaptedInst::SetElement {
-                vec_ty,
                 vector,
                 value,
                 slot,
             } => {
-                let src_ty = self.typing.convert(vec_ty)?;
+                let src_ty = self.typing.convert(ty)?;
                 let (dst_ty, bound) = match &src_ty {
                     Type::Vector { element, length } => (element.as_ref().clone(), *length),
                     _ => {
@@ -1320,7 +1319,7 @@ impl<'a> Context<'a> {
 
                 let vector_new = self.parse_value(vector, &src_ty)?;
                 let value_new = self.parse_value(value, &dst_ty)?;
-                let slot_new = self.parse_value(slot, &Type::Int { bits: 32 })?;
+                let slot_new = self.parse_value(slot, &Type::Int { bits: 64 })?;
                 Instruction::SetElement {
                     elem_ty: dst_ty,
                     bound,

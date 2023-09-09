@@ -640,7 +640,6 @@ json::Object FunctionSerializationContext::serialize_inst_get_element(
 json::Object FunctionSerializationContext::serialize_inst_set_element(
     const InsertElementInst &inst) const {
   json::Object result;
-  result["vec_ty"] = serialize_type(*inst.getType());
   result["vector"] = serialize_value(*inst.getOperand(0));
   result["value"] = serialize_value(*inst.getOperand(1));
   result["slot"] = serialize_value(*inst.getOperand(2));
