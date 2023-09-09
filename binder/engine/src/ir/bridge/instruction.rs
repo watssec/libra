@@ -124,6 +124,22 @@ pub enum Instruction {
         rhs: Value,
         result: RegisterSlot,
     },
+    CompareVecInt {
+        bits: usize,
+        length: usize,
+        predicate: ComparePredicate,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    CompareVecFloat {
+        bits: usize,
+        length: usize,
+        predicate: ComparePredicate,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
     ComparePtr {
         predicate: ComparePredicate,
         lhs: Value,
@@ -878,47 +894,21 @@ impl<'a> Context<'a> {
                 rhs,
             } => {
                 let inst_ty = self.typing.convert(ty)?;
-                match &inst_ty {
-                    Type::Int { bits } => {
-                        if *bits != 1 {
-                            return Err(EngineError::InvalidAssumption(
-                                "compare inst has non-bool instruction type".into(),
-                            ));
-                        }
-                    }
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "compare inst has non-1-bit instruction type".into(),
-                        ));
-                    }
-                };
-
                 let operand_ty = self.typing.convert(operand_type)?;
+
                 let lhs_new = self.parse_value(lhs, &operand_ty)?;
                 let rhs_new = self.parse_value(rhs, &operand_ty)?;
 
                 let (predicate_parsed, is_float_op) = ComparePredicate::parse(predicate)?;
-                match operand_ty {
-                    Type::Int { bits } => {
-                        if is_float_op {
-                            return Err(EngineError::InvalidAssumption(
-                                "value type and compare type mismatch".into(),
-                            ));
-                        }
-                        Instruction::CompareInt {
-                            bits,
-                            predicate: predicate_parsed,
-                            lhs: lhs_new,
-                            rhs: rhs_new,
-                            result: index.into(),
-                        }
-                    }
-                    Type::Float { bits } => {
-                        if !is_float_op {
-                            return Err(EngineError::InvalidAssumption(
-                                "value type and compare type mismatch".into(),
-                            ));
-                        }
+                match (inst_ty, operand_ty, is_float_op) {
+                    (Type::Int { bits: 1 }, Type::Int { bits }, false) => Instruction::CompareInt {
+                        bits,
+                        predicate: predicate_parsed,
+                        lhs: lhs_new,
+                        rhs: rhs_new,
+                        result: index.into(),
+                    },
+                    (Type::Int { bits: 1 }, Type::Float { bits }, true) => {
                         Instruction::CompareFloat {
                             bits,
                             predicate: predicate_parsed,
@@ -927,22 +917,52 @@ impl<'a> Context<'a> {
                             result: index.into(),
                         }
                     }
-                    Type::Pointer => {
-                        if is_float_op {
-                            return Err(EngineError::InvalidAssumption(
-                                "value type and compare type mismatch".into(),
-                            ));
-                        }
-                        Instruction::ComparePtr {
-                            predicate: predicate_parsed,
-                            lhs: lhs_new,
-                            rhs: rhs_new,
-                            result: index.into(),
-                        }
-                    }
+                    (Type::Int { bits: 1 }, Type::Pointer, false) => Instruction::ComparePtr {
+                        predicate: predicate_parsed,
+                        lhs: lhs_new,
+                        rhs: rhs_new,
+                        result: index.into(),
+                    },
+                    (
+                        Type::VecInt {
+                            bits: 1,
+                            length: length_output,
+                        },
+                        Type::VecInt {
+                            bits,
+                            length: length_inputs,
+                        },
+                        false,
+                    ) if length_inputs == length_output => Instruction::CompareVecInt {
+                        bits,
+                        length: length_output,
+                        predicate: predicate_parsed,
+                        lhs: lhs_new,
+                        rhs: rhs_new,
+                        result: index.into(),
+                    },
+                    (
+                        Type::VecInt {
+                            bits: 1,
+                            length: length_output,
+                        },
+                        Type::VecFloat {
+                            bits,
+                            length: length_inputs,
+                        },
+                        true,
+                    ) if length_inputs == length_output => Instruction::CompareVecFloat {
+                        bits,
+                        length: length_output,
+                        predicate: predicate_parsed,
+                        lhs: lhs_new,
+                        rhs: rhs_new,
+                        result: index.into(),
+                    },
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "compare inst has operand type that is int, float, nor ptr".into(),
+                            "compare inst has operand type that is neither int<>, float<>, nor ptr"
+                                .into(),
                         ));
                     }
                 }

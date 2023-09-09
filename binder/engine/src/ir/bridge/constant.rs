@@ -532,6 +532,20 @@ pub enum Expression {
         lhs: Constant,
         rhs: Constant,
     },
+    CompareVecInt {
+        bits: usize,
+        length: usize,
+        predicate: ComparePredicate,
+        lhs: Constant,
+        rhs: Constant,
+    },
+    CompareVecFloat {
+        bits: usize,
+        length: usize,
+        predicate: ComparePredicate,
+        lhs: Constant,
+        rhs: Constant,
+    },
     // casts
     CastInt {
         bits_from: usize,
@@ -826,6 +840,40 @@ impl Expression {
             } => {
                 assert!(result == usize::MAX.into());
                 Self::ComparePtr {
+                    predicate,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::CompareVecInt {
+                bits,
+                length,
+                predicate,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CompareVecInt {
+                    bits,
+                    length,
+                    predicate,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::CompareVecFloat {
+                bits,
+                length,
+                predicate,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CompareVecFloat {
+                    bits,
+                    length,
                     predicate,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
