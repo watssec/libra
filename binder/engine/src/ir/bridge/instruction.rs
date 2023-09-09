@@ -1352,6 +1352,9 @@ impl<'a> Context<'a> {
                 let offset = indices.first().unwrap();
                 let offset_new = self.parse_value_int32_or_int64(offset)?;
 
+                // TODO: hack for holding temporary types from vector
+                let mut temporary_type_holder;
+
                 let mut cur_ty = &src_ty;
                 let mut indices_new = vec![];
                 for idx in indices.iter().skip(1) {
@@ -1389,9 +1392,21 @@ impl<'a> Context<'a> {
                             indices_new.push(idx_new);
                             element.as_ref()
                         }
+                        Type::VecInt { bits, length: _ } => {
+                            let idx_new = self.parse_value_int32_or_int64(idx)?;
+                            indices_new.push(idx_new);
+                            temporary_type_holder = Type::Int { bits: *bits };
+                            &temporary_type_holder
+                        }
+                        Type::VecFloat { bits, length: _ } => {
+                            let idx_new = self.parse_value_int32_or_int64(idx)?;
+                            indices_new.push(idx_new);
+                            temporary_type_holder = Type::Float { bits: *bits };
+                            &temporary_type_holder
+                        }
                         _ => {
                             return Err(EngineError::InvalidAssumption(
-                                "GEP only applies to array and struct".into(),
+                                "GEP only applies to vector, array, and struct".into(),
                             ));
                         }
                     };
