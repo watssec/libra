@@ -1071,12 +1071,9 @@ impl<'a> Context<'a> {
                         // as bitcasts, such as:
                         // - %0 = bitcast float %value to i32
                         // - %0 = bitcast double %value to i64
-                        (Type::Float { bits: bits_from }, Type::Int { bits: bits_into }) => {
-                            if bits_from != bits_into {
-                                return Err(EngineError::InvalidAssumption(
-                                    "expect float and int of the same size for bitcast".into(),
-                                ));
-                            }
+                        (Type::Float { bits: bits_from }, Type::Int { bits: bits_into })
+                            if bits_from == bits_into =>
+                        {
                             Instruction::CastFloatToInt {
                                 bits_from,
                                 bits_into,
@@ -1084,15 +1081,48 @@ impl<'a> Context<'a> {
                                 result: index.into(),
                             }
                         }
-                        (Type::Int { bits: bits_from }, Type::Float { bits: bits_into }) => {
-                            if bits_from != bits_into {
-                                return Err(EngineError::InvalidAssumption(
-                                    "expect float and int of the same size for bitcast".into(),
-                                ));
-                            }
+                        (Type::Int { bits: bits_from }, Type::Float { bits: bits_into })
+                            if bits_from == bits_into =>
+                        {
                             Instruction::CastIntToFloat {
                                 bits_from,
                                 bits_into,
+                                operand: operand_new,
+                                result: index.into(),
+                            }
+                        }
+                        (
+                            Type::VecFloat {
+                                bits: bits_from,
+                                length: length_from,
+                            },
+                            Type::VecInt {
+                                bits: bits_into,
+                                length: length_into,
+                            },
+                        ) if bits_from == bits_into && length_from == length_into => {
+                            Instruction::CastVecFloatToVecInt {
+                                bits_from,
+                                bits_into,
+                                length: length_into,
+                                operand: operand_new,
+                                result: index.into(),
+                            }
+                        }
+                        (
+                            Type::VecInt {
+                                bits: bits_from,
+                                length: length_from,
+                            },
+                            Type::VecFloat {
+                                bits: bits_into,
+                                length: length_into,
+                            },
+                        ) if bits_from == bits_into && length_from == length_into => {
+                            Instruction::CastVecIntToVecFloat {
+                                bits_from,
+                                bits_into,
+                                length: length_into,
                                 operand: operand_new,
                                 result: index.into(),
                             }
