@@ -87,8 +87,16 @@ pub enum Instruction {
         rhs: Value,
         result: RegisterSlot,
     },
-    BinaryBitwise {
+    BinaryBitwiseInt {
         bits: usize,
+        opcode: BinaryOpBitwise,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    BinaryBitwiseVecInt {
+        bits: usize,
+        length: usize,
         opcode: BinaryOpBitwise,
         lhs: Value,
         rhs: Value,
@@ -807,23 +815,28 @@ impl<'a> Context<'a> {
                             }
                         }
                     }
-                    BinaryOperator::Bitwise(operator) => {
-                        let bits = match inst_ty {
-                            Type::Int { bits } => bits,
-                            _ => {
-                                return Err(EngineError::InvalidAssumption(
-                                    "value type and bitwise operation type mismatch".into(),
-                                ));
-                            }
-                        };
-                        Instruction::BinaryBitwise {
+                    BinaryOperator::Bitwise(operator) => match inst_ty {
+                        Type::Int { bits } => Instruction::BinaryBitwiseInt {
                             bits,
                             opcode: operator,
                             lhs: lhs_new,
                             rhs: rhs_new,
                             result: index.into(),
+                        },
+                        Type::VecInt { bits, length } => Instruction::BinaryBitwiseVecInt {
+                            bits,
+                            length,
+                            opcode: operator,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
+                        },
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and bitwise operation type mismatch".into(),
+                            ));
                         }
-                    }
+                    },
                     BinaryOperator::Shift(operator) => {
                         let bits = match inst_ty {
                             Type::Int { bits } => bits,

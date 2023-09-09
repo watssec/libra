@@ -495,8 +495,15 @@ pub enum Expression {
         lhs: Constant,
         rhs: Constant,
     },
-    BinaryBitwise {
+    BinaryBitwiseInt {
         bits: usize,
+        opcode: BinaryOpBitwise,
+        lhs: Constant,
+        rhs: Constant,
+    },
+    BinaryBitwiseVecInt {
+        bits: usize,
+        length: usize,
         opcode: BinaryOpBitwise,
         lhs: Constant,
         rhs: Constant,
@@ -722,7 +729,7 @@ impl Expression {
                     rhs: rhs.expect_constant()?,
                 }
             }
-            Instruction::BinaryBitwise {
+            Instruction::BinaryBitwiseInt {
                 bits,
                 opcode,
                 lhs,
@@ -730,8 +737,25 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::BinaryBitwise {
+                Self::BinaryBitwiseInt {
                     bits,
+                    opcode,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::BinaryBitwiseVecInt {
+                bits,
+                length,
+                opcode,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::BinaryBitwiseVecInt {
+                    bits,
+                    length,
                     opcode,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
