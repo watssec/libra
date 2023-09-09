@@ -582,6 +582,18 @@ pub enum Expression {
         bits_into: usize,
         operand: Constant,
     },
+    CastVecFloatToVecInt {
+        bits_from: usize,
+        bits_into: usize,
+        length: usize,
+        operand: Constant,
+    },
+    CastVecIntToVecFloat {
+        bits_from: usize,
+        bits_into: usize,
+        length: usize,
+        operand: Constant,
+    },
     CastPtrToInt {
         bits_into: usize,
         operand: Constant,
@@ -964,6 +976,36 @@ impl Expression {
                 Self::CastIntToFloat {
                     bits_from,
                     bits_into,
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::CastVecFloatToVecInt {
+                bits_from,
+                bits_into,
+                length,
+                operand,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CastVecFloatToVecInt {
+                    bits_from,
+                    bits_into,
+                    length,
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::CastVecIntToVecFloat {
+                bits_from,
+                bits_into,
+                length,
+                operand,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CastVecIntToVecFloat {
+                    bits_from,
+                    bits_into,
+                    length,
                     operand: operand.expect_constant()?,
                 }
             }
