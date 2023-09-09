@@ -46,6 +46,10 @@ pub enum Constant {
     UndefInt { bits: usize },
     /// Undefined float
     UndefFloat { bits: usize },
+    /// Undefined vector of ints
+    UndefVecInt { bits: usize, length: usize },
+    /// Undefined vector of floats
+    UndefVecFloat { bits: usize, length: usize },
     /// Undefined pointer
     UndefPointer,
     /// Expression
@@ -131,12 +135,14 @@ impl Constant {
                 )));
             }
             Type::Pointer => Self::UndefPointer,
-            Type::VecInt { .. } | Type::VecFloat { .. } => {
-                return Err(EngineError::InvalidAssumption(format!(
-                    "trying to create undef for a vector type: {}",
-                    ty
-                )));
-            }
+            Type::VecInt { bits, length } => Self::UndefVecInt {
+                bits: *bits,
+                length: *length,
+            },
+            Type::VecFloat { bits, length } => Self::UndefVecFloat {
+                bits: *bits,
+                length: *length,
+            },
         };
         Ok(value)
     }
@@ -1042,6 +1048,8 @@ impl Expression {
             | Instruction::FreezePtr
             | Instruction::FreezeInt { .. }
             | Instruction::FreezeFloat { .. }
+            | Instruction::FreezeVecInt { .. }
+            | Instruction::FreezeVecFloat { .. }
             | Instruction::FreezeNop { .. }
             | Instruction::Phi { .. } => {
                 return Err(EngineError::InvalidAssumption(
