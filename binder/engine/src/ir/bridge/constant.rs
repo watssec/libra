@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rug::{Integer, Rational};
+use rug::ops::CompleteRound;
+use rug::{Float, Integer, Rational};
 
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
@@ -147,7 +148,10 @@ impl Constant {
                     Type::Int { bits } => Self::Int {
                         bits: *bits,
                         value: Integer::from_str_radix(value, 10).map_err(|e| {
-                            EngineError::InvariantViolation(format!("const int parse error: {}", e))
+                            EngineError::InvariantViolation(format!(
+                                "const int parse error: {} - {}",
+                                e, value
+                            ))
                         })?,
                     },
                     _ => {
@@ -163,12 +167,22 @@ impl Constant {
                 match expected_type {
                     Type::Float { bits } => Self::Float {
                         bits: *bits,
-                        value: Rational::from_str_radix(value, 10).map_err(|e| {
-                            EngineError::InvariantViolation(format!(
-                                "const float parse error: {}",
-                                e
-                            ))
-                        })?,
+                        value: {
+                            Float::parse_radix(value, 10)
+                                .map_err(|e| {
+                                    EngineError::InvariantViolation(format!(
+                                        "const float parse error: {} - {}",
+                                        e, value
+                                    ))
+                                })?
+                                .complete(*bits as u32)
+                                .to_rational()
+                                .ok_or_else(|| {
+                                    EngineError::InvariantViolation(
+                                        "const float is infinity".to_string(),
+                                    )
+                                })?
+                        },
                     },
                     _ => {
                         return Err(EngineError::InvalidAssumption(format!(
