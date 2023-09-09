@@ -343,7 +343,7 @@ impl ClangArg {
 }
 
 pub struct ClangCommand {
-    pub is_cpp: bool,
+    is_cpp: bool,
     pub workdir: PathBuf,
     args: Vec<ClangArg>,
 }
@@ -381,6 +381,36 @@ impl ClangCommand {
             .collect()
     }
 
+    pub fn infer_language(&self) -> Option<ClangSupportedLanguage> {
+        // TODO: is this the best way?
+        if self.is_cpp {
+            return Some(ClangSupportedLanguage::CPP);
+        }
+
+        // guess language
+        let mut inferred = None;
+        for input in self.inputs() {
+            let ext = Path::new(input).extension().and_then(|ext| ext.to_str())?;
+            let lang = match ext {
+                "c" => ClangSupportedLanguage::C,
+                "cc" | "cpp" => ClangSupportedLanguage::CPP,
+                "m" => ClangSupportedLanguage::ObjC,
+                "mm" => ClangSupportedLanguage::ObjCPP,
+                "bc" | "ll" => ClangSupportedLanguage::Bitcode,
+                "o" => ClangSupportedLanguage::Object,
+                _ => {
+                    return None;
+                }
+            };
+            // input has mixed languages
+            if matches!(inferred, Some(existing) if existing != lang) {
+                return None;
+            }
+            inferred = Some(lang);
+        }
+        inferred
+    }
+
     pub fn gen_args_for_libra(&self) -> Vec<String> {
         let mut accumulated = vec![];
         for arg in &self.args {
@@ -416,4 +446,20 @@ impl Display for ClangCommand {
         tokens.extend(args.iter().map(|arg| arg.to_string()));
         write!(f, "{}", tokens.join(" "))
     }
+}
+
+#[derive(Ord, PartialOrd, Eq, PartialEq)]
+pub enum ClangSupportedLanguage {
+    /// .c
+    C,
+    /// .cc, .cpp
+    CPP,
+    /// .m
+    ObjC,
+    /// .mm
+    ObjCPP,
+    /// .ll, .bc
+    Bitcode,
+    /// .o
+    Object,
 }

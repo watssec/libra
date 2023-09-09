@@ -7,7 +7,7 @@ use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use libra_engine::flow::shared::Context;
 use log::debug;
 
-use libra_shared::compile_db::ClangCommand;
+use libra_shared::compile_db::{ClangCommand, ClangSupportedLanguage};
 
 pub struct LLVMTestCase {
     pub name: String,
@@ -36,9 +36,13 @@ impl LLVMTestCase {
             command,
         } = self;
 
-        // TODO: support c++
-        if command.is_cpp {
-            return Ok(None);
+        // TODO: support other languages like C++ and ObjC
+        match command.infer_language() {
+            None => bail!("unable to infer input language"),
+            Some(lang) => match lang {
+                ClangSupportedLanguage::C | ClangSupportedLanguage::Bitcode => (),
+                _ => return Ok(None),
+            },
         }
 
         // retrieve input
