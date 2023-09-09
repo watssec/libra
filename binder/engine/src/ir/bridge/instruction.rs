@@ -1293,7 +1293,7 @@ impl<'a> Context<'a> {
                 };
 
                 let vector_new = self.parse_value(vector, &src_ty)?;
-                let slot_new = self.parse_value(slot, &Type::Int { bits: 64 })?;
+                let slot_new = self.parse_value_int32_or_int64(slot)?;
                 Instruction::GetElement {
                     elem_ty: dst_ty,
                     bound,
@@ -1319,7 +1319,7 @@ impl<'a> Context<'a> {
 
                 let vector_new = self.parse_value(vector, &src_ty)?;
                 let value_new = self.parse_value(value, &dst_ty)?;
-                let slot_new = self.parse_value(slot, &Type::Int { bits: 64 })?;
+                let slot_new = self.parse_value_int32_or_int64(slot)?;
                 Instruction::SetElement {
                     elem_ty: dst_ty,
                     bound,
