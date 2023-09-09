@@ -508,8 +508,15 @@ pub enum Expression {
         lhs: Constant,
         rhs: Constant,
     },
-    BinaryShift {
+    BinaryShiftInt {
         bits: usize,
+        opcode: BinaryOpShift,
+        lhs: Constant,
+        rhs: Constant,
+    },
+    BinaryShiftVecInt {
+        bits: usize,
+        length: usize,
         opcode: BinaryOpShift,
         lhs: Constant,
         rhs: Constant,
@@ -799,7 +806,7 @@ impl Expression {
                     rhs: rhs.expect_constant()?,
                 }
             }
-            Instruction::BinaryShift {
+            Instruction::BinaryShiftInt {
                 bits,
                 opcode,
                 lhs,
@@ -807,8 +814,25 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::BinaryShift {
+                Self::BinaryShiftInt {
                     bits,
+                    opcode,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::BinaryShiftVecInt {
+                bits,
+                length,
+                opcode,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::BinaryShiftVecInt {
+                    bits,
+                    length,
                     opcode,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,

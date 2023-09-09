@@ -102,8 +102,16 @@ pub enum Instruction {
         rhs: Value,
         result: RegisterSlot,
     },
-    BinaryShift {
+    BinaryShiftInt {
         bits: usize,
+        opcode: BinaryOpShift,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
+    BinaryShiftVecInt {
+        bits: usize,
+        length: usize,
         opcode: BinaryOpShift,
         lhs: Value,
         rhs: Value,
@@ -881,23 +889,28 @@ impl<'a> Context<'a> {
                             ));
                         }
                     },
-                    BinaryOperator::Shift(operator) => {
-                        let bits = match inst_ty {
-                            Type::Int { bits } => bits,
-                            _ => {
-                                return Err(EngineError::InvalidAssumption(
-                                    "value type and shift operation type mismatch".into(),
-                                ));
-                            }
-                        };
-                        Instruction::BinaryShift {
+                    BinaryOperator::Shift(operator) => match inst_ty {
+                        Type::Int { bits } => Instruction::BinaryShiftInt {
                             bits,
                             opcode: operator,
                             lhs: lhs_new,
                             rhs: rhs_new,
                             result: index.into(),
+                        },
+                        Type::VecInt { bits, length } => Instruction::BinaryShiftVecInt {
+                            bits,
+                            length,
+                            opcode: operator,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
+                        },
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and shift operation type mismatch".into(),
+                            ));
                         }
-                    }
+                    },
                 }
             }
             // comparison
