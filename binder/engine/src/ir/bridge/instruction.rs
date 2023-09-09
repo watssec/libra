@@ -82,6 +82,9 @@ pub enum Instruction {
     FreezeBitvec {
         bits: usize,
     },
+    FreezeNop {
+        value: Value,
+    },
     // GEP
     GEP {
         src_pointee_type: Type,
@@ -715,14 +718,13 @@ impl<'a> Context<'a> {
                         Instruction::FreezeBitvec { bits }
                     }
                     Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
-                    // TODO(mengxu): freeze instruction should only be possible on undef
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(format!(
-                            "freeze instruction should only be possible on undef constants, not {}",
-                            serde_json::to_string_pretty(operand)
-                                .unwrap_or_else(|e| format!("unable to deserialize: {}", e))
-                        )));
-                    }
+                    // TODO(mengxu): freeze instruction should only be possible on undef,
+                    // and yet, we still see freeze being applied to instruction values, e.g.,
+                    // - %1 = load i32, ptr @loop_2
+                    // - %.fr = freeze i32 %1
+                    // - %cmp13 = icmp sgt i32 %.fr, 0
+                    // Marking these cases as no-op here.
+                    v => Instruction::FreezeNop { value: v },
                 }
             }
             // GEP

@@ -539,8 +539,9 @@ impl Expression {
             | Instruction::Store { .. }
             | Instruction::CallDirect { .. }
             | Instruction::CallIndirect { .. }
-            | Instruction::FreezeBitvec { .. }
             | Instruction::FreezePtr
+            | Instruction::FreezeBitvec { .. }
+            | Instruction::FreezeNop { .. }
             | Instruction::Phi { .. } => {
                 return Err(EngineError::InvalidAssumption(
                     "unexpected instruction type for const expr".into(),
