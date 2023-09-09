@@ -9,6 +9,9 @@ use log::debug;
 
 use libra_shared::compile_db::{ClangCommand, ClangSupportedLanguage};
 
+/// Maximum number of fixedpoint optimization
+static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
+
 pub struct LLVMTestCase {
     pub name: String,
     _path: PathBuf,
@@ -88,7 +91,12 @@ fn libra_workflow(
         .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
 
     // fixedpoint
-    let flow_fp = FlowFixedpoint::new(ctxt, bc_init, output.to_path_buf(), None);
+    let flow_fp = FlowFixedpoint::new(
+        ctxt,
+        bc_init,
+        output.to_path_buf(),
+        Some(MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION),
+    );
     flow_fp.execute()?;
 
     // done with everything
