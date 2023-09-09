@@ -114,18 +114,26 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
 }
 
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
-    fn run(_repo: GitRepo, resolver: ResolverLLVMExternal) -> Result<()> {
+    fn run(_repo: GitRepo, resolver: ResolverLLVMExternal, force: bool) -> Result<()> {
+        // prepare te environment
+        let mut workdir = PATH_STUDIO.to_path_buf();
+        workdir.extend(PATH_WORKSPACE);
+        if workdir.exists() {
+            if !force {
+                info!("Prior testing result exists");
+                return Ok(());
+            }
+            fs::remove_dir_all(&workdir)?;
+        }
+        fs::create_dir_all(&workdir)?;
+
+        // check instances
         let commands = Self::parse_compile_database(&resolver)?;
         let test_cases = Self::lit_test_discovery(&resolver, commands)?;
         info!("Number of test cases discovered: {}", test_cases.len());
 
-        // prepare te environment
-        let ctxt = Context::new()?;
-        let mut workdir = PATH_STUDIO.to_path_buf();
-        workdir.extend(PATH_WORKSPACE);
-        fs::create_dir_all(&workdir)?;
-
         // run the tests
+        let ctxt = Context::new()?;
         let consolidated: Vec<_> = if *PARALLEL {
             test_cases
                 .into_par_iter()
@@ -200,7 +208,13 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
         info!("failed [loading]: {}", result_loading.len());
         info!("failed [invariant]: {}", result_invariant.len());
         info!("failed [assumption]: {}", result_assumption.len());
-        info!("failed [unsupported]: {}", result_unsupported.len());
+        info!(
+            "failed [unsupported]: {}",
+            result_unsupported.values().map(|v| v.len()).sum::<usize>()
+        );
+        for (category, tests) in result_unsupported {
+            info!("  - {}: {}", category, tests.len());
+        }
         Ok(())
     }
 }

@@ -305,7 +305,9 @@ impl ClangArg {
                 args.push("-isysroot".into());
                 args.push(v.to_string());
             }
-            Self::Optimization(_) => (),
+            Self::Optimization(_) => {
+                // NOTE: libra handles optimization itself
+            }
             Self::Arch(v) => {
                 args.push("-arch".to_string());
                 args.push(v.to_string());
@@ -313,7 +315,9 @@ impl ClangArg {
             Self::MachineArch(v) => {
                 args.push(format!("-march={}", v));
             }
-            Self::Debug => (),
+            Self::Debug => {
+                // NOTE: libra handles metadata itself
+            }
             Self::Flag(k, None) => {
                 args.push(format!("-f{}", k));
             }
@@ -382,6 +386,20 @@ impl ClangCommand {
         for arg in &self.args {
             arg.accumulate_arg_for_libra(&mut accumulated);
         }
+
+        // TODO: disable unsupported features
+        if self.args.iter().any(|arg| {
+            matches!(arg, ClangArg::Flag(key, None)
+                if key == "vectorize" || key == "no-vectorize")
+        }) {
+            // do nothing
+        } else {
+            accumulated.push("-fno-vectorize".to_string());
+        }
+
+        // allow libra to handle optimization
+        accumulated.push("-Xclang".to_string());
+        accumulated.push("-disable-O0-optnone".to_string());
         accumulated
     }
 }

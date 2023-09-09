@@ -6,5 +6,5 @@ use libra_shared::git::GitRepo;
 /// A trait that marks a test suite
 pub trait TestSuite<R: Resolver> {
     /// Run the test suite
-    fn run(repo: GitRepo, resolver: R) -> Result<()>;
+    fn run(repo: GitRepo, resolver: R, force: bool) -> Result<()>;
 }

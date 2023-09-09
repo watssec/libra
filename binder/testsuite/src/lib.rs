@@ -18,13 +18,17 @@ enum Command {
 
     /// Build the test suite
     Build {
-        /// Force the build to proceed
+        /// Force the execution to proceed
         #[structopt(short, long)]
         force: bool,
     },
 
     /// Run the test suite
-    Run,
+    Run {
+        /// Force the execution to proceed
+        #[structopt(short, long)]
+        force: bool,
+    },
 }
 
 #[derive(StructOpt)]
@@ -73,9 +77,9 @@ fn run_internal<R: Resolver, T: Dependency<R> + TestSuite<R>>(command: Command) 
         Command::Build { force } => {
             state.build(force)?;
         }
-        Command::Run => {
+        Command::Run { force } => {
             let (repo, resolver) = state.into_source_and_artifact()?;
-            T::run(repo, resolver)?;
+            T::run(repo, resolver, force)?;
         }
     }
     Ok(())
