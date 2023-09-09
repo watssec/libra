@@ -408,6 +408,8 @@ dependencies = [
  "libra-shared",
  "log",
  "rayon",
+ "serde",
+ "serde_json",
  "structopt",
  "tempfile",
  "walkdir",

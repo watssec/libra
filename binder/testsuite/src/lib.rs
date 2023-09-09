@@ -78,8 +78,8 @@ fn run_internal<R: Resolver, T: Dependency<R> + TestSuite<R>>(command: Command) 
             state.build(force)?;
         }
         Command::Run { force } => {
-            let (repo, resolver) = state.into_source_and_artifact()?;
-            T::run(repo, resolver, force)?;
+            let (_, resolver) = state.into_source_and_artifact()?;
+            T::run(resolver, force)?;
         }
     }
     Ok(())

@@ -7,6 +7,7 @@ use anyhow::{anyhow, bail, Result};
 use log::info;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
+use serde::{Deserialize, Serialize};
 
 use libra_builder::ResolverLLVM;
 use libra_engine::error::EngineError;
@@ -113,8 +114,44 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct Summary {
+    passed: Vec<String>,
+    failed_compile: Vec<String>,
+    failed_loading: Vec<String>,
+    failed_invariant: Vec<String>,
+    failed_assumption: Vec<String>,
+    failed_unsupported: BTreeMap<String, Vec<String>>,
+}
+
+impl Summary {
+    pub fn save(&self, path: &Path) -> Result<()> {
+        let content = serde_json::to_string_pretty(self)?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+
+    pub fn show(&self) {
+        println!("passed: {}", self.passed.len());
+        println!("failed [compile]: {}", self.failed_compile.len());
+        println!("failed [loading]: {}", self.failed_loading.len());
+        println!("failed [invariant]: {}", self.failed_invariant.len());
+        println!("failed [assumption]: {}", self.failed_assumption.len());
+        println!(
+            "failed [unsupported]: {}",
+            self.failed_unsupported
+                .values()
+                .map(|v| v.len())
+                .sum::<usize>()
+        );
+        for (category, tests) in &self.failed_unsupported {
+            println!("  - {}: {}", category, tests.len());
+        }
+    }
+}
+
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
-    fn run(_repo: GitRepo, resolver: ResolverLLVMExternal, force: bool) -> Result<()> {
+    fn run(resolver: ResolverLLVMExternal, force: bool) -> Result<()> {
         // prepare te environment
         let mut workdir = PATH_STUDIO.to_path_buf();
         workdir.extend(PATH_WORKSPACE);
@@ -165,56 +202,60 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
         info!("Number of test cases executed: {}", executed.len());
 
         // split the results
-        let mut result_pass = vec![];
-        let mut result_loading = vec![];
-        let mut result_invariant = vec![];
-        let mut result_assumption = vec![];
-        let mut result_unsupported = BTreeMap::new();
-        let mut result_uncompilable = vec![];
+        let mut passed = vec![];
+        let mut failed_compile = vec![];
+        let mut failed_loading = vec![];
+        let mut failed_invariant = vec![];
+        let mut failed_assumption = vec![];
+        let mut failed_unsupported = BTreeMap::new();
 
         for (name, result) in executed {
             match result {
                 Ok(_) => {
-                    result_pass.push(name);
+                    passed.push(name);
                 }
                 // potential setup issue
                 Err(EngineError::CompilationError(_)) => {
-                    result_uncompilable.push(name);
+                    failed_compile.push(name);
                 }
                 // known issues
                 Err(EngineError::NotSupportedYet(reason)) => {
-                    result_unsupported
+                    failed_unsupported
                         .entry(reason)
                         .or_insert_with(Vec::new)
                         .push(name);
                 }
                 // potential bugs with the oracle
                 Err(EngineError::LLVMLoadingError(_)) => {
-                    result_loading.push(name);
+                    failed_loading.push(name);
                 }
                 // potential bugs with the backend
                 Err(EngineError::InvariantViolation(_)) => {
-                    result_invariant.push(name);
+                    failed_invariant.push(name);
                 }
                 Err(EngineError::InvalidAssumption(_)) => {
-                    result_assumption.push(name);
+                    failed_assumption.push(name);
                 }
             }
         }
 
         // summarize the result
-        info!("passed: {}", result_pass.len());
-        info!("failed [compile]: {}", result_uncompilable.len());
-        info!("failed [loading]: {}", result_loading.len());
-        info!("failed [invariant]: {}", result_invariant.len());
-        info!("failed [assumption]: {}", result_assumption.len());
-        info!(
-            "failed [unsupported]: {}",
-            result_unsupported.values().map(|v| v.len()).sum::<usize>()
-        );
-        for (category, tests) in result_unsupported {
-            info!("  - {}: {}", category, tests.len());
-        }
+        let summary = Summary {
+            passed,
+            failed_compile,
+            failed_loading,
+            failed_invariant,
+            failed_assumption,
+            failed_unsupported: failed_unsupported
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v))
+                .collect(),
+        };
+        summary.show();
+
+        let path_summary = workdir.join("summary.json");
+        summary.save(&path_summary)?;
+        info!("Summary saved at: {}", path_summary.to_string_lossy());
         Ok(())
     }
 }
