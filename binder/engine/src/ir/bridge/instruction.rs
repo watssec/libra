@@ -372,7 +372,9 @@ impl ComparePredicate {
             "f_olt" | "f_ult" => (Self::LT, true),
             "f_ole" | "f_ule" => (Self::LE, true),
             "f_f" | "f_ord" | "f_uno" | "f_t" => {
-                return Err(EngineError::NotSupportedYet(Unsupported::FloatingPointOrdering))
+                return Err(EngineError::NotSupportedYet(
+                    Unsupported::FloatingPointOrdering,
+                ))
             }
             _ => {
                 return Err(EngineError::InvalidAssumption(format!(
