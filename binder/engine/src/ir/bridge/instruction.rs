@@ -837,6 +837,36 @@ impl<'a> Context<'a> {
                             operand: operand_new,
                             result: index.into(),
                         },
+                        // TODO (mengxu): some of the float to int casts are also represented
+                        // as bitcasts, such as:
+                        // - %0 = bitcast float %value to i32
+                        // - %0 = bitcast double %value to i64
+                        (Type::Float { bits: bits_from }, Type::Int { bits: bits_into }) => {
+                            if bits_from != bits_into {
+                                return Err(EngineError::InvalidAssumption(
+                                    "expect float and int of the same size for bitcast".into(),
+                                ));
+                            }
+                            Instruction::CastFloatToInt {
+                                bits_from,
+                                bits_into,
+                                operand: operand_new,
+                                result: index.into(),
+                            }
+                        }
+                        (Type::Int { bits: bits_from }, Type::Float { bits: bits_into }) => {
+                            if bits_from != bits_into {
+                                return Err(EngineError::InvalidAssumption(
+                                    "expect float and int of the same size for bitcast".into(),
+                                ));
+                            }
+                            Instruction::CastIntToFloat {
+                                bits_from,
+                                bits_into,
+                                operand: operand_new,
+                                result: index.into(),
+                            }
+                        }
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect ptr type for bitcast".into(),
