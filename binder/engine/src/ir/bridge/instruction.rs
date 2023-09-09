@@ -394,8 +394,8 @@ impl<'a> Context<'a> {
         Ok(converted)
     }
 
-    /// convert a value in either bv32 or bv64
-    pub fn parse_value_bv32_or_bv64(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
+    /// convert a value in either int32 or int64
+    fn parse_value_int32_or_int64(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
         match val.get_type() {
             adapter::typing::Type::Int { width: 32 } => {
                 self.parse_value(val, &Type::Int { bits: 32 })
@@ -985,7 +985,7 @@ impl<'a> Context<'a> {
                 }
 
                 let offset = indices.first().unwrap();
-                let offset_new = self.parse_value_bv32_or_bv64(offset)?;
+                let offset_new = self.parse_value_int32_or_int64(offset)?;
 
                 let mut cur_ty = &src_ty;
                 let mut indices_new = vec![];
@@ -1007,7 +1007,7 @@ impl<'a> Context<'a> {
                                 },
                                 _ => {
                                     return Err(EngineError::InvalidAssumption(
-                                        "field number must be bv32".into(),
+                                        "field number must be int32".into(),
                                     ));
                                 }
                             };
@@ -1020,7 +1020,7 @@ impl<'a> Context<'a> {
                             fields.get(field_offset).unwrap()
                         }
                         Type::Array { element, length: _ } => {
-                            let idx_new = self.parse_value_bv32_or_bv64(idx)?;
+                            let idx_new = self.parse_value_int32_or_int64(idx)?;
                             indices_new.push(idx_new);
                             element.as_ref()
                         }
@@ -1331,7 +1331,7 @@ impl<'a> Context<'a> {
                         },
                         _ => {
                             return Err(EngineError::InvariantViolation(
-                                "switch case is not a constant bitvec".into(),
+                                "switch case is not a constant int".into(),
                             ));
                         }
                     };

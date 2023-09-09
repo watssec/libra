@@ -152,7 +152,7 @@ impl Constant {
                     },
                     _ => {
                         return Err(EngineError::InvalidAssumption(format!(
-                            "type mismatch: expect bitvec, found {}",
+                            "type mismatch: expect int, found {}",
                             expected_type
                         )));
                     }
