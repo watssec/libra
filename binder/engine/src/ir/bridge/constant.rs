@@ -18,7 +18,10 @@ pub enum Constant {
     /// Integer
     Int { bits: usize, value: Integer },
     /// Floating-point
-    Float { bits: usize, value: Rational },
+    Float {
+        bits: usize,
+        value: Option<Rational>, // None means infinity
+    },
     /// Null pointer
     Null,
     /// Array
@@ -51,7 +54,7 @@ impl Constant {
             },
             Type::Float { bits } => Self::Float {
                 bits: *bits,
-                value: Rational::ZERO.clone(),
+                value: Some(Rational::ZERO.clone()),
             },
             Type::Array { element, length } => {
                 let elements = (0..*length)
@@ -177,11 +180,6 @@ impl Constant {
                                 })?
                                 .complete(*bits as u32)
                                 .to_rational()
-                                .ok_or_else(|| {
-                                    EngineError::InvariantViolation(
-                                        "const float is infinity".to_string(),
-                                    )
-                                })?
                         },
                     },
                     _ => {
