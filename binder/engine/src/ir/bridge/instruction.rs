@@ -137,9 +137,23 @@ pub enum Instruction {
         operand: Value,
         result: RegisterSlot,
     },
+    CastVecInt {
+        bits_from: usize,
+        bits_into: usize,
+        length: usize,
+        operand: Value,
+        result: RegisterSlot,
+    },
     CastFloat {
         bits_from: usize,
         bits_into: usize,
+        operand: Value,
+        result: RegisterSlot,
+    },
+    CastVecFloat {
+        bits_from: usize,
+        bits_into: usize,
+        length: usize,
         operand: Value,
         result: RegisterSlot,
     },
@@ -961,6 +975,22 @@ impl<'a> Context<'a> {
                                 result: index.into(),
                             }
                         }
+                        (
+                            Type::VecInt {
+                                bits: bits_from,
+                                length: length_from,
+                            },
+                            Type::VecInt {
+                                bits: bits_into,
+                                length: length_into,
+                            },
+                        ) if length_from == length_into => Instruction::CastVecInt {
+                            bits_from,
+                            bits_into,
+                            length: length_from,
+                            operand: operand_new,
+                            result: index.into(),
+                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect int type for int cast".into(),
@@ -976,6 +1006,22 @@ impl<'a> Context<'a> {
                                 result: index.into(),
                             }
                         }
+                        (
+                            Type::VecFloat {
+                                bits: bits_from,
+                                length: length_from,
+                            },
+                            Type::VecFloat {
+                                bits: bits_into,
+                                length: length_into,
+                            },
+                        ) if length_from == length_into => Instruction::CastVecFloat {
+                            bits_from,
+                            bits_into,
+                            length: length_from,
+                            operand: operand_new,
+                            result: index.into(),
+                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect float type for float cast".into(),
