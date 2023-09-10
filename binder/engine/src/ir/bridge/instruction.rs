@@ -242,7 +242,23 @@ pub enum Instruction {
         result: RegisterSlot,
     },
     // selection
-    ITE {
+    ITEOne {
+        cond: Value,
+        then_value: Value,
+        else_value: Value,
+        result: RegisterSlot,
+    },
+    ITEVecInt {
+        bits: usize,
+        length: usize,
+        cond: Value,
+        then_value: Value,
+        else_value: Value,
+        result: RegisterSlot,
+    },
+    ITEVecFloat {
+        bits: usize,
+        length: usize,
         cond: Value,
         then_value: Value,
         else_value: Value,
@@ -1421,15 +1437,53 @@ impl<'a> Context<'a> {
                 then_value,
                 else_value,
             } => {
-                let cond_new = self.parse_value(cond, &Type::Int { bits: 1 })?;
+                let cond_ty = self.typing.convert(cond.get_type())?;
+                let cond_new = self.parse_value(cond, &cond_ty)?;
+
                 let inst_ty = self.typing.convert(ty)?;
                 let then_value_new = self.parse_value(then_value, &inst_ty)?;
                 let else_value_new = self.parse_value(else_value, &inst_ty)?;
-                Instruction::ITE {
-                    cond: cond_new,
-                    then_value: then_value_new,
-                    else_value: else_value_new,
-                    result: index.into(),
+
+                match (cond_ty, inst_ty) {
+                    (Type::Int { bits: 1 }, _) => Instruction::ITEOne {
+                        cond: cond_new,
+                        then_value: then_value_new,
+                        else_value: else_value_new,
+                        result: index.into(),
+                    },
+                    (
+                        Type::VecInt { bits: 1, length },
+                        Type::VecInt {
+                            bits,
+                            length: length_vec,
+                        },
+                    ) if length_vec == length => Instruction::ITEVecInt {
+                        bits,
+                        length,
+                        cond: cond_new,
+                        then_value: then_value_new,
+                        else_value: else_value_new,
+                        result: index.into(),
+                    },
+                    (
+                        Type::VecInt { bits: 1, length },
+                        Type::VecFloat {
+                            bits,
+                            length: length_vec,
+                        },
+                    ) if length_vec == length => Instruction::ITEVecFloat {
+                        bits,
+                        length,
+                        cond: cond_new,
+                        then_value: then_value_new,
+                        else_value: else_value_new,
+                        result: index.into(),
+                    },
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "ITE cond and value type mismatch".into(),
+                        ));
+                    }
                 }
             }
             AdaptedInst::Phi { options } => {

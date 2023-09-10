@@ -617,7 +617,21 @@ pub enum Expression {
         indices: Vec<Constant>,
     },
     // choice
-    ITE {
+    ITEOne {
+        cond: Constant,
+        then_value: Constant,
+        else_value: Constant,
+    },
+    ITEVecInt {
+        bits: usize,
+        length: usize,
+        cond: Constant,
+        then_value: Constant,
+        else_value: Constant,
+    },
+    ITEVecFloat {
+        bits: usize,
+        length: usize,
         cond: Constant,
         then_value: Constant,
         else_value: Constant,
@@ -1074,14 +1088,48 @@ impl Expression {
                         .collect::<EngineResult<_>>()?,
                 }
             }
-            Instruction::ITE {
+            Instruction::ITEOne {
                 cond,
                 then_value,
                 else_value,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::ITE {
+                Self::ITEOne {
+                    cond: cond.expect_constant()?,
+                    then_value: then_value.expect_constant()?,
+                    else_value: else_value.expect_constant()?,
+                }
+            }
+            Instruction::ITEVecInt {
+                bits,
+                length,
+                cond,
+                then_value,
+                else_value,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::ITEVecInt {
+                    bits,
+                    length,
+                    cond: cond.expect_constant()?,
+                    then_value: then_value.expect_constant()?,
+                    else_value: else_value.expect_constant()?,
+                }
+            }
+            Instruction::ITEVecFloat {
+                bits,
+                length,
+                cond,
+                then_value,
+                else_value,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::ITEVecFloat {
+                    bits,
+                    length,
                     cond: cond.expect_constant()?,
                     then_value: then_value.expect_constant()?,
                     else_value: else_value.expect_constant()?,
