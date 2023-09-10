@@ -25,11 +25,14 @@ pub enum Constant {
     /// Null pointer
     Null,
     /// Vector of integers
-    VecInt { bits: usize, elements: Vec<Integer> },
+    VecInt {
+        bits: usize,
+        elements: Vec<Constant>,
+    },
     /// Vector of floating points
     VecFloat {
         bits: usize,
-        elements: Vec<Option<Rational>>,
+        elements: Vec<Constant>,
     },
     /// Array
     Array { sub: Type, elements: Vec<Constant> },
@@ -46,10 +49,6 @@ pub enum Constant {
     UndefInt { bits: usize },
     /// Undefined float
     UndefFloat { bits: usize },
-    /// Undefined vector of ints
-    UndefVecInt { bits: usize, length: usize },
-    /// Undefined vector of floats
-    UndefVecFloat { bits: usize, length: usize },
     /// Undefined pointer
     UndefPointer,
     /// Expression
@@ -69,11 +68,21 @@ impl Constant {
             },
             Type::VecInt { bits, length } => Self::VecInt {
                 bits: *bits,
-                elements: (0..*length).map(|_| Integer::ZERO).collect(),
+                elements: (0..*length)
+                    .map(|_| Constant::Int {
+                        bits: *bits,
+                        value: Integer::ZERO,
+                    })
+                    .collect(),
             },
             Type::VecFloat { bits, length } => Self::VecFloat {
                 bits: *bits,
-                elements: (0..*length).map(|_| Some(Rational::ZERO.clone())).collect(),
+                elements: (0..*length)
+                    .map(|_| Constant::Float {
+                        bits: *bits,
+                        value: Some(Rational::ZERO.clone()),
+                    })
+                    .collect(),
             },
             Type::Array { element, length } => {
                 let elements = (0..*length)
@@ -135,13 +144,17 @@ impl Constant {
                 )));
             }
             Type::Pointer => Self::UndefPointer,
-            Type::VecInt { bits, length } => Self::UndefVecInt {
+            Type::VecInt { bits, length } => Self::VecInt {
                 bits: *bits,
-                length: *length,
+                elements: (0..*length)
+                    .map(|_| Constant::UndefInt { bits: *bits })
+                    .collect(),
             },
-            Type::VecFloat { bits, length } => Self::UndefVecFloat {
+            Type::VecFloat { bits, length } => Self::VecFloat {
                 bits: *bits,
-                length: *length,
+                elements: (0..*length)
+                    .map(|_| Constant::UndefFloat { bits: *bits })
+                    .collect(),
             },
         };
         Ok(value)
@@ -259,15 +272,7 @@ impl Constant {
                         }
                         let elements_new = elements
                             .iter()
-                            .map(|e| {
-                                Self::convert(e, &Type::Int { bits: *bits }, typing, symbols)
-                                    .and_then(|c| match c {
-                                        Constant::Int { bits: _, value } => Ok(value),
-                                        _ => Err(EngineError::InvariantViolation(
-                                            "expect only const int for vector const".into(),
-                                        )),
-                                    })
-                            })
+                            .map(|e| Self::convert(e, &Type::Int { bits: *bits }, typing, symbols))
                             .collect::<EngineResult<_>>()?;
                         Self::VecInt {
                             bits: *bits,
@@ -286,12 +291,6 @@ impl Constant {
                             .iter()
                             .map(|e| {
                                 Self::convert(e, &Type::Float { bits: *bits }, typing, symbols)
-                                    .and_then(|c| match c {
-                                        Constant::Float { bits: _, value } => Ok(value),
-                                        _ => Err(EngineError::InvariantViolation(
-                                            "expect only const float for vector const".into(),
-                                        )),
-                                    })
                             })
                             .collect::<EngineResult<_>>()?;
                         Self::VecFloat {
@@ -1228,8 +1227,6 @@ impl Expression {
             | Instruction::FreezePtr
             | Instruction::FreezeInt { .. }
             | Instruction::FreezeFloat { .. }
-            | Instruction::FreezeVecInt { .. }
-            | Instruction::FreezeVecFloat { .. }
             | Instruction::FreezeNop { .. }
             | Instruction::Phi { .. } => {
                 return Err(EngineError::InvalidAssumption(

@@ -229,14 +229,6 @@ pub enum Instruction {
     FreezeFloat {
         bits: usize,
     },
-    FreezeVecInt {
-        bits: usize,
-        length: usize,
-    },
-    FreezeVecFloat {
-        bits: usize,
-        length: usize,
-    },
     FreezeNop {
         value: Value,
     },
@@ -1301,12 +1293,6 @@ impl<'a> Context<'a> {
                     Value::Constant(Constant::UndefInt { bits }) => Instruction::FreezeInt { bits },
                     Value::Constant(Constant::UndefFloat { bits }) => {
                         Instruction::FreezeFloat { bits }
-                    }
-                    Value::Constant(Constant::UndefVecInt { bits, length }) => {
-                        Instruction::FreezeVecInt { bits, length }
-                    }
-                    Value::Constant(Constant::UndefVecFloat { bits, length }) => {
-                        Instruction::FreezeVecFloat { bits, length }
                     }
                     Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
                     // TODO(mengxu): freeze instruction should only be possible on undef,
