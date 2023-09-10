@@ -122,7 +122,7 @@ pub enum Inst {
     ShuffleVector {
         lhs: Value,
         rhs: Value,
-        mask: Vec<usize>,
+        mask: Vec<i128>,
     },
     // concurrency
     Fence {

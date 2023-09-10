@@ -320,7 +320,7 @@ pub enum Instruction {
         length: usize,
         lhs: Value,
         rhs: Value,
-        mask: Vec<usize>,
+        mask: Vec<i128>,
         result: RegisterSlot,
     },
     ShuffleVecFloat {
@@ -328,7 +328,7 @@ pub enum Instruction {
         length: usize,
         lhs: Value,
         rhs: Value,
-        mask: Vec<usize>,
+        mask: Vec<i128>,
         result: RegisterSlot,
     },
 }

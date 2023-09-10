@@ -681,14 +681,14 @@ pub enum Expression {
         length: usize,
         lhs: Constant,
         rhs: Constant,
-        mask: Vec<usize>,
+        mask: Vec<i128>,
     },
     ShuffleVecFloat {
         bits: usize,
         length: usize,
         lhs: Constant,
         rhs: Constant,
-        mask: Vec<usize>,
+        mask: Vec<i128>,
     },
 }
 
