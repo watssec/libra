@@ -524,7 +524,7 @@ pub enum Expression {
         rhs: Constant,
     },
     // casts
-    CastBitvecBits {
+    CastBitvecSize {
         // invariant: bits_from != bits_into
         bits_from: usize,
         bits_into: usize,
@@ -542,30 +542,8 @@ pub enum Expression {
         length: Option<usize>,
         operand: Constant,
     },
-    CastBitvecInterp {
-        // pure re-interpretation cast without changing content
-        // invariant: number_from != number_into
-        bits: usize,
-        number_from: NumRepr,
-        number_into: NumRepr,
-        length: Option<usize>,
-        operand: Constant,
-    },
-    CastBitvecShape {
-        // invariant: bits_from != bits_into
-        // invariant: length_from != length_into
-        // invariant: bits * length = <constant>
-        bits_from: usize,
-        bits_into: usize,
-        number: NumRepr,
-        length_from: Option<usize>,
-        length_into: Option<usize>,
-        operand: Constant,
-    },
     CastBitvecFree {
-        // invariant: bits_from != bits_into
-        // invariant: number_from != number_into
-        // invariant: length_from != length_into
+        // pure re-interpretation cast without changing content
         // invariant: bits * length = <constant>
         bits_from: usize,
         bits_into: usize,
@@ -757,7 +735,7 @@ impl Expression {
                     rhs: rhs.expect_constant()?,
                 }
             }
-            Instruction::CastBitvecBits {
+            Instruction::CastBitvecSize {
                 bits_from,
                 bits_into,
                 number,
@@ -766,7 +744,7 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::CastBitvecBits {
+                Self::CastBitvecSize {
                     bits_from,
                     bits_into,
                     number,
@@ -790,42 +768,6 @@ impl Expression {
                     number_from,
                     number_into,
                     length,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastBitvecInterp {
-                bits,
-                number_from,
-                number_into,
-                length,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastBitvecInterp {
-                    bits,
-                    number_from,
-                    number_into,
-                    length,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastBitvecShape {
-                bits_from,
-                bits_into,
-                number,
-                length_from,
-                length_into,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastBitvecShape {
-                    bits_from,
-                    bits_into,
-                    number,
-                    length_from,
-                    length_into,
                     operand: operand.expect_constant()?,
                 }
             }

@@ -94,7 +94,7 @@ pub enum Instruction {
         result: RegisterSlot,
     },
     // cast
-    CastBitvecBits {
+    CastBitvecSize {
         // invariant: bits_from != bits_into
         bits_from: usize,
         bits_into: usize,
@@ -114,32 +114,8 @@ pub enum Instruction {
         operand: Value,
         result: RegisterSlot,
     },
-    CastBitvecInterp {
-        // pure re-interpretation cast without changing content
-        // invariant: number_from != number_into
-        bits: usize,
-        number_from: NumRepr,
-        number_into: NumRepr,
-        length: Option<usize>,
-        operand: Value,
-        result: RegisterSlot,
-    },
-    CastBitvecShape {
-        // invariant: bits_from != bits_into
-        // invariant: length_from != length_into
-        // invariant: bits * length = <constant>
-        bits_from: usize,
-        bits_into: usize,
-        number: NumRepr,
-        length_from: Option<usize>,
-        length_into: Option<usize>,
-        operand: Value,
-        result: RegisterSlot,
-    },
     CastBitvecFree {
-        // invariant: bits_from != bits_into
-        // invariant: number_from != number_into
-        // invariant: length_from != length_into
+        // pure re-interpretation cast without changing content
         // invariant: bits * length = <constant>
         bits_from: usize,
         bits_into: usize,
@@ -968,7 +944,7 @@ impl<'a> Context<'a> {
                                 length,
                             },
                         ) if length_from == length && bits_from != bits_into => {
-                            Instruction::CastBitvecBits {
+                            Instruction::CastBitvecSize {
                                 bits_from,
                                 bits_into,
                                 number: NumRepr::Int,
@@ -996,7 +972,7 @@ impl<'a> Context<'a> {
                                 length,
                             },
                         ) if length_from == length && bits_from != bits_into => {
-                            Instruction::CastBitvecBits {
+                            Instruction::CastBitvecSize {
                                 bits_from,
                                 bits_into,
                                 number: NumRepr::Float,
@@ -1017,6 +993,8 @@ impl<'a> Context<'a> {
                                 operand: operand_new,
                                 result: index.into(),
                             },
+                            // free casts
+                            //
                             // TODO (mengxu): some of the float to int casts are also represented
                             // as bitcasts, such as:
                             // - %0 = bitcast float %value to i32
@@ -1029,61 +1007,22 @@ impl<'a> Context<'a> {
                                     length: length_from,
                                 },
                                 Type::Bitvec {
-                                    bits,
-                                    number: number_into,
-                                    length,
-                                },
-                            ) if bits_from == bits
-                                && length_from == length
-                                && number_from != number_into =>
-                            {
-                                Instruction::CastBitvecInterp {
-                                    bits,
-                                    number_from,
-                                    number_into,
-                                    length,
-                                    operand: operand_new,
-                                    result: index.into(),
-                                }
-                            }
-                            // shape and free casts
-                            (
-                                Type::Bitvec {
-                                    bits: bits_from,
-                                    number: number_from,
-                                    length: length_from,
-                                },
-                                Type::Bitvec {
                                     bits: bits_into,
                                     number: number_into,
                                     length: length_into,
                                 },
-                            ) if bits_from != bits_into
-                                && length_from != length_into
-                                && bits_from * length_from.unwrap_or(1)
-                                    == bits_into * length_into.unwrap_or(1) =>
+                            ) if bits_from * length_from.unwrap_or(1)
+                                == bits_into * length_into.unwrap_or(1) =>
                             {
-                                if number_from == number_into {
-                                    Instruction::CastBitvecShape {
-                                        bits_from,
-                                        bits_into,
-                                        number: number_into,
-                                        length_from,
-                                        length_into,
-                                        operand: operand_new,
-                                        result: index.into(),
-                                    }
-                                } else {
-                                    Instruction::CastBitvecFree {
-                                        bits_from,
-                                        bits_into,
-                                        number_from,
-                                        number_into,
-                                        length_from,
-                                        length_into,
-                                        operand: operand_new,
-                                        result: index.into(),
-                                    }
+                                Instruction::CastBitvecFree {
+                                    bits_from,
+                                    bits_into,
+                                    number_from,
+                                    number_into,
+                                    length_from,
+                                    length_into,
+                                    operand: operand_new,
+                                    result: index.into(),
                                 }
                             }
                             _ => {
