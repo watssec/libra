@@ -159,8 +159,13 @@ impl Summary {
 }
 
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
-    fn run(resolver: ResolverLLVMExternal, force: bool, filter: Vec<String>) -> Result<()> {
-        // prepare te environment
+    fn run(
+        _repo: GitRepo,
+        resolver: ResolverLLVMExternal,
+        force: bool,
+        filter: Vec<String>,
+    ) -> Result<()> {
+        // prepare the environment
         let mut workdir = PATH_STUDIO.to_path_buf();
         workdir.extend(PATH_WORKSPACE);
         if workdir.exists() {

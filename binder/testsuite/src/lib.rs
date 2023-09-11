@@ -1,5 +1,6 @@
 mod common;
 mod llvm_external;
+mod llvm_internal;
 mod llvm_lit;
 
 use anyhow::{bail, Result};
@@ -10,6 +11,7 @@ use libra_shared::logging;
 
 use crate::common::TestSuite;
 use crate::llvm_external::{DepLLVMExternal, ResolverLLVMExternal};
+use crate::llvm_internal::{DepLLVMInternal, ResolverLLVMInternal};
 
 #[derive(StructOpt)]
 enum Command {
@@ -67,7 +69,8 @@ pub fn entrypoint() -> Result<()> {
 
     // run the subcommand
     match name.as_str() {
-        "llvm" => run_internal::<ResolverLLVMExternal, DepLLVMExternal>(command)?,
+        "external" => run_internal::<ResolverLLVMExternal, DepLLVMExternal>(command)?,
+        "internal" => run_internal::<ResolverLLVMInternal, DepLLVMInternal>(command)?,
         _ => bail!("Invalid deps name: {}", name),
     }
 
@@ -82,8 +85,8 @@ fn run_internal<R: Resolver, T: Dependency<R> + TestSuite<R>>(command: Command) 
             state.build(force)?;
         }
         Command::Run { force, selection } => {
-            let (_, resolver) = state.into_source_and_artifact()?;
-            T::run(resolver, force, selection)?;
+            let (repo, resolver) = state.into_source_and_artifact()?;
+            T::run(repo, resolver, force, selection)?;
         }
     }
     Ok(())
