@@ -518,6 +518,13 @@ pub enum Expression {
         lhs: Constant,
         rhs: Constant,
     },
+    CompareOrder {
+        bits: usize,
+        length: Option<usize>,
+        ordered: bool,
+        lhs: Constant,
+        rhs: Constant,
+    },
     ComparePtr {
         predicate: ComparePredicate,
         lhs: Constant,
@@ -718,6 +725,23 @@ impl Expression {
                     number,
                     length,
                     predicate,
+                    lhs: lhs.expect_constant()?,
+                    rhs: rhs.expect_constant()?,
+                }
+            }
+            Instruction::CompareOrder {
+                bits,
+                length,
+                ordered,
+                lhs,
+                rhs,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CompareOrder {
+                    bits,
+                    length,
+                    ordered,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
                 }

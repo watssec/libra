@@ -87,6 +87,14 @@ pub enum Instruction {
         rhs: Value,
         result: RegisterSlot,
     },
+    CompareOrder {
+        bits: usize,
+        length: Option<usize>,
+        ordered: bool,
+        lhs: Value,
+        rhs: Value,
+        result: RegisterSlot,
+    },
     ComparePtr {
         predicate: ComparePredicate,
         lhs: Value,
@@ -311,22 +319,29 @@ pub enum ComparePredicate {
     LE,
 }
 
-impl ComparePredicate {
-    pub fn parse(opcode: &str) -> EngineResult<(Self, NumRepr)> {
+pub enum CompareOperator {
+    Pred(ComparePredicate, NumRepr),
+    Ord(bool),
+}
+
+impl CompareOperator {
+    pub fn parse(opcode: &str) -> EngineResult<Self> {
         let parsed = match opcode {
-            "i_eq" => (Self::EQ, NumRepr::Int),
-            "i_ne" => (Self::NE, NumRepr::Int),
-            "i_ugt" | "i_sgt" => (Self::GT, NumRepr::Int),
-            "i_uge" | "i_sge" => (Self::GE, NumRepr::Int),
-            "i_ult" | "i_slt" => (Self::LT, NumRepr::Int),
-            "i_ule" | "i_sle" => (Self::LE, NumRepr::Int),
-            "f_oeq" | "f_ueq" => (Self::EQ, NumRepr::Float),
-            "f_one" | "f_une" => (Self::NE, NumRepr::Float),
-            "f_ogt" | "f_ugt" => (Self::GT, NumRepr::Float),
-            "f_oge" | "f_uge" => (Self::GE, NumRepr::Float),
-            "f_olt" | "f_ult" => (Self::LT, NumRepr::Float),
-            "f_ole" | "f_ule" => (Self::LE, NumRepr::Float),
-            "f_f" | "f_ord" | "f_uno" | "f_t" => {
+            "i_eq" => Self::Pred(ComparePredicate::EQ, NumRepr::Int),
+            "i_ne" => Self::Pred(ComparePredicate::NE, NumRepr::Int),
+            "i_ugt" | "i_sgt" => Self::Pred(ComparePredicate::GT, NumRepr::Int),
+            "i_uge" | "i_sge" => Self::Pred(ComparePredicate::GE, NumRepr::Int),
+            "i_ult" | "i_slt" => Self::Pred(ComparePredicate::LT, NumRepr::Int),
+            "i_ule" | "i_sle" => Self::Pred(ComparePredicate::LE, NumRepr::Int),
+            "f_oeq" | "f_ueq" => Self::Pred(ComparePredicate::EQ, NumRepr::Float),
+            "f_one" | "f_une" => Self::Pred(ComparePredicate::NE, NumRepr::Float),
+            "f_ogt" | "f_ugt" => Self::Pred(ComparePredicate::GT, NumRepr::Float),
+            "f_oge" | "f_uge" => Self::Pred(ComparePredicate::GE, NumRepr::Float),
+            "f_olt" | "f_ult" => Self::Pred(ComparePredicate::LT, NumRepr::Float),
+            "f_ole" | "f_ule" => Self::Pred(ComparePredicate::LE, NumRepr::Float),
+            "f_ord" => Self::Ord(true),
+            "f_uno" => Self::Ord(false),
+            "f_f" | "f_t" => {
                 return Err(EngineError::NotSupportedYet(
                     Unsupported::FloatingPointOrdering,
                 ))
@@ -868,48 +883,75 @@ impl<'a> Context<'a> {
                 let lhs_new = self.parse_value(lhs, &operand_ty)?;
                 let rhs_new = self.parse_value(rhs, &operand_ty)?;
 
-                let (predicate_parsed, repr) = ComparePredicate::parse(predicate)?;
-                match (inst_ty, operand_ty) {
-                    (
-                        Type::Bitvec {
-                            bits: 1,
-                            number: NumRepr::Int,
-                            length: length_inst,
+                match CompareOperator::parse(predicate)? {
+                    CompareOperator::Pred(predicate_parsed, repr) => match (inst_ty, operand_ty) {
+                        (
+                            Type::Bitvec {
+                                bits: 1,
+                                number: NumRepr::Int,
+                                length: length_inst,
+                            },
+                            Type::Bitvec {
+                                bits,
+                                number,
+                                length,
+                            },
+                        ) if number == repr && length == length_inst => {
+                            Instruction::CompareBitvec {
+                                bits,
+                                number,
+                                length,
+                                predicate: predicate_parsed,
+                                lhs: lhs_new,
+                                rhs: rhs_new,
+                                result: index.into(),
+                            }
+                        }
+                        (
+                            Type::Bitvec {
+                                bits: 1,
+                                number: NumRepr::Int,
+                                length: Option::None,
+                            },
+                            Type::Pointer,
+                        ) if matches!(repr, NumRepr::Int) => Instruction::ComparePtr {
+                            predicate: predicate_parsed,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
                         },
-                        Type::Bitvec {
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "compare pred expects int<>, float<>, or ptr operands".into(),
+                            ));
+                        }
+                    },
+                    CompareOperator::Ord(ordered) => match (inst_ty, operand_ty) {
+                        (
+                            Type::Bitvec {
+                                bits: 1,
+                                number: NumRepr::Int,
+                                length: length_inst,
+                            },
+                            Type::Bitvec {
+                                bits,
+                                number: NumRepr::Float,
+                                length,
+                            },
+                        ) if length == length_inst => Instruction::CompareOrder {
                             bits,
-                            number,
                             length,
+                            ordered,
+                            lhs: lhs_new,
+                            rhs: rhs_new,
+                            result: index.into(),
                         },
-                    ) if number == repr && length == length_inst => Instruction::CompareBitvec {
-                        bits,
-                        number,
-                        length,
-                        predicate: predicate_parsed,
-                        lhs: lhs_new,
-                        rhs: rhs_new,
-                        result: index.into(),
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "compare ord expects float<> operands only".into(),
+                            ));
+                        }
                     },
-
-                    (
-                        Type::Bitvec {
-                            bits: 1,
-                            number: NumRepr::Int,
-                            length: Option::None,
-                        },
-                        Type::Pointer,
-                    ) if matches!(repr, NumRepr::Int) => Instruction::ComparePtr {
-                        predicate: predicate_parsed,
-                        lhs: lhs_new,
-                        rhs: rhs_new,
-                        result: index.into(),
-                    },
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "compare inst has operand type that is neither int<>, float<>, nor ptr"
-                                .into(),
-                        ));
-                    }
                 }
             }
             // casts
