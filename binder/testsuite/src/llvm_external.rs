@@ -115,13 +115,13 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Summary {
-    passed: Vec<String>,
-    failed_compile: Vec<String>,
-    failed_loading: Vec<String>,
-    failed_invariant: Vec<String>,
-    failed_assumption: Vec<String>,
-    failed_unsupported: BTreeMap<String, Vec<String>>,
+pub struct Summary {
+    pub passed: Vec<String>,
+    pub failed_compile: Vec<String>,
+    pub failed_loading: Vec<String>,
+    pub failed_invariant: Vec<String>,
+    pub failed_assumption: Vec<String>,
+    pub failed_unsupported: BTreeMap<String, Vec<String>>,
 }
 
 impl Summary {

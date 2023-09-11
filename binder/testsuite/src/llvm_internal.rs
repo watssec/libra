@@ -5,6 +5,8 @@ use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
 use log::{debug, info, warn};
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 
 use libra_builder::ResolverLLVM;
 use libra_engine::error::{EngineError, EngineResult};
@@ -15,6 +17,7 @@ use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
 use crate::common::TestSuite;
+use crate::llvm_external::Summary;
 
 /// Maximum number of fixedpoint optimization
 static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
@@ -91,8 +94,11 @@ impl TestSuite<ResolverLLVMInternal> for DepLLVMInternal {
 
         // run the tests
         let ctxt = Context::new()?;
-        if *PARALLEL && filter.is_empty() {
-            todo!()
+        let consolidated: Vec<_> = if *PARALLEL && filter.is_empty() {
+            test_cases
+                .into_par_iter()
+                .map(|test| test.run_libra(&ctxt, &workdir))
+                .collect::<Result<_>>()?
         } else {
             // serial execution will halt on first failure caused by potential bugs
             let mut results = vec![];
@@ -106,7 +112,7 @@ impl TestSuite<ResolverLLVMInternal> for DepLLVMInternal {
                 let output = test.run_libra(&ctxt, &workdir)?;
 
                 // check errors to halt on first failure caused by potential bugs
-                if let Some(Err(err)) = output.as_ref() {
+                if let Some((_, Err(err))) = output.as_ref() {
                     match err {
                         EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
                         EngineError::LLVMLoadingError(reason)
@@ -118,8 +124,68 @@ impl TestSuite<ResolverLLVMInternal> for DepLLVMInternal {
                 }
                 results.push(output);
             }
+            results
+        };
+
+        // filter the results
+        let executed: BTreeMap<_, _> = consolidated.into_iter().flatten().collect();
+        info!("Number of test cases executed: {}", executed.len());
+
+        // split the results
+        let mut passed = vec![];
+        let mut failed_compile = vec![];
+        let mut failed_loading = vec![];
+        let mut failed_invariant = vec![];
+        let mut failed_assumption = vec![];
+        let mut failed_unsupported = BTreeMap::new();
+
+        for (name, result) in executed {
+            match result {
+                Ok(_) => {
+                    passed.push(name);
+                }
+                // potential setup issue
+                Err(EngineError::CompilationError(_)) => {
+                    failed_compile.push(name);
+                }
+                // known issues
+                Err(EngineError::NotSupportedYet(reason)) => {
+                    failed_unsupported
+                        .entry(reason)
+                        .or_insert_with(Vec::new)
+                        .push(name);
+                }
+                // potential bugs with the oracle
+                Err(EngineError::LLVMLoadingError(_)) => {
+                    failed_loading.push(name);
+                }
+                // potential bugs with the backend
+                Err(EngineError::InvariantViolation(_)) => {
+                    failed_invariant.push(name);
+                }
+                Err(EngineError::InvalidAssumption(_)) => {
+                    failed_assumption.push(name);
+                }
+            }
         }
 
+        // summarize the result
+        let summary = Summary {
+            passed,
+            failed_compile,
+            failed_loading,
+            failed_invariant,
+            failed_assumption,
+            failed_unsupported: failed_unsupported
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v))
+                .collect(),
+        };
+        summary.show();
+
+        let path_summary = workdir.join("summary.json");
+        summary.save(&path_summary)?;
+        info!("Summary saved at: {}", path_summary.to_string_lossy());
         Ok(())
     }
 }
@@ -257,7 +323,11 @@ struct BitcodeTestCase {
 
 impl BitcodeTestCase {
     /// Run the test case through libra workflow (internal)
-    pub fn run_libra(&self, ctxt: &Context, workdir: &Path) -> Result<Option<EngineResult<()>>> {
+    pub fn run_libra(
+        &self,
+        ctxt: &Context,
+        workdir: &Path,
+    ) -> Result<Option<(String, EngineResult<()>)>> {
         let Self { name, path } = self;
 
         // report progress
@@ -282,7 +352,7 @@ impl BitcodeTestCase {
 
         // workflow
         let result = libra_workflow(ctxt, &path_bc_init, &output_dir);
-        Ok(Some(result))
+        Ok(Some((name.to_string(), result)))
     }
 }
 
