@@ -2,9 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
-use crate::ir::bridge::constant::Constant;
+use crate::ir::bridge::constant::{Constant, NumValue};
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
-use crate::ir::bridge::typing::{Type, TypeRegistry};
+use crate::ir::bridge::typing::{NumRepr, Type, TypeRegistry};
 use crate::ir::bridge::value::{BlockLabel, RegisterSlot, Value};
 
 /// An naive translation of an LLVM instruction
@@ -43,106 +43,45 @@ pub enum Instruction {
         result: Option<(Type, RegisterSlot)>,
     },
     // unary
-    UnaryArithFloat {
+    UnaryArith {
         bits: usize,
-        opcode: UnaryOpArith,
-        operand: Value,
-        result: RegisterSlot,
-    },
-    UnaryArithVecFloat {
-        bits: usize,
-        length: usize,
+        number: NumRepr,
+        length: Option<usize>,
         opcode: UnaryOpArith,
         operand: Value,
         result: RegisterSlot,
     },
     // binary
-    BinaryArithInt {
+    BinaryArith {
         bits: usize,
+        number: NumRepr,
+        length: Option<usize>,
         opcode: BinaryOpArith,
         lhs: Value,
         rhs: Value,
         result: RegisterSlot,
     },
-    BinaryArithFloat {
+    BinaryBitwise {
         bits: usize,
-        opcode: BinaryOpArith,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    BinaryArithVecInt {
-        bits: usize,
-        length: usize,
-        opcode: BinaryOpArith,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    BinaryArithVecFloat {
-        bits: usize,
-        length: usize,
-        opcode: BinaryOpArith,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    BinaryBitwiseInt {
-        bits: usize,
+        length: Option<usize>,
         opcode: BinaryOpBitwise,
         lhs: Value,
         rhs: Value,
         result: RegisterSlot,
     },
-    BinaryBitwiseVecInt {
+    BinaryShift {
         bits: usize,
-        length: usize,
-        opcode: BinaryOpBitwise,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    BinaryShiftInt {
-        bits: usize,
-        opcode: BinaryOpShift,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    BinaryShiftVecInt {
-        bits: usize,
-        length: usize,
+        length: Option<usize>,
         opcode: BinaryOpShift,
         lhs: Value,
         rhs: Value,
         result: RegisterSlot,
     },
     // compare
-    CompareInt {
+    CompareBitvec {
         bits: usize,
-        predicate: ComparePredicate,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    CompareFloat {
-        bits: usize,
-        predicate: ComparePredicate,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    CompareVecInt {
-        bits: usize,
-        length: usize,
-        predicate: ComparePredicate,
-        lhs: Value,
-        rhs: Value,
-        result: RegisterSlot,
-    },
-    CompareVecFloat {
-        bits: usize,
-        length: usize,
+        number: NumRepr,
+        length: Option<usize>,
         predicate: ComparePredicate,
         lhs: Value,
         rhs: Value,
@@ -155,59 +94,42 @@ pub enum Instruction {
         result: RegisterSlot,
     },
     // cast
-    CastInt {
+    CastBitvecBits {
         bits_from: usize,
         bits_into: usize,
+        number: NumRepr,
+        length: Option<usize>,
         operand: Value,
         result: RegisterSlot,
     },
-    CastVecInt {
-        bits_from: usize,
-        bits_into: usize,
-        length: usize,
+    CastBitvecRepr {
+        // semantics-changing cast
+        bits: usize,
+        number_from: NumRepr,
+        number_into: NumRepr,
+        length: Option<usize>,
         operand: Value,
         result: RegisterSlot,
     },
-    CastFloat {
-        bits_from: usize,
-        bits_into: usize,
+    CastBitvecInterp {
+        // pure re-interpretation cast without changing content
+        bits: usize,
+        number_from: NumRepr,
+        number_into: NumRepr,
+        length: Option<usize>,
         operand: Value,
         result: RegisterSlot,
     },
-    CastVecFloat {
+    CastBitvecShape {
         bits_from: usize,
         bits_into: usize,
-        length: usize,
+        number: NumRepr,
+        length_from: Option<usize>,
+        length_into: Option<usize>,
         operand: Value,
         result: RegisterSlot,
     },
     CastPtr {
-        operand: Value,
-        result: RegisterSlot,
-    },
-    CastFloatToInt {
-        bits_from: usize,
-        bits_into: usize,
-        operand: Value,
-        result: RegisterSlot,
-    },
-    CastIntToFloat {
-        bits_from: usize,
-        bits_into: usize,
-        operand: Value,
-        result: RegisterSlot,
-    },
-    CastVecFloatToVecInt {
-        bits_from: usize,
-        bits_into: usize,
-        length: usize,
-        operand: Value,
-        result: RegisterSlot,
-    },
-    CastVecIntToVecFloat {
-        bits_from: usize,
-        bits_into: usize,
-        length: usize,
         operand: Value,
         result: RegisterSlot,
     },
@@ -222,13 +144,11 @@ pub enum Instruction {
         result: RegisterSlot,
     },
     // freeze
+    FreezeBitvec {
+        bits: usize,
+        number: NumRepr,
+    },
     FreezePtr,
-    FreezeInt {
-        bits: usize,
-    },
-    FreezeFloat {
-        bits: usize,
-    },
     FreezeNop {
         value: Value,
     },
@@ -238,7 +158,7 @@ pub enum Instruction {
         dst_pointee_type: Type,
         pointer: Value,
         offset: Value,
-        indices: Vec<Value>,
+        indices: Vec<GEPIndex>,
         result: RegisterSlot,
     },
     // selection
@@ -248,16 +168,9 @@ pub enum Instruction {
         else_value: Value,
         result: RegisterSlot,
     },
-    ITEVecInt {
+    ITEVec {
         bits: usize,
-        length: usize,
-        cond: Value,
-        then_value: Value,
-        else_value: Value,
-        result: RegisterSlot,
-    },
-    ITEVecFloat {
-        bits: usize,
+        number: NumRepr,
         length: usize,
         cond: Value,
         then_value: Value,
@@ -265,7 +178,6 @@ pub enum Instruction {
         result: RegisterSlot,
     },
     Phi {
-        ty: Type,
         options: BTreeMap<BlockLabel, Value>,
         result: RegisterSlot,
     },
@@ -278,53 +190,31 @@ pub enum Instruction {
         result: RegisterSlot,
     },
     SetValue {
-        src_ty: Type,
-        dst_ty: Type,
         aggregate: Value,
         value: Value,
         indices: Vec<usize>,
         result: RegisterSlot,
     },
-    GetElementVecInt {
+    GetElement {
         bits: usize,
+        number: NumRepr,
         length: usize,
         vector: Value,
         slot: Value,
         result: RegisterSlot,
     },
-    GetElementVecFloat {
+    SetElement {
         bits: usize,
-        length: usize,
-        vector: Value,
-        slot: Value,
-        result: RegisterSlot,
-    },
-    SetElementVecInt {
-        bits: usize,
+        number: NumRepr,
         length: usize,
         vector: Value,
         value: Value,
         slot: Value,
         result: RegisterSlot,
     },
-    SetElementVecFloat {
+    ShuffleVec {
         bits: usize,
-        length: usize,
-        vector: Value,
-        value: Value,
-        slot: Value,
-        result: RegisterSlot,
-    },
-    ShuffleVecInt {
-        bits: usize,
-        length: usize,
-        lhs: Value,
-        rhs: Value,
-        mask: Vec<i128>,
-        result: RegisterSlot,
-    },
-    ShuffleVecFloat {
-        bits: usize,
+        number: NumRepr,
         length: usize,
         lhs: Value,
         rhs: Value,
@@ -339,13 +229,13 @@ pub enum UnaryOpArith {
 }
 
 pub enum UnaryOperator {
-    Arithmetic(UnaryOpArith, bool),
+    Arithmetic(UnaryOpArith, NumRepr),
 }
 
 impl UnaryOperator {
     pub fn parse(opcode: &str) -> EngineResult<Self> {
         let parsed = match opcode {
-            "fneg" => Self::Arithmetic(UnaryOpArith::Neg, true),
+            "fneg" => Self::Arithmetic(UnaryOpArith::Neg, NumRepr::Float),
             _ => {
                 return Err(EngineError::InvalidAssumption(format!(
                     "unexpected unary opcode: {}",
@@ -380,7 +270,7 @@ pub enum BinaryOpShift {
 }
 
 pub enum BinaryOperator {
-    Arithmetic(BinaryOpArith, bool),
+    Arithmetic(BinaryOpArith, NumRepr),
     Bitwise(BinaryOpBitwise),
     Shift(BinaryOpShift),
 }
@@ -388,16 +278,16 @@ pub enum BinaryOperator {
 impl BinaryOperator {
     pub fn parse(opcode: &str) -> EngineResult<Self> {
         let parsed = match opcode {
-            "add" => Self::Arithmetic(BinaryOpArith::Add, false),
-            "sub" => Self::Arithmetic(BinaryOpArith::Sub, false),
-            "mul" => Self::Arithmetic(BinaryOpArith::Mul, false),
-            "udiv" | "sdiv" => Self::Arithmetic(BinaryOpArith::Div, false),
-            "urem" | "srem" => Self::Arithmetic(BinaryOpArith::Mod, false),
-            "fadd" => Self::Arithmetic(BinaryOpArith::Add, true),
-            "fsub" => Self::Arithmetic(BinaryOpArith::Sub, true),
-            "fmul" => Self::Arithmetic(BinaryOpArith::Mul, true),
-            "fdiv" => Self::Arithmetic(BinaryOpArith::Div, true),
-            "frem" => Self::Arithmetic(BinaryOpArith::Mod, true),
+            "add" => Self::Arithmetic(BinaryOpArith::Add, NumRepr::Int),
+            "sub" => Self::Arithmetic(BinaryOpArith::Sub, NumRepr::Int),
+            "mul" => Self::Arithmetic(BinaryOpArith::Mul, NumRepr::Int),
+            "udiv" | "sdiv" => Self::Arithmetic(BinaryOpArith::Div, NumRepr::Int),
+            "urem" | "srem" => Self::Arithmetic(BinaryOpArith::Mod, NumRepr::Int),
+            "fadd" => Self::Arithmetic(BinaryOpArith::Add, NumRepr::Float),
+            "fsub" => Self::Arithmetic(BinaryOpArith::Sub, NumRepr::Float),
+            "fmul" => Self::Arithmetic(BinaryOpArith::Mul, NumRepr::Float),
+            "fdiv" => Self::Arithmetic(BinaryOpArith::Div, NumRepr::Float),
+            "frem" => Self::Arithmetic(BinaryOpArith::Mod, NumRepr::Float),
             "shl" => Self::Shift(BinaryOpShift::Shl),
             "lshr" | "ashr" => Self::Shift(BinaryOpShift::Shr),
             "and" => Self::Bitwise(BinaryOpBitwise::And),
@@ -425,20 +315,20 @@ pub enum ComparePredicate {
 }
 
 impl ComparePredicate {
-    pub fn parse(opcode: &str) -> EngineResult<(Self, bool)> {
+    pub fn parse(opcode: &str) -> EngineResult<(Self, NumRepr)> {
         let parsed = match opcode {
-            "i_eq" => (Self::EQ, false),
-            "i_ne" => (Self::NE, false),
-            "i_ugt" | "i_sgt" => (Self::GT, false),
-            "i_uge" | "i_sge" => (Self::GE, false),
-            "i_ult" | "i_slt" => (Self::LT, false),
-            "i_ule" | "i_sle" => (Self::LE, false),
-            "f_oeq" | "f_ueq" => (Self::EQ, true),
-            "f_one" | "f_une" => (Self::NE, true),
-            "f_ogt" | "f_ugt" => (Self::GT, true),
-            "f_oge" | "f_uge" => (Self::GE, true),
-            "f_olt" | "f_ult" => (Self::LT, true),
-            "f_ole" | "f_ule" => (Self::LE, true),
+            "i_eq" => (Self::EQ, NumRepr::Int),
+            "i_ne" => (Self::NE, NumRepr::Int),
+            "i_ugt" | "i_sgt" => (Self::GT, NumRepr::Int),
+            "i_uge" | "i_sge" => (Self::GE, NumRepr::Int),
+            "i_ult" | "i_slt" => (Self::LT, NumRepr::Int),
+            "i_ule" | "i_sle" => (Self::LE, NumRepr::Int),
+            "f_oeq" | "f_ueq" => (Self::EQ, NumRepr::Float),
+            "f_one" | "f_une" => (Self::NE, NumRepr::Float),
+            "f_ogt" | "f_ugt" => (Self::GT, NumRepr::Float),
+            "f_oge" | "f_uge" => (Self::GE, NumRepr::Float),
+            "f_olt" | "f_ult" => (Self::LT, NumRepr::Float),
+            "f_ole" | "f_ule" => (Self::LE, NumRepr::Float),
             "f_f" | "f_ord" | "f_uno" | "f_t" => {
                 return Err(EngineError::NotSupportedYet(
                     Unsupported::FloatingPointOrdering,
@@ -453,6 +343,17 @@ impl ComparePredicate {
         };
         Ok(parsed)
     }
+}
+
+/// Represents an index into an aggregate in the GEP instruction
+#[derive(Eq, PartialEq)]
+pub enum GEPIndex {
+    /// element index in array
+    Array(Value),
+    /// field index in struct
+    Struct(usize),
+    /// slot index in vector
+    Vector(Value),
 }
 
 /// An naive translation of an LLVM terminator instruction
@@ -564,13 +465,83 @@ impl<'a> Context<'a> {
         Ok(converted)
     }
 
+    /// convert a value in either int1
+    fn parse_value_int1(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
+        match val.get_type() {
+            adapter::typing::Type::Int { width: 1 } => self.parse_value(
+                val,
+                &Type::Bitvec {
+                    bits: 1,
+                    number: NumRepr::Int,
+                    length: None,
+                },
+            ),
+            ty => Err(EngineError::InvalidAssumption(format!(
+                "expect int1, found {}",
+                self.typing.convert(ty)?
+            ))),
+        }
+    }
+
+    /// convert a value in either int32
+    fn parse_value_int32(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
+        match val.get_type() {
+            adapter::typing::Type::Int { width: 32 } => self.parse_value(
+                val,
+                &Type::Bitvec {
+                    bits: 32,
+                    number: NumRepr::Int,
+                    length: None,
+                },
+            ),
+            ty => Err(EngineError::InvalidAssumption(format!(
+                "expect int32, found {}",
+                self.typing.convert(ty)?
+            ))),
+        }
+    }
+
+    /// convert a value in either int32 or int64
+    fn parse_value_int64(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
+        match val.get_type() {
+            adapter::typing::Type::Int { width: 64 } => self.parse_value(
+                val,
+                &Type::Bitvec {
+                    bits: 64,
+                    number: NumRepr::Int,
+                    length: None,
+                },
+            ),
+            ty => Err(EngineError::InvalidAssumption(format!(
+                "expect int64, found {}",
+                self.typing.convert(ty)?
+            ))),
+        }
+    }
+
     /// convert a value in either int32 or int64
     fn parse_value_int32_or_int64(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
         match val.get_type() {
-            adapter::typing::Type::Int { width: 32 } => {
-                self.parse_value(val, &Type::Int { bits: 32 })
-            }
-            _ => self.parse_value(val, &Type::Int { bits: 64 }),
+            adapter::typing::Type::Int { width: 32 } => self.parse_value(
+                val,
+                &Type::Bitvec {
+                    bits: 32,
+                    number: NumRepr::Int,
+                    length: None,
+                },
+            ),
+            adapter::typing::Type::Int { width: 64 } => self.parse_value(
+                val,
+                &Type::Bitvec {
+                    bits: 64,
+                    number: NumRepr::Int,
+                    length: None,
+                },
+            ),
+            ty => Err(EngineError::InvalidAssumption(format!(
+                "expect int32 or int64, found {}",
+                self.typing.convert(ty)?
+            ))),
         }
     }
 
@@ -610,7 +581,7 @@ impl<'a> Context<'a> {
                 let base_type = self.typing.convert(allocated_type)?;
                 let size_new = match size.as_ref() {
                     None => None,
-                    Some(val) => Some(self.parse_value(val, &Type::Int { bits: 64 })?),
+                    Some(val) => Some(self.parse_value_int64(val)?),
                 };
                 Instruction::Alloca {
                     base_type,
@@ -800,30 +771,25 @@ impl<'a> Context<'a> {
                 let inst_ty = self.typing.convert(ty)?;
                 let operand_new = self.parse_value(operand, &inst_ty)?;
                 match UnaryOperator::parse(opcode)? {
-                    UnaryOperator::Arithmetic(operator, is_float_op) => {
-                        match (inst_ty, is_float_op) {
-                            (Type::Float { bits }, true) => Instruction::UnaryArithFloat {
-                                bits,
-                                opcode: operator,
-                                operand: operand_new,
-                                result: index.into(),
-                            },
-                            (Type::VecFloat { bits, length }, true) => {
-                                Instruction::UnaryArithVecFloat {
-                                    bits,
-                                    length,
-                                    opcode: operator,
-                                    operand: operand_new,
-                                    result: index.into(),
-                                }
-                            }
-                            _ => {
-                                return Err(EngineError::InvalidAssumption(
-                                    "unary operator has invalid instruction type".into(),
-                                ));
-                            }
+                    UnaryOperator::Arithmetic(operator, repr) => match inst_ty {
+                        Type::Bitvec {
+                            bits,
+                            number,
+                            length,
+                        } if number == repr => Instruction::UnaryArith {
+                            bits,
+                            number,
+                            length,
+                            opcode: operator,
+                            operand: operand_new,
+                            result: index.into(),
+                        },
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "unary operator has invalid instruction type".into(),
+                            ));
                         }
-                    }
+                    },
                 }
             }
             // binary
@@ -832,58 +798,32 @@ impl<'a> Context<'a> {
                 let lhs_new = self.parse_value(lhs, &inst_ty)?;
                 let rhs_new = self.parse_value(rhs, &inst_ty)?;
                 match BinaryOperator::parse(opcode)? {
-                    BinaryOperator::Arithmetic(operator, is_float_op) => {
-                        match (inst_ty, is_float_op) {
-                            (Type::Int { bits }, false) => Instruction::BinaryArithInt {
-                                bits,
-                                opcode: operator,
-                                lhs: lhs_new,
-                                rhs: rhs_new,
-                                result: index.into(),
-                            },
-                            (Type::Float { bits }, true) => Instruction::BinaryArithFloat {
-                                bits,
-                                opcode: operator,
-                                lhs: lhs_new,
-                                rhs: rhs_new,
-                                result: index.into(),
-                            },
-                            (Type::VecInt { bits, length }, false) => {
-                                Instruction::BinaryArithVecInt {
-                                    bits,
-                                    length,
-                                    opcode: operator,
-                                    lhs: lhs_new,
-                                    rhs: rhs_new,
-                                    result: index.into(),
-                                }
-                            }
-                            (Type::VecFloat { bits, length }, true) => {
-                                Instruction::BinaryArithVecFloat {
-                                    bits,
-                                    length,
-                                    opcode: operator,
-                                    lhs: lhs_new,
-                                    rhs: rhs_new,
-                                    result: index.into(),
-                                }
-                            }
-                            _ => {
-                                return Err(EngineError::InvalidAssumption(
-                                    "value type and arithmetic operation type mismatch".into(),
-                                ));
-                            }
-                        }
-                    }
-                    BinaryOperator::Bitwise(operator) => match inst_ty {
-                        Type::Int { bits } => Instruction::BinaryBitwiseInt {
+                    BinaryOperator::Arithmetic(operator, repr) => match inst_ty {
+                        Type::Bitvec {
                             bits,
+                            number,
+                            length,
+                        } if number == repr => Instruction::BinaryArith {
+                            bits,
+                            number,
+                            length,
                             opcode: operator,
                             lhs: lhs_new,
                             rhs: rhs_new,
                             result: index.into(),
                         },
-                        Type::VecInt { bits, length } => Instruction::BinaryBitwiseVecInt {
+                        _ => {
+                            return Err(EngineError::InvalidAssumption(
+                                "value type and arithmetic operation type mismatch".into(),
+                            ));
+                        }
+                    },
+                    BinaryOperator::Bitwise(operator) => match inst_ty {
+                        Type::Bitvec {
+                            bits,
+                            number: NumRepr::Int,
+                            length,
+                        } => Instruction::BinaryBitwise {
                             bits,
                             length,
                             opcode: operator,
@@ -898,14 +838,11 @@ impl<'a> Context<'a> {
                         }
                     },
                     BinaryOperator::Shift(operator) => match inst_ty {
-                        Type::Int { bits } => Instruction::BinaryShiftInt {
+                        Type::Bitvec {
                             bits,
-                            opcode: operator,
-                            lhs: lhs_new,
-                            rhs: rhs_new,
-                            result: index.into(),
-                        },
-                        Type::VecInt { bits, length } => Instruction::BinaryShiftVecInt {
+                            number: NumRepr::Int,
+                            length,
+                        } => Instruction::BinaryShift {
                             bits,
                             length,
                             opcode: operator,
@@ -934,61 +871,37 @@ impl<'a> Context<'a> {
                 let lhs_new = self.parse_value(lhs, &operand_ty)?;
                 let rhs_new = self.parse_value(rhs, &operand_ty)?;
 
-                let (predicate_parsed, is_float_op) = ComparePredicate::parse(predicate)?;
-                match (inst_ty, operand_ty, is_float_op) {
-                    (Type::Int { bits: 1 }, Type::Int { bits }, false) => Instruction::CompareInt {
-                        bits,
-                        predicate: predicate_parsed,
-                        lhs: lhs_new,
-                        rhs: rhs_new,
-                        result: index.into(),
-                    },
-                    (Type::Int { bits: 1 }, Type::Float { bits }, true) => {
-                        Instruction::CompareFloat {
-                            bits,
-                            predicate: predicate_parsed,
-                            lhs: lhs_new,
-                            rhs: rhs_new,
-                            result: index.into(),
-                        }
-                    }
-                    (Type::Int { bits: 1 }, Type::Pointer, false) => Instruction::ComparePtr {
-                        predicate: predicate_parsed,
-                        lhs: lhs_new,
-                        rhs: rhs_new,
-                        result: index.into(),
-                    },
+                let (predicate_parsed, repr) = ComparePredicate::parse(predicate)?;
+                match (inst_ty, operand_ty) {
                     (
-                        Type::VecInt {
+                        Type::Bitvec {
                             bits: 1,
-                            length: length_output,
+                            number: NumRepr::Int,
+                            length: length_inst,
                         },
-                        Type::VecInt {
+                        Type::Bitvec {
                             bits,
-                            length: length_inputs,
+                            number,
+                            length,
                         },
-                        false,
-                    ) if length_inputs == length_output => Instruction::CompareVecInt {
+                    ) if number == repr && length == length_inst => Instruction::CompareBitvec {
                         bits,
-                        length: length_output,
+                        number,
+                        length,
                         predicate: predicate_parsed,
                         lhs: lhs_new,
                         rhs: rhs_new,
                         result: index.into(),
                     },
+
                     (
-                        Type::VecInt {
+                        Type::Bitvec {
                             bits: 1,
-                            length: length_output,
+                            number: NumRepr::Int,
+                            length: Option::None,
                         },
-                        Type::VecFloat {
-                            bits,
-                            length: length_inputs,
-                        },
-                        true,
-                    ) if length_inputs == length_output => Instruction::CompareVecFloat {
-                        bits,
-                        length: length_output,
+                        Type::Pointer,
+                    ) if matches!(repr, NumRepr::Int) => Instruction::ComparePtr {
                         predicate: predicate_parsed,
                         lhs: lhs_new,
                         rhs: rhs_new,
@@ -1022,30 +935,27 @@ impl<'a> Context<'a> {
                 let operand_new = self.parse_value(operand, &src_ty_new)?;
                 match opcode.as_str() {
                     "trunc" | "zext" | "sext" => match (src_ty_new, dst_ty_new) {
-                        (Type::Int { bits: bits_from }, Type::Int { bits: bits_into }) => {
-                            Instruction::CastInt {
+                        (
+                            Type::Bitvec {
+                                bits: bits_from,
+                                number: NumRepr::Int,
+                                length: length_from,
+                            },
+                            Type::Bitvec {
+                                bits: bits_into,
+                                number: NumRepr::Int,
+                                length,
+                            },
+                        ) if length_from == length && bits_from != bits_into => {
+                            Instruction::CastBitvecBits {
                                 bits_from,
                                 bits_into,
+                                number: NumRepr::Int,
+                                length,
                                 operand: operand_new,
                                 result: index.into(),
                             }
                         }
-                        (
-                            Type::VecInt {
-                                bits: bits_from,
-                                length: length_from,
-                            },
-                            Type::VecInt {
-                                bits: bits_into,
-                                length: length_into,
-                            },
-                        ) if length_from == length_into => Instruction::CastVecInt {
-                            bits_from,
-                            bits_into,
-                            length: length_from,
-                            operand: operand_new,
-                            result: index.into(),
-                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect int type for int cast".into(),
@@ -1053,30 +963,27 @@ impl<'a> Context<'a> {
                         }
                     },
                     "fp_trunc" | "fp_ext" => match (src_ty_new, dst_ty_new) {
-                        (Type::Float { bits: bits_from }, Type::Float { bits: bits_into }) => {
-                            Instruction::CastFloat {
+                        (
+                            Type::Bitvec {
+                                bits: bits_from,
+                                number: NumRepr::Float,
+                                length: length_from,
+                            },
+                            Type::Bitvec {
+                                bits: bits_into,
+                                number: NumRepr::Float,
+                                length,
+                            },
+                        ) if length_from == length && bits_from != bits_into => {
+                            Instruction::CastBitvecBits {
                                 bits_from,
                                 bits_into,
+                                number: NumRepr::Float,
+                                length,
                                 operand: operand_new,
                                 result: index.into(),
                             }
                         }
-                        (
-                            Type::VecFloat {
-                                bits: bits_from,
-                                length: length_from,
-                            },
-                            Type::VecFloat {
-                                bits: bits_into,
-                                length: length_into,
-                            },
-                        ) if length_from == length_into => Instruction::CastVecFloat {
-                            bits_from,
-                            bits_into,
-                            length: length_from,
-                            operand: operand_new,
-                            result: index.into(),
-                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect float type for float cast".into(),
@@ -1093,88 +1000,63 @@ impl<'a> Context<'a> {
                             // as bitcasts, such as:
                             // - %0 = bitcast float %value to i32
                             // - %0 = bitcast double %value to i64
-                            (Type::Float { bits: bits_from }, Type::Int { bits: bits_into })
-                                if bits_from == bits_into =>
-                            {
-                                Instruction::CastFloatToInt {
-                                    bits_from,
-                                    bits_into,
-                                    operand: operand_new,
-                                    result: index.into(),
-                                }
-                            }
-                            (Type::Int { bits: bits_from }, Type::Float { bits: bits_into })
-                                if bits_from == bits_into =>
-                            {
-                                Instruction::CastIntToFloat {
-                                    bits_from,
-                                    bits_into,
-                                    operand: operand_new,
-                                    result: index.into(),
-                                }
-                            }
+                            // seems a bit weird as this does not change the content
                             (
-                                Type::VecFloat {
+                                Type::Bitvec {
                                     bits: bits_from,
+                                    number: number_from,
                                     length: length_from,
                                 },
-                                Type::VecInt {
-                                    bits: bits_into,
-                                    length: length_into,
+                                Type::Bitvec {
+                                    bits,
+                                    number: number_into,
+                                    length,
                                 },
-                            ) if bits_from == bits_into && length_from == length_into => {
-                                Instruction::CastVecFloatToVecInt {
-                                    bits_from,
-                                    bits_into,
-                                    length: length_into,
+                            ) if bits_from == bits
+                                && length_from == length
+                                && number_from != number_into =>
+                            {
+                                Instruction::CastBitvecInterp {
+                                    bits,
+                                    number_from,
+                                    number_into,
+                                    length,
                                     operand: operand_new,
                                     result: index.into(),
                                 }
                             }
+                            // shape cast
                             (
-                                Type::VecInt {
+                                Type::Bitvec {
                                     bits: bits_from,
+                                    number: number_from,
                                     length: length_from,
                                 },
-                                Type::VecFloat {
+                                Type::Bitvec {
                                     bits: bits_into,
+                                    number,
                                     length: length_into,
                                 },
-                            ) if bits_from == bits_into && length_from == length_into => {
-                                Instruction::CastVecIntToVecFloat {
+                            ) if number_from == number
+                                && bits_from != bits_into
+                                && length_from != length_into
+                                && bits_from * length_from.unwrap_or(1)
+                                    == bits_into * length_into.unwrap_or(1) =>
+                            {
+                                Instruction::CastBitvecShape {
                                     bits_from,
                                     bits_into,
-                                    length: length_into,
+                                    number,
+                                    length_from,
+                                    length_into,
                                     operand: operand_new,
                                     result: index.into(),
                                 }
                             }
-                            // other cases
-                            (t_from, t_into) => {
-                                let total_bits_from = match t_from {
-                                    Type::Int { bits } | Type::Float { bits } => Some(bits),
-                                    Type::VecInt { bits, length }
-                                    | Type::VecFloat { bits, length } => Some(bits * length),
-                                    _ => None,
-                                };
-                                let total_bits_into = match t_into {
-                                    Type::Int { bits } | Type::Float { bits } => Some(bits),
-                                    Type::VecInt { bits, length }
-                                    | Type::VecFloat { bits, length } => Some(bits * length),
-                                    _ => None,
-                                };
-                                match (total_bits_from, total_bits_into) {
-                                    (Some(b1), Some(b2)) if b1 == b2 => {
-                                        return Err(EngineError::NotSupportedYet(
-                                            Unsupported::VectorBitcast,
-                                        ));
-                                    }
-                                    _ => {
-                                        return Err(EngineError::InvalidAssumption(
-                                            "expect ptr type for bitcast".into(),
-                                        ));
-                                    }
-                                }
+                            _ => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "expect ptr or bits-preserving type for bitcast".into(),
+                                ));
                             }
                         }
                     }
@@ -1184,30 +1066,27 @@ impl<'a> Context<'a> {
                         ));
                     }
                     "fp_to_ui" | "fp_to_si" => match (src_ty_new, dst_ty_new) {
-                        (Type::Float { bits: bits_from }, Type::Int { bits: bits_into }) => {
-                            Instruction::CastFloatToInt {
-                                bits_from,
-                                bits_into,
+                        (
+                            Type::Bitvec {
+                                bits: bits_from,
+                                number: NumRepr::Float,
+                                length: length_from,
+                            },
+                            Type::Bitvec {
+                                bits,
+                                number: NumRepr::Int,
+                                length,
+                            },
+                        ) if bits_from == bits && length_from == length => {
+                            Instruction::CastBitvecRepr {
+                                bits,
+                                number_from: NumRepr::Float,
+                                number_into: NumRepr::Int,
+                                length,
                                 operand: operand_new,
                                 result: index.into(),
                             }
                         }
-                        (
-                            Type::VecFloat {
-                                bits: bits_from,
-                                length: length_from,
-                            },
-                            Type::VecInt {
-                                bits: bits_into,
-                                length: length_into,
-                            },
-                        ) if length_from == length_into => Instruction::CastVecFloatToVecInt {
-                            bits_from,
-                            bits_into,
-                            length: length_into,
-                            operand: operand_new,
-                            result: index.into(),
-                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect float<> and int<> for fp_to_ui/si cast".into(),
@@ -1215,30 +1094,27 @@ impl<'a> Context<'a> {
                         }
                     },
                     "ui_to_fp" | "si_to_fp" => match (src_ty_new, dst_ty_new) {
-                        (Type::Int { bits: bits_from }, Type::Float { bits: bits_into }) => {
-                            Instruction::CastIntToFloat {
-                                bits_from,
-                                bits_into,
+                        (
+                            Type::Bitvec {
+                                bits: bits_from,
+                                number: NumRepr::Int,
+                                length: length_from,
+                            },
+                            Type::Bitvec {
+                                bits,
+                                number: NumRepr::Float,
+                                length,
+                            },
+                        ) if bits_from == bits && length_from == length => {
+                            Instruction::CastBitvecRepr {
+                                bits,
+                                number_from: NumRepr::Float,
+                                number_into: NumRepr::Int,
+                                length,
                                 operand: operand_new,
                                 result: index.into(),
                             }
                         }
-                        (
-                            Type::VecInt {
-                                bits: bits_from,
-                                length: length_from,
-                            },
-                            Type::VecFloat {
-                                bits: bits_into,
-                                length: length_into,
-                            },
-                        ) if length_from == length_into => Instruction::CastVecIntToVecFloat {
-                            bits_from,
-                            bits_into,
-                            length: length_into,
-                            operand: operand_new,
-                            result: index.into(),
-                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect int<> and float<> for ui/si_to_fo cast".into(),
@@ -1246,7 +1122,14 @@ impl<'a> Context<'a> {
                         }
                     },
                     "ptr_to_int" => match (src_ty_new, dst_ty_new) {
-                        (Type::Pointer, Type::Int { bits: bits_into }) => match src_address_space {
+                        (
+                            Type::Pointer,
+                            Type::Bitvec {
+                                bits: bits_into,
+                                number: NumRepr::Int,
+                                length: Option::None,
+                            },
+                        ) => match src_address_space {
                             None => {
                                 return Err(EngineError::InvalidAssumption(
                                     "expect (src address_space) for ptr_to_int cast".into(),
@@ -1270,7 +1153,14 @@ impl<'a> Context<'a> {
                         }
                     },
                     "int_to_ptr" => match (src_ty_new, dst_ty_new) {
-                        (Type::Int { bits: bits_from }, Type::Pointer) => match dst_address_space {
+                        (
+                            Type::Bitvec {
+                                bits: bits_from,
+                                number: NumRepr::Int,
+                                length: Option::None,
+                            },
+                            Type::Pointer,
+                        ) => match dst_address_space {
                             None => {
                                 return Err(EngineError::InvalidAssumption(
                                     "expect (dst address_space) for int_to_ptr cast".into(),
@@ -1306,10 +1196,20 @@ impl<'a> Context<'a> {
                 let inst_ty = self.typing.convert(ty)?;
                 let operand_new = self.parse_value(operand, &inst_ty)?;
                 match operand_new {
-                    Value::Constant(Constant::UndefInt { bits }) => Instruction::FreezeInt { bits },
-                    Value::Constant(Constant::UndefFloat { bits }) => {
-                        Instruction::FreezeFloat { bits }
-                    }
+                    Value::Constant(Constant::NumOne {
+                        bits,
+                        value: NumValue::IntUndef,
+                    }) => Instruction::FreezeBitvec {
+                        bits,
+                        number: NumRepr::Int,
+                    },
+                    Value::Constant(Constant::NumOne {
+                        bits,
+                        value: NumValue::FloatUndef,
+                    }) => Instruction::FreezeBitvec {
+                        bits,
+                        number: NumRepr::Float,
+                    },
                     Value::Constant(Constant::UndefPointer) => Instruction::FreezePtr,
                     // TODO(mengxu): freeze instruction should only be possible on undef,
                     // and yet, we still see freeze being applied to instruction values, e.g.,
@@ -1362,11 +1262,11 @@ impl<'a> Context<'a> {
                 for idx in indices.iter().skip(1) {
                     let next_cur_ty = match cur_ty {
                         Type::Struct { name: _, fields } => {
-                            let idx_new = self.parse_value(idx, &Type::Int { bits: 32 })?;
-                            let field_offset = match &idx_new {
-                                Value::Constant(Constant::Int {
+                            let idx_new = self.parse_value_int32(idx)?;
+                            let field_offset = match idx_new {
+                                Value::Constant(Constant::NumOne {
                                     bits: _,
-                                    value: field_offset,
+                                    value: NumValue::Int(field_offset),
                                 }) => match field_offset.to_usize() {
                                     None => {
                                         return Err(EngineError::InvariantViolation(
@@ -1386,24 +1286,26 @@ impl<'a> Context<'a> {
                                     "field number out of range".into(),
                                 ));
                             }
-                            indices_new.push(idx_new);
+                            indices_new.push(GEPIndex::Struct(field_offset));
                             fields.get(field_offset).unwrap()
                         }
                         Type::Array { element, length: _ } => {
                             let idx_new = self.parse_value_int32_or_int64(idx)?;
-                            indices_new.push(idx_new);
+                            indices_new.push(GEPIndex::Array(idx_new));
                             element.as_ref()
                         }
-                        Type::VecInt { bits, length: _ } => {
+                        Type::Bitvec {
+                            bits,
+                            number,
+                            length: Some(_),
+                        } => {
                             let idx_new = self.parse_value_int32_or_int64(idx)?;
-                            indices_new.push(idx_new);
-                            temporary_type_holder = Type::Int { bits: *bits };
-                            &temporary_type_holder
-                        }
-                        Type::VecFloat { bits, length: _ } => {
-                            let idx_new = self.parse_value_int32_or_int64(idx)?;
-                            indices_new.push(idx_new);
-                            temporary_type_holder = Type::Float { bits: *bits };
+                            indices_new.push(GEPIndex::Vector(idx_new));
+                            temporary_type_holder = Type::Bitvec {
+                                bits: *bits,
+                                number: *number,
+                                length: None,
+                            };
                             &temporary_type_holder
                         }
                         _ => {
@@ -1445,35 +1347,34 @@ impl<'a> Context<'a> {
                 let else_value_new = self.parse_value(else_value, &inst_ty)?;
 
                 match (cond_ty, inst_ty) {
-                    (Type::Int { bits: 1 }, _) => Instruction::ITEOne {
+                    (
+                        Type::Bitvec {
+                            bits: 1,
+                            number: NumRepr::Int,
+                            length: Option::None,
+                        },
+                        _,
+                    ) => Instruction::ITEOne {
                         cond: cond_new,
                         then_value: then_value_new,
                         else_value: else_value_new,
                         result: index.into(),
                     },
                     (
-                        Type::VecInt { bits: 1, length },
-                        Type::VecInt {
-                            bits,
-                            length: length_vec,
+                        Type::Bitvec {
+                            bits: 1,
+                            number: NumRepr::Int,
+                            length: Some(len),
                         },
-                    ) if length_vec == length => Instruction::ITEVecInt {
-                        bits,
-                        length,
-                        cond: cond_new,
-                        then_value: then_value_new,
-                        else_value: else_value_new,
-                        result: index.into(),
-                    },
-                    (
-                        Type::VecInt { bits: 1, length },
-                        Type::VecFloat {
+                        Type::Bitvec {
                             bits,
-                            length: length_vec,
+                            number,
+                            length: Some(len_value),
                         },
-                    ) if length_vec == length => Instruction::ITEVecFloat {
+                    ) if len_value == len => Instruction::ITEVec {
                         bits,
-                        length,
+                        number,
+                        length: len,
                         cond: cond_new,
                         then_value: then_value_new,
                         else_value: else_value_new,
@@ -1511,7 +1412,6 @@ impl<'a> Context<'a> {
                     options_new.insert(label_new, value_new);
                 }
                 Instruction::Phi {
-                    ty: inst_ty,
                     options: options_new,
                     result: index.into(),
                 }
@@ -1601,13 +1501,10 @@ impl<'a> Context<'a> {
                     };
                     cur_ty = next_cur_ty;
                 }
-                let dst_ty = cur_ty.clone();
 
                 let aggregate_new = self.parse_value(aggregate, &src_ty)?;
-                let value_new = self.parse_value(value, &dst_ty)?;
+                let value_new = self.parse_value(value, cur_ty)?;
                 Instruction::SetValue {
-                    src_ty,
-                    dst_ty,
                     aggregate: aggregate_new,
                     value: value_new,
                     indices: indices.clone(),
@@ -1624,23 +1521,22 @@ impl<'a> Context<'a> {
                 let vector_new = self.parse_value(vector, &src_ty)?;
                 let slot_new = self.parse_value_int32_or_int64(slot)?;
                 match (src_ty, dst_ty) {
-                    (Type::VecInt { bits, length }, Type::Int { bits: bits_element })
-                        if bits == bits_element =>
-                    {
-                        Instruction::GetElementVecInt {
+                    (
+                        Type::Bitvec {
+                            bits: bits_vector,
+                            number: number_vector,
+                            length: Some(len),
+                        },
+                        Type::Bitvec {
                             bits,
-                            length,
-                            vector: vector_new,
-                            slot: slot_new,
-                            result: index.into(),
-                        }
-                    }
-                    (Type::VecFloat { bits, length }, Type::Float { bits: bits_element })
-                        if bits == bits_element =>
-                    {
-                        Instruction::GetElementVecFloat {
+                            number,
+                            length: Option::None,
+                        },
+                    ) if bits_vector == bits && number_vector == number => {
+                        Instruction::GetElement {
                             bits,
-                            length,
+                            number,
+                            length: len,
                             vector: vector_new,
                             slot: slot_new,
                             result: index.into(),
@@ -1663,22 +1559,23 @@ impl<'a> Context<'a> {
                 let slot_new = self.parse_value_int32_or_int64(slot)?;
 
                 match src_ty {
-                    Type::VecInt { bits, length } => {
-                        let value_new = self.parse_value(value, &Type::Int { bits })?;
-                        Instruction::SetElementVecInt {
+                    Type::Bitvec {
+                        bits,
+                        number,
+                        length: Some(len),
+                    } => {
+                        let value_new = self.parse_value(
+                            value,
+                            &Type::Bitvec {
+                                bits,
+                                number,
+                                length: None,
+                            },
+                        )?;
+                        Instruction::SetElement {
                             bits,
-                            length,
-                            vector: vector_new,
-                            slot: slot_new,
-                            value: value_new,
-                            result: index.into(),
-                        }
-                    }
-                    Type::VecFloat { bits, length } => {
-                        let value_new = self.parse_value(value, &Type::Float { bits })?;
-                        Instruction::SetElementVecFloat {
-                            bits,
-                            length,
+                            number,
+                            length: len,
                             vector: vector_new,
                             slot: slot_new,
                             value: value_new,
@@ -1700,53 +1597,33 @@ impl<'a> Context<'a> {
                 let lhs_new = self.parse_value(lhs, &lhs_ty)?;
                 let rhs_new = self.parse_value(rhs, &rhs_ty)?;
 
-                match (&lhs_ty, &rhs_ty, dst_ty) {
+                match (lhs_ty, rhs_ty, dst_ty) {
                     (
-                        Type::VecInt {
+                        Type::Bitvec {
                             bits: bits_lhs,
-                            length: _,
+                            number: number_lhs,
+                            length: Some(_),
                         },
-                        Type::VecInt {
+                        Type::Bitvec {
                             bits: bits_rhs,
-                            length: _,
+                            number: number_rhs,
+                            length: Some(_),
                         },
-                        Type::VecInt { bits, length },
-                    ) => {
-                        if *bits_lhs != bits || *bits_rhs != bits {
-                            return Err(EngineError::InvalidAssumption(
-                                "ShuffleVector 3-way type mismatch".into(),
-                            ));
-                        }
-                        // TODO: check relation with mask
-                        Instruction::ShuffleVecInt {
+                        Type::Bitvec {
                             bits,
-                            length,
-                            lhs: lhs_new,
-                            rhs: rhs_new,
-                            mask: mask.clone(),
-                            result: index.into(),
-                        }
-                    }
-                    (
-                        Type::VecFloat {
-                            bits: bits_lhs,
-                            length: _,
+                            number,
+                            length: Some(len),
                         },
-                        Type::VecFloat {
-                            bits: bits_rhs,
-                            length: _,
-                        },
-                        Type::VecFloat { bits, length },
-                    ) => {
-                        if *bits_lhs != bits || *bits_rhs != bits {
-                            return Err(EngineError::InvalidAssumption(
-                                "ShuffleVector 3-way type mismatch".into(),
-                            ));
-                        }
+                    ) if bits_lhs == bits
+                        && bits_rhs == bits
+                        && number_lhs == number
+                        && number_rhs == number =>
+                    {
                         // TODO: check relation with mask
-                        Instruction::ShuffleVecFloat {
+                        Instruction::ShuffleVec {
                             bits,
-                            length,
+                            number,
+                            length: len,
                             lhs: lhs_new,
                             rhs: rhs_new,
                             mask: mask.clone(),
@@ -1828,7 +1705,7 @@ impl<'a> Context<'a> {
                     }
                 }
                 Some(val) => {
-                    let cond_new = self.parse_value(val, &Type::Int { bits: 1 })?;
+                    let cond_new = self.parse_value_int1(val)?;
                     if targets.len() != 2 {
                         return Err(EngineError::InvalidAssumption(
                             "conditional branch should have exactly two targets".into(),
@@ -1861,7 +1738,14 @@ impl<'a> Context<'a> {
                 default,
             } => {
                 let cond_ty_new = self.typing.convert(cond_ty)?;
-                if !matches!(cond_ty_new, Type::Int { .. }) {
+                if !matches!(
+                    cond_ty_new,
+                    Type::Bitvec {
+                        bits: _,
+                        number: NumRepr::Int,
+                        length: Option::None
+                    }
+                ) {
                     return Err(EngineError::InvalidAssumption(
                         "switch condition must be int".into(),
                     ));
@@ -1879,9 +1763,9 @@ impl<'a> Context<'a> {
                     let case_val =
                         Constant::convert(&case.value, &cond_ty_new, self.typing, self.symbols)?;
                     let label_val = match case_val {
-                        Constant::Int {
+                        Constant::NumOne {
                             bits: _,
-                            value: label_val,
+                            value: NumValue::Int(label_val),
                         } => match label_val.to_u64() {
                             None => {
                                 return Err(EngineError::InvalidAssumption(

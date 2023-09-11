@@ -6,23 +6,31 @@ use crate::ir::adapter;
 use crate::ir::adapter::typing::UserDefinedStruct;
 use crate::ir::bridge::shared::Identifier;
 
+/// The underlying representation of the bitvec
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+pub enum NumRepr {
+    Int,
+    Float,
+}
+
+impl Display for NumRepr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Int => write!(f, "int"),
+            Self::Float => write!(f, "float"),
+        }
+    }
+}
+
 /// A naive translation from an LLVM type
 #[derive(Eq, PartialEq)]
 enum TypeToken {
     Void,
-    Int {
+    Bitvec {
         width: usize,
-    },
-    Float {
-        width: usize,
-    },
-    VecInt {
-        width: usize,
-        length: usize,
-    },
-    VecFloat {
-        width: usize,
-        length: usize,
+        number: NumRepr,
+        // set if vectorized
+        length: Option<usize>,
     },
     Array {
         element: Box<TypeToken>,
@@ -49,10 +57,18 @@ impl TypeToken {
 
         let converted = match ty {
             AdaptedType::Void => Self::Void,
-            AdaptedType::Int { width } => Self::Int { width: *width },
+            AdaptedType::Int { width } => Self::Bitvec {
+                width: *width,
+                number: NumRepr::Int,
+                length: None,
+            },
             AdaptedType::Float { width, name: _ } => {
-                // TODO: differentiate the name
-                Self::Float { width: *width }
+                // TODO: differentiate the name of float type
+                Self::Bitvec {
+                    width: *width,
+                    number: NumRepr::Float,
+                    length: None,
+                }
             }
             AdaptedType::Vector {
                 element,
@@ -62,25 +78,25 @@ impl TypeToken {
                 if !fixed {
                     return Err(EngineError::NotSupportedYet(Unsupported::ScalableVector));
                 }
-
-                let element_new = Self::parse(element.as_ref(), user_defined_structs)?;
-                match element_new {
-                    TypeToken::Int { width } => Self::VecInt {
+                match Self::parse(element.as_ref(), user_defined_structs)? {
+                    TypeToken::Bitvec {
                         width,
-                        length: *length,
-                    },
-                    TypeToken::Float { width } => Self::VecFloat {
+                        number,
+                        length: Option::None,
+                    } => Self::Bitvec {
                         width,
-                        length: *length,
+                        number,
+                        length: Some(*length),
                     },
                     TypeToken::Pointer => {
                         // TODO: a vector of pointers seems counter-intuitive
                         return Err(EngineError::NotSupportedYet(Unsupported::VectorOfPointers));
                     }
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "only int, float, and pointer type can be vector element".into(),
-                        ));
+                    token => {
+                        return Err(EngineError::InvalidAssumption(format!(
+                            "type cannot be vector element: {}",
+                            token
+                        )));
                     }
                 }
             }
@@ -103,7 +119,7 @@ impl TypeToken {
                 let name_new = name.as_ref().map(|ident| ident.into());
 
                 // sanity check
-                match name_new.as_ref() {
+                match &name_new {
                     None => (),
                     Some(ident) => match user_defined_structs.get(ident) {
                         None => {
@@ -182,17 +198,67 @@ impl TypeToken {
     }
 }
 
+impl Display for TypeToken {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Void => write!(f, "void"),
+            Self::Bitvec {
+                width,
+                number,
+                length,
+            } => {
+                write!(
+                    f,
+                    "{}{}{}",
+                    number,
+                    width,
+                    length
+                        .as_ref()
+                        .map_or_else(|| "".to_string(), |l| format!("<{}>", l))
+                )
+            }
+            Self::Array { element, length } => {
+                write!(f, "{}[{}]", element, length)
+            }
+            Self::Struct { name, fields } => {
+                let repr: Vec<_> = fields.iter().map(|e| e.to_string()).collect();
+                write!(
+                    f,
+                    "{}{{{}}}",
+                    name.as_ref()
+                        .map_or_else(|| "<anonymous>".to_string(), |n| n.to_string()),
+                    repr.join(",")
+                )
+            }
+            Self::Function {
+                params,
+                variadic,
+                ret,
+            } => {
+                let repr: Vec<_> = params.iter().map(|e| e.to_string()).collect();
+                write!(
+                    f,
+                    "({}{})->{}",
+                    repr.join(","),
+                    if *variadic { ", ..." } else { "" },
+                    ret
+                )
+            }
+            Self::Pointer => write!(f, "ptr"),
+        }
+    }
+}
+
 /// An adapted representation of LLVM typing system
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Type {
-    /// Integer
-    Int { bits: usize },
-    /// Floating point
-    Float { bits: usize },
-    /// A vector of integers
-    VecInt { bits: usize, length: usize },
-    /// A vector of floating points
-    VecFloat { bits: usize, length: usize },
+    /// Bitvec
+    Bitvec {
+        bits: usize,
+        number: NumRepr,
+        // set if vectorized
+        length: Option<usize>,
+    },
     /// An array with elements being the same type
     Array { element: Box<Type>, length: usize },
     /// A struct type, named or anonymous
@@ -218,15 +284,14 @@ impl Type {
                     "unexpected void type".into(),
                 ));
             }
-            TypeToken::Int { width } => Self::Int { bits: *width },
-            TypeToken::Float { width } => Self::Float { bits: *width },
-            TypeToken::VecInt { width, length } => Self::VecInt {
+            TypeToken::Bitvec {
+                width,
+                number,
+                length,
+            } => Self::Bitvec {
                 bits: *width,
-                length: *length,
-            },
-            TypeToken::VecFloat { width, length } => Self::VecFloat {
-                bits: *width,
-                length: *length,
+                number: *number,
+                length: length.as_ref().copied(),
             },
             TypeToken::Array { element, length } => {
                 let converted = Self::convert_token(element)?;
@@ -277,17 +342,20 @@ impl Type {
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Int { bits } => {
-                write!(f, "int{}", bits)
-            }
-            Self::Float { bits } => {
-                write!(f, "float{}", bits)
-            }
-            Self::VecInt { bits, length } => {
-                write!(f, "int{}<{}>", bits, length)
-            }
-            Self::VecFloat { bits, length } => {
-                write!(f, "float{}<{}>", bits, length)
+            Self::Bitvec {
+                bits,
+                number,
+                length,
+            } => {
+                write!(
+                    f,
+                    "{}{}{}",
+                    number,
+                    bits,
+                    length
+                        .as_ref()
+                        .map_or_else(|| "".to_string(), |l| format!("<{}>", l))
+                )
             }
             Self::Array { element, length } => {
                 write!(f, "{}[{}]", element, length)

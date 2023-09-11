@@ -44,7 +44,7 @@ enum Command {
 struct Args {
     /// Verbosity
     #[structopt(short, long)]
-    verbose: bool,
+    verbose: Option<usize>,
 
     /// Name of the test suite
     name: String,

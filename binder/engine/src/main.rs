@@ -22,7 +22,7 @@ use libra_shared::logging;
 struct Args {
     /// Verbosity
     #[structopt(short, long)]
-    verbose: bool,
+    verbose: Option<usize>,
 
     /// Keep the workflow artifacts in the studio
     #[structopt(short, long)]

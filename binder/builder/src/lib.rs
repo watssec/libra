@@ -21,7 +21,7 @@ use crate::pass::PassArgs;
 struct Args {
     /// Verbosity
     #[structopt(short, long)]
-    verbose: bool,
+    verbose: Option<usize>,
 
     /// Subcommand
     #[structopt(subcommand)]

@@ -1,39 +1,41 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use rug::ops::CompleteRound;
-use rug::{Float, Integer, Rational};
+use rug::{Complete, Float, Integer, Rational};
 
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::instruction::{
-    BinaryOpArith, BinaryOpBitwise, BinaryOpShift, ComparePredicate, Context, Instruction,
-    UnaryOpArith,
+    BinaryOpArith, BinaryOpBitwise, BinaryOpShift, ComparePredicate, Context, GEPIndex,
+    Instruction, UnaryOpArith,
 };
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
-use crate::ir::bridge::typing::{Type, TypeRegistry};
+use crate::ir::bridge::typing::{NumRepr, Type, TypeRegistry};
+
+/// The underlying representation of the bitvec
+#[derive(Eq, PartialEq, Clone)]
+pub enum NumValue {
+    Int(Integer),
+    IntUndef,
+    Float(Option<Rational>),
+    FloatUndef,
+}
 
 /// A naive translation from an LLVM constant
 #[derive(Eq, PartialEq, Clone)]
 pub enum Constant {
-    /// Integer
-    Int { bits: usize, value: Integer },
-    /// Floating-point
-    Float {
+    /// A single bitvec for a number
+    NumOne { bits: usize, value: NumValue },
+    /// A vector of bitvec (for numbers and expressions)
+    NumVec {
         bits: usize,
-        value: Option<Rational>, // None means infinity
+        number: NumRepr,
+        elements: Vec<Constant>,
     },
     /// Null pointer
     Null,
-    /// Vector of integers
-    VecInt {
-        bits: usize,
-        elements: Vec<Constant>,
-    },
-    /// Vector of floating points
-    VecFloat {
-        bits: usize,
-        elements: Vec<Constant>,
-    },
+    /// Undefined pointer
+    UndefPointer,
     /// Array
     Array { sub: Type, elements: Vec<Constant> },
     /// Struct
@@ -45,12 +47,6 @@ pub enum Constant {
     Variable { name: Identifier },
     /// Function
     Function { name: Identifier },
-    /// Undefined int
-    UndefInt { bits: usize },
-    /// Undefined float
-    UndefFloat { bits: usize },
-    /// Undefined pointer
-    UndefPointer,
     /// Expression
     Expr(Box<Expression>),
 }
@@ -58,31 +54,39 @@ pub enum Constant {
 impl Constant {
     fn default_from_type(ty: &Type) -> EngineResult<Self> {
         let value = match ty {
-            Type::Int { bits } => Self::Int {
-                bits: *bits,
-                value: Integer::ZERO,
-            },
-            Type::Float { bits } => Self::Float {
-                bits: *bits,
-                value: Some(Rational::ZERO.clone()),
-            },
-            Type::VecInt { bits, length } => Self::VecInt {
-                bits: *bits,
-                elements: (0..*length)
-                    .map(|_| Constant::Int {
-                        bits: *bits,
-                        value: Integer::ZERO,
-                    })
-                    .collect(),
-            },
-            Type::VecFloat { bits, length } => Self::VecFloat {
-                bits: *bits,
-                elements: (0..*length)
-                    .map(|_| Constant::Float {
-                        bits: *bits,
-                        value: Some(Rational::ZERO.clone()),
-                    })
-                    .collect(),
+            Type::Bitvec {
+                bits,
+                number,
+                length,
+            } => match (number, length) {
+                (NumRepr::Int, None) => Self::NumOne {
+                    bits: *bits,
+                    value: NumValue::Int(Integer::ZERO),
+                },
+                (NumRepr::Int, Some(len)) => Self::NumVec {
+                    bits: *bits,
+                    number: NumRepr::Int,
+                    elements: (0..*len)
+                        .map(|_| Self::NumOne {
+                            bits: *bits,
+                            value: NumValue::Int(Integer::ZERO),
+                        })
+                        .collect(),
+                },
+                (NumRepr::Float, None) => Self::NumOne {
+                    bits: *bits,
+                    value: NumValue::Float(Some(Rational::ZERO.clone())),
+                },
+                (NumRepr::Float, Some(len)) => Self::NumVec {
+                    bits: *bits,
+                    number: NumRepr::Float,
+                    elements: (0..*len)
+                        .map(|_| Self::NumOne {
+                            bits: *bits,
+                            value: NumValue::Float(Some(Rational::ZERO.clone())),
+                        })
+                        .collect(),
+                },
             },
             Type::Array { element, length } => {
                 let elements = (0..*length)
@@ -116,27 +120,53 @@ impl Constant {
 
     fn undef_from_type(ty: &Type) -> EngineResult<Self> {
         let value = match ty {
-            Type::Int { bits } => Self::UndefInt { bits: *bits },
-            Type::Float { bits } => Self::UndefFloat { bits: *bits },
-            Type::Array { element, length } => {
-                let elements = (0..*length)
+            Type::Bitvec {
+                bits,
+                number,
+                length,
+            } => match (number, length) {
+                (NumRepr::Int, None) => Self::NumOne {
+                    bits: *bits,
+                    value: NumValue::IntUndef,
+                },
+                (NumRepr::Int, Some(len)) => Self::NumVec {
+                    bits: *bits,
+                    number: NumRepr::Int,
+                    elements: (0..*len)
+                        .map(|_| Self::NumOne {
+                            bits: *bits,
+                            value: NumValue::IntUndef,
+                        })
+                        .collect(),
+                },
+                (NumRepr::Float, None) => Self::NumOne {
+                    bits: *bits,
+                    value: NumValue::FloatUndef,
+                },
+                (NumRepr::Float, Some(len)) => Self::NumVec {
+                    bits: *bits,
+                    number: NumRepr::Float,
+                    elements: (0..*len)
+                        .map(|_| Self::NumOne {
+                            bits: *bits,
+                            value: NumValue::FloatUndef,
+                        })
+                        .collect(),
+                },
+            },
+            Type::Array { element, length } => Self::Array {
+                sub: element.as_ref().clone(),
+                elements: (0..*length)
                     .map(|_| Self::undef_from_type(element))
-                    .collect::<EngineResult<_>>()?;
-                Self::Array {
-                    sub: element.as_ref().clone(),
-                    elements,
-                }
-            }
-            Type::Struct { name, fields } => {
-                let defaults = fields
+                    .collect::<EngineResult<_>>()?,
+            },
+            Type::Struct { name, fields } => Self::Struct {
+                name: name.clone(),
+                fields: fields
                     .iter()
                     .map(Self::undef_from_type)
-                    .collect::<EngineResult<_>>()?;
-                Self::Struct {
-                    name: name.clone(),
-                    fields: defaults,
-                }
-            }
+                    .collect::<EngineResult<_>>()?,
+            },
             Type::Function { .. } => {
                 return Err(EngineError::InvariantViolation(format!(
                     "trying to create undef-body for a function type: {}",
@@ -144,18 +174,6 @@ impl Constant {
                 )));
             }
             Type::Pointer => Self::UndefPointer,
-            Type::VecInt { bits, length } => Self::VecInt {
-                bits: *bits,
-                elements: (0..*length)
-                    .map(|_| Constant::UndefInt { bits: *bits })
-                    .collect(),
-            },
-            Type::VecFloat { bits, length } => Self::VecFloat {
-                bits: *bits,
-                elements: (0..*length)
-                    .map(|_| Constant::UndefFloat { bits: *bits })
-                    .collect(),
-            },
         };
         Ok(value)
     }
@@ -188,15 +206,24 @@ impl Constant {
             AdaptedConst::Int { value } => {
                 check_type(ty)?;
                 match expected_type {
-                    Type::Int { bits } => Self::Int {
-                        bits: *bits,
-                        value: Integer::from_str_radix(value, 10).map_err(|e| {
-                            EngineError::InvariantViolation(format!(
-                                "const int parse error: {} - {}",
-                                e, value
-                            ))
-                        })?,
-                    },
+                    Type::Bitvec {
+                        bits,
+                        number: NumRepr::Int,
+                        length: Option::None,
+                    } => {
+                        let parsed = Integer::parse_radix(value, 10)
+                            .map_err(|e| {
+                                EngineError::InvariantViolation(format!(
+                                    "const int parse error: {} - {}",
+                                    e, value
+                                ))
+                            })?
+                            .complete();
+                        Self::NumOne {
+                            bits: *bits,
+                            value: NumValue::Int(parsed),
+                        }
+                    }
                     _ => {
                         return Err(EngineError::InvalidAssumption(format!(
                             "type mismatch: expect int, found {}",
@@ -208,20 +235,25 @@ impl Constant {
             AdaptedConst::Float { value } => {
                 check_type(ty)?;
                 match expected_type {
-                    Type::Float { bits } => Self::Float {
-                        bits: *bits,
-                        value: {
-                            Float::parse_radix(value, 10)
-                                .map_err(|e| {
-                                    EngineError::InvariantViolation(format!(
-                                        "const float parse error: {} - {}",
-                                        e, value
-                                    ))
-                                })?
-                                .complete(*bits as u32)
-                                .to_rational()
-                        },
-                    },
+                    Type::Bitvec {
+                        bits,
+                        number: NumRepr::Int,
+                        length: Option::None,
+                    } => {
+                        let parsed = Float::parse_radix(value, 10)
+                            .map_err(|e| {
+                                EngineError::InvariantViolation(format!(
+                                    "const float parse error: {} - {}",
+                                    e, value
+                                ))
+                            })?
+                            .complete(*bits as u32)
+                            .to_rational();
+                        Self::NumOne {
+                            bits: *bits,
+                            value: NumValue::Float(parsed),
+                        }
+                    }
                     _ => {
                         return Err(EngineError::InvalidAssumption(format!(
                             "type mismatch: expect float, found {}",
@@ -262,39 +294,30 @@ impl Constant {
             AdaptedConst::Vector { elements } => {
                 check_type(ty)?;
                 match expected_type {
-                    Type::VecInt { bits, length } => {
-                        if elements.len() != *length {
+                    Type::Bitvec {
+                        bits,
+                        number,
+                        length: Some(len),
+                    } => {
+                        if elements.len() != *len {
                             return Err(EngineError::InvalidAssumption(format!(
                                 "type mismatch: expect {} elements, found {}",
-                                length,
+                                *len,
                                 elements.len()
                             )));
                         }
+                        let element_ty = Type::Bitvec {
+                            bits: *bits,
+                            number: *number,
+                            length: None,
+                        };
                         let elements_new = elements
                             .iter()
-                            .map(|e| Self::convert(e, &Type::Int { bits: *bits }, typing, symbols))
+                            .map(|e| Self::convert(e, &element_ty, typing, symbols))
                             .collect::<EngineResult<_>>()?;
-                        Self::VecInt {
+                        Self::NumVec {
                             bits: *bits,
-                            elements: elements_new,
-                        }
-                    }
-                    Type::VecFloat { bits, length } => {
-                        if elements.len() != *length {
-                            return Err(EngineError::InvalidAssumption(format!(
-                                "type mismatch: expect {} elements, found {}",
-                                length,
-                                elements.len()
-                            )));
-                        }
-                        let elements_new = elements
-                            .iter()
-                            .map(|e| {
-                                Self::convert(e, &Type::Float { bits: *bits }, typing, symbols)
-                            })
-                            .collect::<EngineResult<_>>()?;
-                        Self::VecFloat {
-                            bits: *bits,
+                            number: *number,
                             elements: elements_new,
                         }
                     }
@@ -456,79 +479,41 @@ impl Constant {
 #[allow(clippy::upper_case_acronyms)]
 pub enum Expression {
     // unary
-    UnaryArithFloat {
+    UnaryArith {
         bits: usize,
-        opcode: UnaryOpArith,
-        operand: Constant,
-    },
-    UnaryArithVecFloat {
-        bits: usize,
-        length: usize,
+        number: NumRepr,
+        length: Option<usize>,
         opcode: UnaryOpArith,
         operand: Constant,
     },
     // binary
-    BinaryArithInt {
+    BinaryArith {
         bits: usize,
+        number: NumRepr,
+        length: Option<usize>,
         opcode: BinaryOpArith,
         lhs: Constant,
         rhs: Constant,
     },
-    BinaryArithFloat {
+    BinaryBitwise {
         bits: usize,
-        opcode: BinaryOpArith,
-        lhs: Constant,
-        rhs: Constant,
-    },
-    BinaryArithVecInt {
-        bits: usize,
-        length: usize,
-        opcode: BinaryOpArith,
-        lhs: Constant,
-        rhs: Constant,
-    },
-    BinaryArithVecFloat {
-        bits: usize,
-        length: usize,
-        opcode: BinaryOpArith,
-        lhs: Constant,
-        rhs: Constant,
-    },
-    BinaryBitwiseInt {
-        bits: usize,
+        length: Option<usize>,
         opcode: BinaryOpBitwise,
         lhs: Constant,
         rhs: Constant,
     },
-    BinaryBitwiseVecInt {
+    BinaryShift {
         bits: usize,
-        length: usize,
-        opcode: BinaryOpBitwise,
-        lhs: Constant,
-        rhs: Constant,
-    },
-    BinaryShiftInt {
-        bits: usize,
-        opcode: BinaryOpShift,
-        lhs: Constant,
-        rhs: Constant,
-    },
-    BinaryShiftVecInt {
-        bits: usize,
-        length: usize,
+        length: Option<usize>,
         opcode: BinaryOpShift,
         lhs: Constant,
         rhs: Constant,
     },
     // comparison
-    CompareInt {
+    CompareBitvec {
         bits: usize,
-        predicate: ComparePredicate,
-        lhs: Constant,
-        rhs: Constant,
-    },
-    CompareFloat {
-        bits: usize,
+        number: NumRepr,
+        length: Option<usize>,
         predicate: ComparePredicate,
         lhs: Constant,
         rhs: Constant,
@@ -538,66 +523,39 @@ pub enum Expression {
         lhs: Constant,
         rhs: Constant,
     },
-    CompareVecInt {
-        bits: usize,
-        length: usize,
-        predicate: ComparePredicate,
-        lhs: Constant,
-        rhs: Constant,
-    },
-    CompareVecFloat {
-        bits: usize,
-        length: usize,
-        predicate: ComparePredicate,
-        lhs: Constant,
-        rhs: Constant,
-    },
     // casts
-    CastInt {
+    CastBitvecBits {
         bits_from: usize,
         bits_into: usize,
+        number: NumRepr,
+        length: Option<usize>,
         operand: Constant,
     },
-    CastFloat {
-        bits_from: usize,
-        bits_into: usize,
+    CastBitvecRepr {
+        // semantics-changing cast
+        bits: usize,
+        number_from: NumRepr,
+        number_into: NumRepr,
+        length: Option<usize>,
         operand: Constant,
     },
-    CastVecInt {
-        bits_from: usize,
-        bits_into: usize,
-        length: usize,
+    CastBitvecInterp {
+        // pure re-interpretation cast without changing content
+        bits: usize,
+        number_from: NumRepr,
+        number_into: NumRepr,
+        length: Option<usize>,
         operand: Constant,
     },
-    CastVecFloat {
+    CastBitvecShape {
         bits_from: usize,
         bits_into: usize,
-        length: usize,
+        number: NumRepr,
+        length_from: Option<usize>,
+        length_into: Option<usize>,
         operand: Constant,
     },
     CastPtr {
-        operand: Constant,
-    },
-    CastFloatToInt {
-        bits_from: usize,
-        bits_into: usize,
-        operand: Constant,
-    },
-    CastIntToFloat {
-        bits_from: usize,
-        bits_into: usize,
-        operand: Constant,
-    },
-    CastVecFloatToVecInt {
-        bits_from: usize,
-        bits_into: usize,
-        length: usize,
-        operand: Constant,
-    },
-    CastVecIntToVecFloat {
-        bits_from: usize,
-        bits_into: usize,
-        length: usize,
         operand: Constant,
     },
     CastPtrToInt {
@@ -614,7 +572,7 @@ pub enum Expression {
         dst_pointee_type: Type,
         pointer: Constant,
         offset: Constant,
-        indices: Vec<Constant>,
+        indices: Vec<GEPConstIndex>,
     },
     // choice
     ITEOne {
@@ -622,15 +580,9 @@ pub enum Expression {
         then_value: Constant,
         else_value: Constant,
     },
-    ITEVecInt {
+    ITEVec {
         bits: usize,
-        length: usize,
-        cond: Constant,
-        then_value: Constant,
-        else_value: Constant,
-    },
-    ITEVecFloat {
-        bits: usize,
+        number: NumRepr,
         length: usize,
         cond: Constant,
         then_value: Constant,
@@ -644,47 +596,28 @@ pub enum Expression {
         indices: Vec<usize>,
     },
     SetValue {
-        src_ty: Type,
-        dst_ty: Type,
         aggregate: Constant,
         value: Constant,
         indices: Vec<usize>,
     },
-    GetElementVecInt {
+    GetElement {
         bits: usize,
+        number: NumRepr,
         length: usize,
         vector: Constant,
         slot: Constant,
     },
-    GetElementVecFloat {
+    SetElement {
         bits: usize,
-        length: usize,
-        vector: Constant,
-        slot: Constant,
-    },
-    SetElementVecInt {
-        bits: usize,
+        number: NumRepr,
         length: usize,
         vector: Constant,
         value: Constant,
         slot: Constant,
     },
-    SetElementVecFloat {
+    ShuffleVec {
         bits: usize,
-        length: usize,
-        vector: Constant,
-        value: Constant,
-        slot: Constant,
-    },
-    ShuffleVecInt {
-        bits: usize,
-        length: usize,
-        lhs: Constant,
-        rhs: Constant,
-        mask: Vec<i128>,
-    },
-    ShuffleVecFloat {
-        bits: usize,
+        number: NumRepr,
         length: usize,
         lhs: Constant,
         rhs: Constant,
@@ -692,68 +625,53 @@ pub enum Expression {
     },
 }
 
+#[derive(Eq, PartialEq, Clone)]
+pub enum GEPConstIndex {
+    Array(Constant),
+    Struct(usize),
+    Vector(Constant),
+}
+
 impl Expression {
     pub fn from_instruction(inst: Instruction) -> EngineResult<Self> {
         let expr = match inst {
-            Instruction::UnaryArithFloat {
+            Instruction::UnaryArith {
                 bits,
-                opcode,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::UnaryArithFloat {
-                    bits,
-                    opcode,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::UnaryArithVecFloat {
-                bits,
+                number,
                 length,
                 opcode,
                 operand,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::UnaryArithVecFloat {
+                Self::UnaryArith {
                     bits,
+                    number,
                     length,
                     opcode,
                     operand: operand.expect_constant()?,
                 }
             }
-            Instruction::BinaryArithInt {
+            Instruction::BinaryArith {
                 bits,
+                number,
+                length,
                 opcode,
                 lhs,
                 rhs,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::BinaryArithInt {
+                Self::BinaryArith {
                     bits,
+                    number,
+                    length,
                     opcode,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
                 }
             }
-            Instruction::BinaryArithFloat {
-                bits,
-                opcode,
-                lhs,
-                rhs,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::BinaryArithFloat {
-                    bits,
-                    opcode,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                }
-            }
-            Instruction::BinaryArithVecInt {
+            Instruction::BinaryBitwise {
                 bits,
                 length,
                 opcode,
@@ -762,7 +680,7 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::BinaryArithVecInt {
+                Self::BinaryBitwise {
                     bits,
                     length,
                     opcode,
@@ -770,7 +688,7 @@ impl Expression {
                     rhs: rhs.expect_constant()?,
                 }
             }
-            Instruction::BinaryArithVecFloat {
+            Instruction::BinaryShift {
                 bits,
                 length,
                 opcode,
@@ -779,7 +697,7 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::BinaryArithVecFloat {
+                Self::BinaryShift {
                     bits,
                     length,
                     opcode,
@@ -787,95 +705,20 @@ impl Expression {
                     rhs: rhs.expect_constant()?,
                 }
             }
-            Instruction::BinaryBitwiseInt {
+            Instruction::CompareBitvec {
                 bits,
-                opcode,
-                lhs,
-                rhs,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::BinaryBitwiseInt {
-                    bits,
-                    opcode,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                }
-            }
-            Instruction::BinaryBitwiseVecInt {
-                bits,
+                number,
                 length,
-                opcode,
-                lhs,
-                rhs,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::BinaryBitwiseVecInt {
-                    bits,
-                    length,
-                    opcode,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                }
-            }
-            Instruction::BinaryShiftInt {
-                bits,
-                opcode,
-                lhs,
-                rhs,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::BinaryShiftInt {
-                    bits,
-                    opcode,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                }
-            }
-            Instruction::BinaryShiftVecInt {
-                bits,
-                length,
-                opcode,
-                lhs,
-                rhs,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::BinaryShiftVecInt {
-                    bits,
-                    length,
-                    opcode,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                }
-            }
-            Instruction::CompareInt {
-                bits,
                 predicate,
                 lhs,
                 rhs,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::CompareInt {
+                Self::CompareBitvec {
                     bits,
-                    predicate,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                }
-            }
-            Instruction::CompareFloat {
-                bits,
-                predicate,
-                lhs,
-                rhs,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CompareFloat {
-                    bits,
+                    number,
+                    length,
                     predicate,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
@@ -894,155 +737,79 @@ impl Expression {
                     rhs: rhs.expect_constant()?,
                 }
             }
-            Instruction::CompareVecInt {
+            Instruction::CastBitvecBits {
+                bits_from,
+                bits_into,
+                number,
+                length,
+                operand,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::CastBitvecBits {
+                    bits_from,
+                    bits_into,
+                    number,
+                    length,
+                    operand: operand.expect_constant()?,
+                }
+            }
+            Instruction::CastBitvecRepr {
                 bits,
+                number_from,
+                number_into,
                 length,
-                predicate,
-                lhs,
-                rhs,
+                operand,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::CompareVecInt {
+                Self::CastBitvecRepr {
                     bits,
+                    number_from,
+                    number_into,
                     length,
-                    predicate,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
+                    operand: operand.expect_constant()?,
                 }
             }
-            Instruction::CompareVecFloat {
+            Instruction::CastBitvecInterp {
                 bits,
+                number_from,
+                number_into,
                 length,
-                predicate,
-                lhs,
-                rhs,
+                operand,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::CompareVecFloat {
+                Self::CastBitvecInterp {
                     bits,
-                    length,
-                    predicate,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                }
-            }
-            Instruction::CastInt {
-                bits_from,
-                bits_into,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastInt {
-                    bits_from,
-                    bits_into,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastFloat {
-                bits_from,
-                bits_into,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastFloat {
-                    bits_from,
-                    bits_into,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastVecInt {
-                bits_from,
-                bits_into,
-                length,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastVecInt {
-                    bits_from,
-                    bits_into,
+                    number_from,
+                    number_into,
                     length,
                     operand: operand.expect_constant()?,
                 }
             }
-            Instruction::CastVecFloat {
+            Instruction::CastBitvecShape {
                 bits_from,
                 bits_into,
-                length,
+                number,
+                length_from,
+                length_into,
                 operand,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::CastVecFloat {
+                Self::CastBitvecShape {
                     bits_from,
                     bits_into,
-                    length,
+                    number,
+                    length_from,
+                    length_into,
                     operand: operand.expect_constant()?,
                 }
             }
             Instruction::CastPtr { operand, result } => {
                 assert!(result == usize::MAX.into());
                 Self::CastPtr {
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastFloatToInt {
-                bits_from,
-                bits_into,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastFloatToInt {
-                    bits_from,
-                    bits_into,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastIntToFloat {
-                bits_from,
-                bits_into,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastIntToFloat {
-                    bits_from,
-                    bits_into,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastVecFloatToVecInt {
-                bits_from,
-                bits_into,
-                length,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastVecFloatToVecInt {
-                    bits_from,
-                    bits_into,
-                    length,
-                    operand: operand.expect_constant()?,
-                }
-            }
-            Instruction::CastVecIntToVecFloat {
-                bits_from,
-                bits_into,
-                length,
-                operand,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::CastVecIntToVecFloat {
-                    bits_from,
-                    bits_into,
-                    length,
                     operand: operand.expect_constant()?,
                 }
             }
@@ -1077,15 +844,21 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
+                let mut indices_new = vec![];
+                for idx in indices {
+                    let idx_new = match idx {
+                        GEPIndex::Array(v) => GEPConstIndex::Array(v.expect_constant()?),
+                        GEPIndex::Struct(v) => GEPConstIndex::Struct(v),
+                        GEPIndex::Vector(v) => GEPConstIndex::Vector(v.expect_constant()?),
+                    };
+                    indices_new.push(idx_new);
+                }
                 Self::GEP {
                     src_pointee_type,
                     dst_pointee_type,
                     pointer: pointer.expect_constant()?,
                     offset: offset.expect_constant()?,
-                    indices: indices
-                        .into_iter()
-                        .map(|i| i.expect_constant())
-                        .collect::<EngineResult<_>>()?,
+                    indices: indices_new,
                 }
             }
             Instruction::ITEOne {
@@ -1101,8 +874,9 @@ impl Expression {
                     else_value: else_value.expect_constant()?,
                 }
             }
-            Instruction::ITEVecInt {
+            Instruction::ITEVec {
                 bits,
+                number,
                 length,
                 cond,
                 then_value,
@@ -1110,25 +884,9 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::ITEVecInt {
+                Self::ITEVec {
                     bits,
-                    length,
-                    cond: cond.expect_constant()?,
-                    then_value: then_value.expect_constant()?,
-                    else_value: else_value.expect_constant()?,
-                }
-            }
-            Instruction::ITEVecFloat {
-                bits,
-                length,
-                cond,
-                then_value,
-                else_value,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::ITEVecFloat {
-                    bits,
+                    number,
                     length,
                     cond: cond.expect_constant()?,
                     then_value: then_value.expect_constant()?,
@@ -1151,8 +909,6 @@ impl Expression {
                 }
             }
             Instruction::SetValue {
-                src_ty,
-                dst_ty,
                 aggregate,
                 value,
                 indices,
@@ -1160,45 +916,31 @@ impl Expression {
             } => {
                 assert!(result == usize::MAX.into());
                 Self::SetValue {
-                    src_ty,
-                    dst_ty,
                     aggregate: aggregate.expect_constant()?,
                     value: value.expect_constant()?,
                     indices,
                 }
             }
-            Instruction::GetElementVecInt {
+            Instruction::GetElement {
                 bits,
+                number,
                 length,
                 vector,
                 slot,
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::GetElementVecInt {
+                Self::GetElement {
                     bits,
+                    number,
                     length,
                     vector: vector.expect_constant()?,
                     slot: slot.expect_constant()?,
                 }
             }
-            Instruction::GetElementVecFloat {
+            Instruction::SetElement {
                 bits,
-                length,
-                vector,
-                slot,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::GetElementVecFloat {
-                    bits,
-                    length,
-                    vector: vector.expect_constant()?,
-                    slot: slot.expect_constant()?,
-                }
-            }
-            Instruction::SetElementVecInt {
-                bits,
+                number,
                 length,
                 vector,
                 value,
@@ -1206,33 +948,18 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::SetElementVecInt {
+                Self::SetElement {
                     bits,
+                    number,
                     length,
                     vector: vector.expect_constant()?,
                     value: value.expect_constant()?,
                     slot: slot.expect_constant()?,
                 }
             }
-            Instruction::SetElementVecFloat {
+            Instruction::ShuffleVec {
                 bits,
-                length,
-                vector,
-                value,
-                slot,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::SetElementVecFloat {
-                    bits,
-                    length,
-                    vector: vector.expect_constant()?,
-                    value: value.expect_constant()?,
-                    slot: slot.expect_constant()?,
-                }
-            }
-            Instruction::ShuffleVecInt {
-                bits,
+                number,
                 length,
                 lhs,
                 rhs,
@@ -1240,25 +967,9 @@ impl Expression {
                 result,
             } => {
                 assert!(result == usize::MAX.into());
-                Self::ShuffleVecInt {
+                Self::ShuffleVec {
                     bits,
-                    length,
-                    lhs: lhs.expect_constant()?,
-                    rhs: rhs.expect_constant()?,
-                    mask,
-                }
-            }
-            Instruction::ShuffleVecFloat {
-                bits,
-                length,
-                lhs,
-                rhs,
-                mask,
-                result,
-            } => {
-                assert!(result == usize::MAX.into());
-                Self::ShuffleVecFloat {
-                    bits,
+                    number,
                     length,
                     lhs: lhs.expect_constant()?,
                     rhs: rhs.expect_constant()?,
@@ -1272,9 +983,8 @@ impl Expression {
             | Instruction::VariadicArg { .. }
             | Instruction::CallDirect { .. }
             | Instruction::CallIndirect { .. }
+            | Instruction::FreezeBitvec { .. }
             | Instruction::FreezePtr
-            | Instruction::FreezeInt { .. }
-            | Instruction::FreezeFloat { .. }
             | Instruction::FreezeNop { .. }
             | Instruction::Phi { .. } => {
                 return Err(EngineError::InvalidAssumption(

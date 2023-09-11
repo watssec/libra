@@ -68,12 +68,12 @@ json::Object serialize_const(const Constant &val) {
       result["Undef"] = json::Value(nullptr);
     } else if (isa<ConstantAggregateZero>(val)) {
       result["Default"] = json::Value(nullptr);
-    } else if (isa<ConstantDataArray>(val)) {
-      result["Array"] =
-          serialize_const_data_array(cast<ConstantDataArray>(val));
     } else if (isa<ConstantDataVector>(val)) {
       result["Vector"] =
           serialize_const_data_vector(cast<ConstantDataVector>(val));
+    } else if (isa<ConstantDataArray>(val)) {
+      result["Array"] =
+          serialize_const_data_array(cast<ConstantDataArray>(val));
     } else {
       LOG->fatal("unknown constant data: {0}", val);
     }
@@ -81,12 +81,12 @@ json::Object serialize_const(const Constant &val) {
 
   // constant aggregate
   else if (isa<ConstantAggregate>(val)) {
-    if (isa<ConstantArray>(val)) {
+    if (isa<ConstantVector>(val)) {
+      result["Vector"] = serialize_const_pack_vector(cast<ConstantVector>(val));
+    } else if (isa<ConstantArray>(val)) {
       result["Array"] = serialize_const_pack_array(cast<ConstantArray>(val));
     } else if (isa<ConstantStruct>(val)) {
       result["Struct"] = serialize_const_pack_struct(cast<ConstantStruct>(val));
-    } else if (isa<ConstantVector>(val)) {
-      result["Vector"] = serialize_const_pack_vector(cast<ConstantVector>(val));
     } else {
       LOG->fatal("unknown constant aggregate: {0}", val);
     }
