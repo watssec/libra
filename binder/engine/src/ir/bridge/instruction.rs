@@ -104,7 +104,8 @@ pub enum Instruction {
     },
     CastBitvecRepr {
         // semantics-changing cast
-        bits: usize,
+        bits_from: usize,
+        bits_into: usize,
         number_from: NumRepr,
         number_into: NumRepr,
         length: Option<usize>,
@@ -1073,20 +1074,19 @@ impl<'a> Context<'a> {
                                 length: length_from,
                             },
                             Type::Bitvec {
-                                bits,
+                                bits: bits_into,
                                 number: NumRepr::Int,
                                 length,
                             },
-                        ) if bits_from == bits && length_from == length => {
-                            Instruction::CastBitvecRepr {
-                                bits,
-                                number_from: NumRepr::Float,
-                                number_into: NumRepr::Int,
-                                length,
-                                operand: operand_new,
-                                result: index.into(),
-                            }
-                        }
+                        ) if length_from == length => Instruction::CastBitvecRepr {
+                            bits_from,
+                            bits_into,
+                            number_from: NumRepr::Float,
+                            number_into: NumRepr::Int,
+                            length,
+                            operand: operand_new,
+                            result: index.into(),
+                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
                                 "expect float<> and int<> for fp_to_ui/si cast".into(),
@@ -1101,23 +1101,22 @@ impl<'a> Context<'a> {
                                 length: length_from,
                             },
                             Type::Bitvec {
-                                bits,
+                                bits: bits_into,
                                 number: NumRepr::Float,
                                 length,
                             },
-                        ) if bits_from == bits && length_from == length => {
-                            Instruction::CastBitvecRepr {
-                                bits,
-                                number_from: NumRepr::Float,
-                                number_into: NumRepr::Int,
-                                length,
-                                operand: operand_new,
-                                result: index.into(),
-                            }
-                        }
+                        ) if length_from == length => Instruction::CastBitvecRepr {
+                            bits_from,
+                            bits_into,
+                            number_from: NumRepr::Int,
+                            number_into: NumRepr::Float,
+                            length,
+                            operand: operand_new,
+                            result: index.into(),
+                        },
                         _ => {
                             return Err(EngineError::InvalidAssumption(
-                                "expect int<> and float<> for ui/si_to_fo cast".into(),
+                                "expect int<> and float<> for ui/si_to_fp cast".into(),
                             ));
                         }
                     },

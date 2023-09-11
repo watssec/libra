@@ -237,7 +237,7 @@ impl Constant {
                 match expected_type {
                     Type::Bitvec {
                         bits,
-                        number: NumRepr::Int,
+                        number: NumRepr::Float,
                         length: Option::None,
                     } => {
                         let parsed = Float::parse_radix(value, 10)
@@ -533,7 +533,8 @@ pub enum Expression {
     },
     CastBitvecRepr {
         // semantics-changing cast
-        bits: usize,
+        bits_from: usize,
+        bits_into: usize,
         number_from: NumRepr,
         number_into: NumRepr,
         length: Option<usize>,
@@ -755,7 +756,8 @@ impl Expression {
                 }
             }
             Instruction::CastBitvecRepr {
-                bits,
+                bits_from,
+                bits_into,
                 number_from,
                 number_into,
                 length,
@@ -764,7 +766,8 @@ impl Expression {
             } => {
                 assert!(result == usize::MAX.into());
                 Self::CastBitvecRepr {
-                    bits,
+                    bits_from,
+                    bits_into,
                     number_from,
                     number_into,
                     length,
