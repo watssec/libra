@@ -263,21 +263,25 @@ impl BitcodeTestCase {
         // report progress
         debug!("running test case: {}", name);
 
-        // check if opt can verify the bitcode
-        match ctxt.opt_verify(path) {
-            Ok(_) => (),
-            Err(e) => {
-                warn!("unable to validate bitcode {} via opt: {}", name, e);
-                return Ok(None);
-            }
-        }
-
         // prepare output directory
         let output_dir = workdir.join(name);
         fs::create_dir_all(&output_dir)?;
 
+        // check if llvm-as and opt likes the bitcode
+        let path_bc_init = workdir.join("init.bc");
+        match ctxt
+            .assemble(path, &path_bc_init)
+            .and_then(|_| ctxt.opt_verify(&path_bc_init))
+        {
+            Ok(_) => (),
+            Err(e) => {
+                warn!("unable to validate bitcode {}: {}", name, e);
+                return Ok(None);
+            }
+        }
+
         // workflow
-        let result = libra_workflow(ctxt, path, &output_dir);
+        let result = libra_workflow(ctxt, &path_bc_init, &output_dir);
         Ok(Some(result))
     }
 }

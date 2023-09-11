@@ -18,6 +18,8 @@ pub struct Context {
     bin_clang: PathBuf,
     /// Path to the llvm-link tool
     bin_llvm_link: PathBuf,
+    /// Path to the llvm-as tool
+    bin_llvm_as: PathBuf,
     /// Path to the llvm-dis tool
     bin_llvm_dis: PathBuf,
     /// Path to the opt tool
@@ -35,6 +37,7 @@ impl Context {
         Ok(Self {
             bin_clang: pkg_llvm.join("bin").join("clang"),
             bin_llvm_link: pkg_llvm.join("bin").join("llvm-link"),
+            bin_llvm_as: pkg_llvm.join("bin").join("llvm-as"),
             bin_llvm_dis: pkg_llvm.join("bin").join("llvm-dis"),
             bin_opt: pkg_llvm.join("bin").join("opt"),
             pkg_llvm,
@@ -106,6 +109,13 @@ impl Context {
             .arg("-o")
             .arg(output.unwrap_or_else(|| Path::new("/dev/null")));
         cmd.arg(input);
+        Self::run(cmd)
+    }
+
+    /// Assemble the readable format into raw bitcode file
+    pub fn assemble(&self, input: &Path, output: &Path) -> Result<()> {
+        let mut cmd = Command::new(&self.bin_llvm_as);
+        cmd.arg("-o").arg(output).arg(input);
         Self::run(cmd)
     }
 
