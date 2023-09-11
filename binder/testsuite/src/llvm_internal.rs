@@ -7,11 +7,17 @@ use anyhow::{anyhow, bail, Result};
 use log::{debug, info, warn};
 
 use libra_builder::ResolverLLVM;
+use libra_engine::error::{EngineError, EngineResult};
+use libra_engine::flow::fixedpoint::FlowFixedpoint;
+use libra_engine::flow::shared::Context;
 use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
 use crate::common::TestSuite;
+
+/// Maximum number of fixedpoint optimization
+static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
 static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
@@ -84,15 +90,33 @@ impl TestSuite<ResolverLLVMInternal> for DepLLVMInternal {
         info!("Number of test cases discovered: {}", test_cases.len());
 
         // run the tests
+        let ctxt = Context::new()?;
         if *PARALLEL && filter.is_empty() {
             todo!()
         } else {
             // serial execution will halt on first failure caused by potential bugs
+            let mut results = vec![];
             for test in test_cases {
                 // apply filter if necessary
                 if !filter.is_empty() && !filter.contains(&test.name) {
                     continue;
                 }
+
+                // actual execution
+                let output = test.run_libra(&ctxt, &workdir)?;
+
+                // check errors to halt on first failure caused by potential bugs
+                if let Some(Err(err)) = output.as_ref() {
+                    match err {
+                        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
+                        EngineError::LLVMLoadingError(reason)
+                        | EngineError::InvalidAssumption(reason)
+                        | EngineError::InvariantViolation(reason) => {
+                            bail!("potential bug: {}", reason);
+                        }
+                    }
+                }
+                results.push(output);
             }
         }
 
@@ -229,4 +253,43 @@ impl DepLLVMInternal {
 struct BitcodeTestCase {
     name: String,
     path: PathBuf,
+}
+
+impl BitcodeTestCase {
+    /// Run the test case through libra workflow (internal)
+    pub fn run_libra(&self, ctxt: &Context, workdir: &Path) -> Result<Option<EngineResult<()>>> {
+        let Self { name, path } = self;
+
+        // report progress
+        debug!("running test case: {}", name);
+
+        // check if opt can verify the bitcode
+        match ctxt.opt_verify(path) {
+            Ok(_) => (),
+            Err(e) => {
+                warn!("unable to validate bitcode {} via opt: {}", name, e);
+                return Ok(None);
+            }
+        }
+
+        // prepare output directory
+        let output_dir = workdir.join(name);
+        fs::create_dir_all(&output_dir)?;
+
+        // workflow
+        let result = libra_workflow(ctxt, path, &output_dir);
+        Ok(Some(result))
+    }
+}
+
+fn libra_workflow(ctxt: &Context, input: &Path, output: &Path) -> EngineResult<()> {
+    // fixedpoint
+    let flow_fp = FlowFixedpoint::new(
+        ctxt,
+        input.to_path_buf(),
+        output.to_path_buf(),
+        Some(MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION),
+    );
+    flow_fp.execute()?;
+    Ok(())
 }
