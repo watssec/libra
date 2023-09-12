@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{bail, Result};
 use log::{error, info};
@@ -13,6 +14,9 @@ use libra_engine::flow::shared::Context;
 use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::Resolver;
 use libra_shared::git::GitRepo;
+
+/// Controls whether we need to halt the parallel execution
+static HALT_PARALLEL_EXECUTION: AtomicBool = AtomicBool::new(false);
 
 /// A trait that marks a test case
 pub trait TestCase: Send {
@@ -58,7 +62,31 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
         let consolidated: Vec<_> = if *PARALLEL && filter.is_empty() {
             test_cases
                 .into_par_iter()
-                .map(|test| test.run_libra(&ctxt, &workdir))
+                .map(|test| {
+                    if HALT_PARALLEL_EXECUTION.load(Ordering::SeqCst) {
+                        // not executing this one
+                        return Ok((test.name().to_string(), None));
+                    }
+                    let (name, output) = test.run_libra(&ctxt, &workdir)?;
+                    match shall_halt(&output) {
+                        None => (),
+                        Some(message) => {
+                            match HALT_PARALLEL_EXECUTION.compare_exchange(
+                                false,
+                                true,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            ) {
+                                Ok(_) => error!("potential bug: {}", message),
+                                Err(_) => {
+                                    // not reporting this one
+                                    return Ok((test.name().to_string(), None));
+                                }
+                            }
+                        }
+                    }
+                    Ok((name, output))
+                })
                 .collect::<Result<_>>()?
         } else {
             // serial execution will halt on first failure caused by potential bugs
@@ -70,20 +98,15 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
                 }
 
                 // actual execution
-                let output = test.run_libra(&ctxt, &workdir)?;
+                let (name, output) = test.run_libra(&ctxt, &workdir)?;
 
                 // check errors to halt on first failure caused by potential bugs
-                if let Some(Err(err)) = output.1.as_ref() {
-                    match err {
-                        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
-                        EngineError::LLVMLoadingError(reason)
-                        | EngineError::InvalidAssumption(reason)
-                        | EngineError::InvariantViolation(reason) => {
-                            bail!("potential bug: {}", reason);
-                        }
-                    }
+                match shall_halt(&output) {
+                    None => (),
+                    Some(message) => bail!("potential bug: {}", message),
                 }
-                results.push(output);
+
+                results.push((name, output));
             }
             results
         };
@@ -98,6 +121,16 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
 
         // done
         Ok(())
+    }
+}
+
+/// A utility to check whether this error means a potential bug
+fn shall_halt<T>(output: &Option<EngineResult<T>>) -> Option<&str> {
+    match output.as_ref()?.as_ref().err()? {
+        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => None,
+        EngineError::LLVMLoadingError(reason)
+        | EngineError::InvalidAssumption(reason)
+        | EngineError::InvariantViolation(reason) => Some(reason),
     }
 }
 
