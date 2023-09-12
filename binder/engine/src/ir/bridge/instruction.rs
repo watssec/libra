@@ -498,42 +498,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// convert a value in either int32
-    fn parse_value_int32(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
-        match val.get_type() {
-            adapter::typing::Type::Int { width: 32 } => self.parse_value(
-                val,
-                &Type::Bitvec {
-                    bits: 32,
-                    number: NumRepr::Int,
-                    length: None,
-                },
-            ),
-            ty => Err(EngineError::InvalidAssumption(format!(
-                "expect int32, found {}",
-                self.typing.convert(ty)?
-            ))),
-        }
-    }
-
-    /// convert a value in either int32 or int64
-    fn parse_value_int64(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
-        match val.get_type() {
-            adapter::typing::Type::Int { width: 64 } => self.parse_value(
-                val,
-                &Type::Bitvec {
-                    bits: 64,
-                    number: NumRepr::Int,
-                    length: None,
-                },
-            ),
-            ty => Err(EngineError::InvalidAssumption(format!(
-                "expect int64, found {}",
-                self.typing.convert(ty)?
-            ))),
-        }
-    }
-
     /// convert a value in any integer type
     fn parse_value_int_any(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
         let ty = self.typing.convert(val.get_type())?;
@@ -541,7 +505,7 @@ impl<'a> Context<'a> {
             Type::Bitvec {
                 bits: _,
                 number: NumRepr::Int,
-                length: Option::None,
+                length: None,
             } => self.parse_value(val, &ty),
             _ => Err(EngineError::InvalidAssumption(format!(
                 "expect int(any) found {}",
@@ -586,7 +550,7 @@ impl<'a> Context<'a> {
                 let base_type = self.typing.convert(allocated_type)?;
                 let size_new = match size.as_ref() {
                     None => None,
-                    Some(val) => Some(self.parse_value_int64(val)?),
+                    Some(val) => Some(self.parse_value_int_any(val)?),
                 };
                 Instruction::Alloca {
                     base_type,
@@ -1267,7 +1231,7 @@ impl<'a> Context<'a> {
                 for idx in indices.iter().skip(1) {
                     let next_cur_ty = match cur_ty {
                         Type::Struct { name: _, fields } => {
-                            let idx_new = self.parse_value_int32(idx)?;
+                            let idx_new = self.parse_value_int_any(idx)?;
                             let field_offset = match idx_new {
                                 Value::Constant(Constant::NumOne {
                                     bits: _,
