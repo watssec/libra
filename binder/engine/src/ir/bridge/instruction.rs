@@ -534,28 +534,18 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// convert a value in either int32 or int64
-    fn parse_value_int32_or_int64(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
-        match val.get_type() {
-            adapter::typing::Type::Int { width: 32 } => self.parse_value(
-                val,
-                &Type::Bitvec {
-                    bits: 32,
-                    number: NumRepr::Int,
-                    length: None,
-                },
-            ),
-            adapter::typing::Type::Int { width: 64 } => self.parse_value(
-                val,
-                &Type::Bitvec {
-                    bits: 64,
-                    number: NumRepr::Int,
-                    length: None,
-                },
-            ),
-            ty => Err(EngineError::InvalidAssumption(format!(
-                "expect int32 or int64, found {}",
-                self.typing.convert(ty)?
+    /// convert a value in any integer type
+    fn parse_value_int_any(&mut self, val: &adapter::value::Value) -> EngineResult<Value> {
+        let ty = self.typing.convert(val.get_type())?;
+        match &ty {
+            Type::Bitvec {
+                bits: _,
+                number: NumRepr::Int,
+                length: Option::None,
+            } => self.parse_value(val, &ty),
+            _ => Err(EngineError::InvalidAssumption(format!(
+                "expect int(any) found {}",
+                ty
             ))),
         }
     }
@@ -1267,7 +1257,7 @@ impl<'a> Context<'a> {
                 }
 
                 let offset = indices.first().unwrap();
-                let offset_new = self.parse_value_int32_or_int64(offset)?;
+                let offset_new = self.parse_value_int_any(offset)?;
 
                 // TODO: hack for holding temporary types from vector
                 let mut temporary_type_holder;
@@ -1305,7 +1295,7 @@ impl<'a> Context<'a> {
                             fields.get(field_offset).unwrap()
                         }
                         Type::Array { element, length: _ } => {
-                            let idx_new = self.parse_value_int32_or_int64(idx)?;
+                            let idx_new = self.parse_value_int_any(idx)?;
                             indices_new.push(GEPIndex::Array(idx_new));
                             element.as_ref()
                         }
@@ -1314,7 +1304,7 @@ impl<'a> Context<'a> {
                             number,
                             length: Some(_),
                         } => {
-                            let idx_new = self.parse_value_int32_or_int64(idx)?;
+                            let idx_new = self.parse_value_int_any(idx)?;
                             indices_new.push(GEPIndex::Vector(idx_new));
                             temporary_type_holder = Type::Bitvec {
                                 bits: *bits,
@@ -1534,7 +1524,7 @@ impl<'a> Context<'a> {
                 let src_ty = self.typing.convert(vec_ty)?;
                 let dst_ty = self.typing.convert(ty)?;
                 let vector_new = self.parse_value(vector, &src_ty)?;
-                let slot_new = self.parse_value_int32_or_int64(slot)?;
+                let slot_new = self.parse_value_int_any(slot)?;
                 match (src_ty, dst_ty) {
                     (
                         Type::Bitvec {
@@ -1571,7 +1561,7 @@ impl<'a> Context<'a> {
             } => {
                 let src_ty = self.typing.convert(ty)?;
                 let vector_new = self.parse_value(vector, &src_ty)?;
-                let slot_new = self.parse_value_int32_or_int64(slot)?;
+                let slot_new = self.parse_value_int_any(slot)?;
 
                 match src_ty {
                     Type::Bitvec {
