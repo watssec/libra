@@ -178,6 +178,9 @@ impl TypeToken {
                     Unsupported::ArchSpecificExtension,
                 ));
             }
+            AdaptedType::TypedPointer { .. } => {
+                return Err(EngineError::NotSupportedYet(Unsupported::TypedPointer));
+            }
             AdaptedType::Label => {
                 return Err(EngineError::InvalidAssumption(
                     "unexpected llvm primitive type: label".into(),

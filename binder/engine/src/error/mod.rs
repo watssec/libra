@@ -13,6 +13,7 @@ pub enum Unsupported {
     VectorBitcast,
     VariadicArguments,
     ArchSpecificExtension,
+    TypedPointer,
     ThreadLocalStorage,
     WeakGlobalVariable,
     WeakFunction,
@@ -55,6 +56,9 @@ impl Display for Unsupported {
             }
             Self::ArchSpecificExtension => {
                 write!(f, "architecture-specific extension")
+            }
+            Self::TypedPointer => {
+                write!(f, "typed pointer")
             }
             Self::ThreadLocalStorage => {
                 write!(f, "thread-local storage")

@@ -32,6 +32,11 @@ pub enum Type {
     },
     /// Target extension type
     Extension { name: String, params: Vec<Type> },
+    /// Typed pointer
+    TypedPointer {
+        pointee: Box<Type>,
+        address_space: usize,
+    },
     /// Label type
     Label,
     /// Token type

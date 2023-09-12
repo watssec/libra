@@ -65,6 +65,10 @@ json::Object serialize_type(const Type &type) {
   case Type::TargetExtTyID:
     result["Extension"] = serialize_type_extension(cast<TargetExtType>(type));
     break;
+  case Type::TypedPointerTyID:
+    result["TypedPointer"] =
+        serialize_type_typed_pointer(cast<TypedPointerType>(type));
+    break;
   case Type::LabelTyID:
     result["Label"] = json::Value(nullptr);
     break;
@@ -74,8 +78,6 @@ json::Object serialize_type(const Type &type) {
   case Type::MetadataTyID:
     result["Metadata"] = json::Value(nullptr);
     break;
-  case Type::TypedPointerTyID:
-    LOG->fatal("serialized a typed pointer");
   }
   return result;
 }
@@ -160,6 +162,13 @@ json::Object serialize_type_extension(const TargetExtType &type) {
   }
   result["params"] = std::move(params);
 
+  return result;
+}
+
+json::Object serialize_type_typed_pointer(const TypedPointerType &type) {
+  json::Object result;
+  result["pointee"] = serialize_type(*type.getElementType());
+  result["address_space"] = type.getAddressSpace();
   return result;
 }
 
