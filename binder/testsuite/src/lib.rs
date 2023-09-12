@@ -1,7 +1,6 @@
 mod common;
 mod llvm_external;
 mod llvm_internal;
-mod llvm_lit;
 
 use anyhow::{bail, Result};
 use structopt::StructOpt;

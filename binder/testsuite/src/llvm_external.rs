@@ -1,27 +1,31 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{env, fs};
 
 use anyhow::{anyhow, bail, Result};
-use log::info;
+use log::{debug, info};
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use serde::{Deserialize, Serialize};
 
 use libra_builder::ResolverLLVM;
-use libra_engine::error::EngineError;
+use libra_engine::error::{EngineError, EngineResult};
+use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use libra_engine::flow::shared::Context;
-use libra_shared::compile_db::{ClangCommand, CompileDB, CompileEntry, TokenStream};
+use libra_shared::compile_db::{
+    ClangCommand, ClangSupportedLanguage, CompileDB, CompileEntry, TokenStream,
+};
 use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
-use crate::common::TestSuite;
-use crate::llvm_lit::LLVMTestCase;
+use crate::common::{Summary, TestCase, TestSuite};
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
+
+/// Maximum number of fixedpoint optimization
+static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
 
 /// Get baseline cmake command
 fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
@@ -114,50 +118,6 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Summary {
-    pub passed: Vec<String>,
-    pub failed_compile: Vec<String>,
-    pub failed_loading: Vec<String>,
-    pub failed_invariant: Vec<String>,
-    pub failed_assumption: Vec<String>,
-    pub failed_unsupported: BTreeMap<String, Vec<String>>,
-}
-
-impl Summary {
-    pub fn save(&self, path: &Path) -> Result<()> {
-        let content = serde_json::to_string_pretty(self)?;
-        fs::write(path, content)?;
-        Ok(())
-    }
-
-    pub fn show(&self) {
-        println!("passed: {}", self.passed.len());
-        if !self.failed_compile.is_empty() {
-            println!("failed [compile]: {}", self.failed_compile.len());
-        }
-        if !self.failed_loading.is_empty() {
-            println!("failed [loading]: {}", self.failed_loading.len());
-        }
-        if !self.failed_invariant.is_empty() {
-            println!("failed [invariant]: {}", self.failed_invariant.len());
-        }
-        if !self.failed_assumption.is_empty() {
-            println!("failed [assumption]: {}", self.failed_assumption.len());
-        }
-        println!(
-            "unsupported: {}",
-            self.failed_unsupported
-                .values()
-                .map(|v| v.len())
-                .sum::<usize>()
-        );
-        for (category, tests) in &self.failed_unsupported {
-            println!("  - {}: {}", category, tests.len());
-        }
-    }
-}
-
 impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
     fn run(
         _repo: GitRepo,
@@ -202,7 +162,7 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
                 let output = test.run_libra(&ctxt, &workdir)?;
 
                 // check errors to halt on first failure caused by potential bugs
-                if let Some((_, Err(err))) = output.as_ref() {
+                if let Some(Err(err)) = output.1.as_ref() {
                     match err {
                         EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
                         EngineError::LLVMLoadingError(reason)
@@ -217,60 +177,8 @@ impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
             results
         };
 
-        // filter the results
-        let executed: BTreeMap<_, _> = consolidated.into_iter().flatten().collect();
-        info!("Number of test cases executed: {}", executed.len());
-
-        // split the results
-        let mut passed = vec![];
-        let mut failed_compile = vec![];
-        let mut failed_loading = vec![];
-        let mut failed_invariant = vec![];
-        let mut failed_assumption = vec![];
-        let mut failed_unsupported = BTreeMap::new();
-
-        for (name, result) in executed {
-            match result {
-                Ok(_) => {
-                    passed.push(name);
-                }
-                // potential setup issue
-                Err(EngineError::CompilationError(_)) => {
-                    failed_compile.push(name);
-                }
-                // known issues
-                Err(EngineError::NotSupportedYet(reason)) => {
-                    failed_unsupported
-                        .entry(reason)
-                        .or_insert_with(Vec::new)
-                        .push(name);
-                }
-                // potential bugs with the oracle
-                Err(EngineError::LLVMLoadingError(_)) => {
-                    failed_loading.push(name);
-                }
-                // potential bugs with the backend
-                Err(EngineError::InvariantViolation(_)) => {
-                    failed_invariant.push(name);
-                }
-                Err(EngineError::InvalidAssumption(_)) => {
-                    failed_assumption.push(name);
-                }
-            }
-        }
-
         // summarize the result
-        let summary = Summary {
-            passed,
-            failed_compile,
-            failed_loading,
-            failed_invariant,
-            failed_assumption,
-            failed_unsupported: failed_unsupported
-                .into_iter()
-                .map(|(k, v)| (k.to_string(), v))
-                .collect(),
-        };
+        let summary = Summary::new(consolidated);
         summary.show();
 
         let path_summary = workdir.join("summary.json");
@@ -384,7 +292,7 @@ impl DepLLVMExternal {
     fn lit_test_discovery(
         resolver: &ResolverLLVMExternal,
         mut commands: BTreeMap<String, ClangCommand>,
-    ) -> Result<Vec<LLVMTestCase>> {
+    ) -> Result<Vec<TestCaseExternal>> {
         // locate the lit tool
         let (_, pkg_llvm) = ResolverLLVM::seek()?;
         let bin_lit = pkg_llvm.path_build().join("bin").join("llvm-lit");
@@ -438,9 +346,99 @@ impl DepLLVMExternal {
             }
 
             // create the test case
-            result.push(LLVMTestCase::new(name.to_string(), path_test, command));
+            result.push(TestCaseExternal {
+                name: name.to_string(),
+                _path: path_test,
+                command,
+            });
         }
 
         Ok(result)
+    }
+}
+
+/// A test case from the llvm-test-suite
+pub struct TestCaseExternal {
+    name: String,
+    _path: PathBuf,
+    command: ClangCommand,
+}
+
+impl TestCaseExternal {
+    /// Run libra engine
+    fn libra_workflow(
+        ctxt: &Context,
+        command: &ClangCommand,
+        input: &Path,
+        output: &Path,
+    ) -> EngineResult<()> {
+        // compile
+        let bc_init = output.join("init.bc");
+        ctxt.compile_to_bitcode(input, &bc_init, command.gen_args_for_libra())
+            .map_err(|e| EngineError::CompilationError(format!("Error during clang: {}", e)))?;
+        ctxt.disassemble_in_place(&bc_init)
+            .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+
+        // fixedpoint
+        let flow_fp = FlowFixedpoint::new(
+            ctxt,
+            bc_init,
+            output.to_path_buf(),
+            Some(MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION),
+        );
+        flow_fp.execute()?;
+
+        // done with everything
+        Ok(())
+    }
+}
+
+impl TestCase for TestCaseExternal {
+    /// Run the test case through libra workflow (internal)
+    fn run_libra(
+        &self,
+        ctxt: &Context,
+        workdir: &Path,
+    ) -> Result<(String, Option<EngineResult<()>>)> {
+        let Self {
+            name,
+            _path: _,
+            command,
+        } = self;
+
+        // TODO: support other languages like C++ and ObjC
+        match command.infer_language() {
+            None => bail!("unable to infer input language"),
+            Some(lang) => match lang {
+                ClangSupportedLanguage::C | ClangSupportedLanguage::Bitcode => (),
+                _ => return Ok((name.to_string(), None)),
+            },
+        }
+
+        // retrieve input
+        let inputs = command.inputs();
+        if inputs.len() != 1 {
+            // NOTE: this is true because we use SingleSource tests only
+            bail!("expect one and only one input");
+        }
+        let input = inputs.into_iter().next().unwrap();
+
+        // report progress
+        debug!("running test case: {}", name);
+
+        // prepare output directory
+        let output_dir = workdir.join(name);
+        fs::create_dir_all(&output_dir)?;
+
+        // temporarily change directory
+        let cursor = env::current_dir()?;
+        env::set_current_dir(&command.workdir)?;
+
+        // workflow
+        let result = Self::libra_workflow(ctxt, command, Path::new(input), &output_dir);
+
+        // clean-up
+        env::set_current_dir(cursor)?;
+        Ok((name.to_string(), Some(result)))
     }
 }

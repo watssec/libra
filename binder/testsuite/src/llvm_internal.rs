@@ -16,14 +16,13 @@ use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
-use crate::common::TestSuite;
-use crate::llvm_external::Summary;
-
-/// Maximum number of fixedpoint optimization
-static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
+use crate::common::{Summary, TestSuite};
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
 static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
+
+/// Maximum number of fixedpoint optimization
+static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
 
 /// Artifact path resolver for LLVM
 pub struct ResolverLLVMInternal {
@@ -112,7 +111,7 @@ impl TestSuite<ResolverLLVMInternal> for DepLLVMInternal {
                 let output = test.run_libra(&ctxt, &workdir)?;
 
                 // check errors to halt on first failure caused by potential bugs
-                if let Some((_, Err(err))) = output.as_ref() {
+                if let Some(Err(err)) = output.1.as_ref() {
                     match err {
                         EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
                         EngineError::LLVMLoadingError(reason)
@@ -127,60 +126,8 @@ impl TestSuite<ResolverLLVMInternal> for DepLLVMInternal {
             results
         };
 
-        // filter the results
-        let executed: BTreeMap<_, _> = consolidated.into_iter().flatten().collect();
-        info!("Number of test cases executed: {}", executed.len());
-
-        // split the results
-        let mut passed = vec![];
-        let mut failed_compile = vec![];
-        let mut failed_loading = vec![];
-        let mut failed_invariant = vec![];
-        let mut failed_assumption = vec![];
-        let mut failed_unsupported = BTreeMap::new();
-
-        for (name, result) in executed {
-            match result {
-                Ok(_) => {
-                    passed.push(name);
-                }
-                // potential setup issue
-                Err(EngineError::CompilationError(_)) => {
-                    failed_compile.push(name);
-                }
-                // known issues
-                Err(EngineError::NotSupportedYet(reason)) => {
-                    failed_unsupported
-                        .entry(reason)
-                        .or_insert_with(Vec::new)
-                        .push(name);
-                }
-                // potential bugs with the oracle
-                Err(EngineError::LLVMLoadingError(_)) => {
-                    failed_loading.push(name);
-                }
-                // potential bugs with the backend
-                Err(EngineError::InvariantViolation(_)) => {
-                    failed_invariant.push(name);
-                }
-                Err(EngineError::InvalidAssumption(_)) => {
-                    failed_assumption.push(name);
-                }
-            }
-        }
-
         // summarize the result
-        let summary = Summary {
-            passed,
-            failed_compile,
-            failed_loading,
-            failed_invariant,
-            failed_assumption,
-            failed_unsupported: failed_unsupported
-                .into_iter()
-                .map(|(k, v)| (k.to_string(), v))
-                .collect(),
-        };
+        let summary = Summary::new(consolidated);
         summary.show();
 
         let path_summary = workdir.join("summary.json");
@@ -327,7 +274,7 @@ impl BitcodeTestCase {
         &self,
         ctxt: &Context,
         workdir: &Path,
-    ) -> Result<Option<(String, EngineResult<()>)>> {
+    ) -> Result<(String, Option<EngineResult<()>>)> {
         let Self { name, path } = self;
 
         // report progress
@@ -346,13 +293,13 @@ impl BitcodeTestCase {
             Ok(_) => (),
             Err(e) => {
                 warn!("unable to validate bitcode {}: {}", name, e);
-                return Ok(None);
+                return Ok((name.to_string(), None));
             }
         }
 
         // workflow
         let result = libra_workflow(ctxt, &path_bc_init, &output_dir);
-        Ok(Some((name.to_string(), result)))
+        Ok((name.to_string(), Some(result)))
     }
 }
 
