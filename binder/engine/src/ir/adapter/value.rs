@@ -11,6 +11,8 @@ pub enum Value {
     Argument { ty: Type, index: usize },
     /// reference to an instruction
     Instruction { ty: Type, index: usize },
+    /// metadata
+    Metadata,
 }
 
 impl Value {
@@ -19,6 +21,8 @@ impl Value {
             Self::Constant(constant) => &constant.ty,
             Self::Argument { ty, .. } => ty,
             Self::Instruction { ty, .. } => ty,
+            // TODO: support metadata system
+            Self::Metadata => &Type::Metadata,
         }
     }
 }

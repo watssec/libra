@@ -23,6 +23,7 @@ pub enum Unsupported {
     InterfaceResolver,
     IndirectJump,
     AtomicInstruction,
+    MetadataSystem,
 }
 
 impl Display for Unsupported {
@@ -84,6 +85,9 @@ impl Display for Unsupported {
             }
             Self::AtomicInstruction => {
                 write!(f, "atomic instruction")
+            }
+            Self::MetadataSystem => {
+                write!(f, "metadata system")
             }
         }
     }

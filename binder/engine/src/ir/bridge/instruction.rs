@@ -473,6 +473,9 @@ impl<'a> Context<'a> {
                     ty: actual_ty,
                 }
             }
+            AdaptedValue::Metadata => {
+                return Err(EngineError::NotSupportedYet(Unsupported::MetadataSystem));
+            }
         };
         Ok(converted)
     }

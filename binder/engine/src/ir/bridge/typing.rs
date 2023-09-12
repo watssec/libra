@@ -189,9 +189,7 @@ impl TypeToken {
                 ));
             }
             AdaptedType::Metadata => {
-                return Err(EngineError::InvalidAssumption(
-                    "unexpected llvm primitive type: metadata".into(),
-                ));
+                return Err(EngineError::NotSupportedYet(Unsupported::MetadataSystem));
             }
         };
         Ok(converted)
