@@ -243,7 +243,7 @@ impl TestCase for TestCaseInternal {
         fs::create_dir_all(&output_dir)?;
 
         // check if llvm-as and opt likes the bitcode
-        let path_bc_init = workdir.join("init.bc");
+        let path_bc_init = output_dir.join("init.bc");
         match ctxt
             .assemble(path, &path_bc_init)
             .and_then(|_| ctxt.opt_verify(&path_bc_init))
