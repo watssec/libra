@@ -8,9 +8,9 @@ use structopt::StructOpt;
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::logging;
 
-use crate::common::TestSuite;
-use crate::llvm_external::{DepLLVMExternal, ResolverLLVMExternal};
-use crate::llvm_internal::{DepLLVMInternal, ResolverLLVMInternal};
+use crate::common::{TestCase, TestSuite};
+use crate::llvm_external::{DepLLVMExternal, ResolverLLVMExternal, TestCaseExternal};
+use crate::llvm_internal::{DepLLVMInternal, ResolverLLVMInternal, TestCaseInternal};
 
 #[derive(StructOpt)]
 enum Command {
@@ -68,15 +68,21 @@ pub fn entrypoint() -> Result<()> {
 
     // run the subcommand
     match name.as_str() {
-        "external" => run_internal::<ResolverLLVMExternal, DepLLVMExternal>(command)?,
-        "internal" => run_internal::<ResolverLLVMInternal, DepLLVMInternal>(command)?,
+        "external" => {
+            run_internal::<TestCaseExternal, ResolverLLVMExternal, DepLLVMExternal>(command)?
+        }
+        "internal" => {
+            run_internal::<TestCaseInternal, ResolverLLVMInternal, DepLLVMInternal>(command)?
+        }
         _ => bail!("Invalid deps name: {}", name),
     }
 
     Ok(())
 }
 
-fn run_internal<R: Resolver, T: Dependency<R> + TestSuite<R>>(command: Command) -> Result<()> {
+fn run_internal<C: TestCase, R: Resolver, T: Dependency<R> + TestSuite<C, R>>(
+    command: Command,
+) -> Result<()> {
     let state: DepState<R, T> = DepState::new()?;
     match command {
         Command::Config => state.list_build_options()?,

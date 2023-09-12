@@ -2,29 +2,103 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-use anyhow::Result;
-use log::error;
+use anyhow::{bail, Result};
+use log::{error, info};
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
 use libra_engine::error::{EngineError, EngineResult};
 use libra_engine::flow::shared::Context;
+use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::Resolver;
 use libra_shared::git::GitRepo;
 
-/// A trait that marks a test suite
-pub trait TestSuite<R: Resolver> {
-    /// Run the test suite
-    fn run(repo: GitRepo, resolver: R, force: bool, filter: Vec<String>) -> Result<()>;
-}
-
 /// A trait that marks a test case
-pub trait TestCase {
-    /// Run the test case through libra workflow (internal)
+pub trait TestCase: Send {
+    /// Get the name of the test case
+    fn name(&self) -> &str;
+
+    /// Run the test case through libra workflow
     fn run_libra(
         &self,
         ctxt: &Context,
         workdir: &Path,
     ) -> Result<(String, Option<EngineResult<()>>)>;
+}
+
+/// A trait that marks a test suite
+pub trait TestSuite<C: TestCase, R: Resolver> {
+    /// Location of the workspace from the studio
+    fn wks_path_from_studio() -> &'static [&'static str];
+
+    /// Test case discovery
+    fn discover_test_cases(repo: &GitRepo, resolver: &R) -> Result<Vec<C>>;
+
+    /// Run the test suite
+    fn run(repo: GitRepo, resolver: R, force: bool, filter: Vec<String>) -> Result<()> {
+        // prepare the environment
+        let mut workdir = PATH_STUDIO.to_path_buf();
+        workdir.extend(Self::wks_path_from_studio());
+        if workdir.exists() {
+            if !force {
+                info!("Prior testing result exists");
+                return Ok(());
+            }
+            fs::remove_dir_all(&workdir)?;
+        }
+        fs::create_dir_all(&workdir)?;
+
+        // information collection
+        let test_cases = Self::discover_test_cases(&repo, &resolver)?;
+        info!("Number of test cases discovered: {}", test_cases.len());
+
+        // run the tests
+        let ctxt = Context::new()?;
+        let consolidated: Vec<_> = if *PARALLEL && filter.is_empty() {
+            test_cases
+                .into_par_iter()
+                .map(|test| test.run_libra(&ctxt, &workdir))
+                .collect::<Result<_>>()?
+        } else {
+            // serial execution will halt on first failure caused by potential bugs
+            let mut results = vec![];
+            for test in test_cases {
+                // apply filter if necessary
+                if !filter.is_empty() && filter.iter().all(|v| v != test.name()) {
+                    continue;
+                }
+
+                // actual execution
+                let output = test.run_libra(&ctxt, &workdir)?;
+
+                // check errors to halt on first failure caused by potential bugs
+                if let Some(Err(err)) = output.1.as_ref() {
+                    match err {
+                        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
+                        EngineError::LLVMLoadingError(reason)
+                        | EngineError::InvalidAssumption(reason)
+                        | EngineError::InvariantViolation(reason) => {
+                            bail!("potential bug: {}", reason);
+                        }
+                    }
+                }
+                results.push(output);
+            }
+            results
+        };
+
+        // summarize the result
+        let summary = Summary::new(consolidated);
+        summary.show();
+
+        let path_summary = workdir.join("summary.json");
+        summary.save(&path_summary)?;
+        info!("Summary saved at: {}", path_summary.to_string_lossy());
+
+        // done
+        Ok(())
+    }
 }
 
 /// A summary for the testing result

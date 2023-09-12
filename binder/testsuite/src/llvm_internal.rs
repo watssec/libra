@@ -4,19 +4,16 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
-use log::{debug, info, warn};
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
+use log::{debug, warn};
 
 use libra_builder::ResolverLLVM;
-use libra_engine::error::{EngineError, EngineResult};
+use libra_engine::error::EngineResult;
 use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use libra_engine::flow::shared::Context;
-use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
-use crate::common::{Summary, TestSuite};
+use crate::common::{TestCase, TestSuite};
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
 static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
@@ -68,72 +65,16 @@ impl Dependency<ResolverLLVMInternal> for DepLLVMInternal {
     }
 }
 
-impl TestSuite<ResolverLLVMInternal> for DepLLVMInternal {
-    fn run(
-        repo: GitRepo,
-        resolver: ResolverLLVMInternal,
-        force: bool,
-        filter: Vec<String>,
-    ) -> Result<()> {
-        // prepare the environment
-        let mut workdir = PATH_STUDIO.to_path_buf();
-        workdir.extend(PATH_WORKSPACE);
-        if workdir.exists() {
-            if !force {
-                info!("Prior testing result exists");
-                return Ok(());
-            }
-            fs::remove_dir_all(&workdir)?;
-        }
-        fs::create_dir_all(&workdir)?;
+impl TestSuite<TestCaseInternal, ResolverLLVMInternal> for DepLLVMInternal {
+    fn wks_path_from_studio() -> &'static [&'static str] {
+        PATH_WORKSPACE.as_ref()
+    }
 
-        // information collection
-        let test_cases = Self::lit_test_discovery(&repo, &resolver)?;
-        info!("Number of test cases discovered: {}", test_cases.len());
-
-        // run the tests
-        let ctxt = Context::new()?;
-        let consolidated: Vec<_> = if *PARALLEL && filter.is_empty() {
-            test_cases
-                .into_par_iter()
-                .map(|test| test.run_libra(&ctxt, &workdir))
-                .collect::<Result<_>>()?
-        } else {
-            // serial execution will halt on first failure caused by potential bugs
-            let mut results = vec![];
-            for test in test_cases {
-                // apply filter if necessary
-                if !filter.is_empty() && !filter.contains(&test.name) {
-                    continue;
-                }
-
-                // actual execution
-                let output = test.run_libra(&ctxt, &workdir)?;
-
-                // check errors to halt on first failure caused by potential bugs
-                if let Some(Err(err)) = output.1.as_ref() {
-                    match err {
-                        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
-                        EngineError::LLVMLoadingError(reason)
-                        | EngineError::InvalidAssumption(reason)
-                        | EngineError::InvariantViolation(reason) => {
-                            bail!("potential bug: {}", reason);
-                        }
-                    }
-                }
-                results.push(output);
-            }
-            results
-        };
-
-        // summarize the result
-        let summary = Summary::new(consolidated);
-        summary.show();
-
-        let path_summary = workdir.join("summary.json");
-        summary.save(&path_summary)?;
-        info!("Summary saved at: {}", path_summary.to_string_lossy());
-        Ok(())
+    fn discover_test_cases(
+        repo: &GitRepo,
+        resolver: &ResolverLLVMInternal,
+    ) -> Result<Vec<TestCaseInternal>> {
+        Self::lit_test_discovery(repo, resolver)
     }
 }
 
@@ -141,7 +82,7 @@ impl DepLLVMInternal {
     fn lit_test_discovery(
         repo: &GitRepo,
         resolver: &ResolverLLVMInternal,
-    ) -> Result<Vec<BitcodeTestCase>> {
+    ) -> Result<Vec<TestCaseInternal>> {
         // run discovery
         let output = Command::new(&resolver.bin_lit)
             .arg("--show-tests")
@@ -215,7 +156,7 @@ impl DepLLVMInternal {
                 .map_err(|e| anyhow!("invalid test case {}: {}", name, e))?;
 
             // add to worklist
-            result.push(BitcodeTestCase {
+            result.push(TestCaseInternal {
                 name: name.to_string(),
                 path: path_test,
             });
@@ -263,14 +204,31 @@ impl DepLLVMInternal {
     }
 }
 
-struct BitcodeTestCase {
+pub struct TestCaseInternal {
     name: String,
     path: PathBuf,
 }
 
-impl BitcodeTestCase {
-    /// Run the test case through libra workflow (internal)
-    pub fn run_libra(
+impl TestCaseInternal {
+    fn libra_workflow(ctxt: &Context, input: &Path, output: &Path) -> EngineResult<()> {
+        // fixedpoint
+        let flow_fp = FlowFixedpoint::new(
+            ctxt,
+            input.to_path_buf(),
+            output.to_path_buf(),
+            Some(MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION),
+        );
+        flow_fp.execute()?;
+        Ok(())
+    }
+}
+
+impl TestCase for TestCaseInternal {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn run_libra(
         &self,
         ctxt: &Context,
         workdir: &Path,
@@ -298,19 +256,7 @@ impl BitcodeTestCase {
         }
 
         // workflow
-        let result = libra_workflow(ctxt, &path_bc_init, &output_dir);
+        let result = Self::libra_workflow(ctxt, &path_bc_init, &output_dir);
         Ok((name.to_string(), Some(result)))
     }
-}
-
-fn libra_workflow(ctxt: &Context, input: &Path, output: &Path) -> EngineResult<()> {
-    // fixedpoint
-    let flow_fp = FlowFixedpoint::new(
-        ctxt,
-        input.to_path_buf(),
-        output.to_path_buf(),
-        Some(MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION),
-    );
-    flow_fp.execute()?;
-    Ok(())
 }

@@ -4,9 +4,7 @@ use std::process::Command;
 use std::{env, fs};
 
 use anyhow::{anyhow, bail, Result};
-use log::{debug, info};
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
+use log::debug;
 
 use libra_builder::ResolverLLVM;
 use libra_engine::error::{EngineError, EngineResult};
@@ -15,11 +13,10 @@ use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{
     ClangCommand, ClangSupportedLanguage, CompileDB, CompileEntry, TokenStream,
 };
-use libra_shared::config::{PARALLEL, PATH_STUDIO};
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
 
-use crate::common::{Summary, TestCase, TestSuite};
+use crate::common::{TestCase, TestSuite};
 
 static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
 static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
@@ -118,73 +115,17 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
     }
 }
 
-impl TestSuite<ResolverLLVMExternal> for DepLLVMExternal {
-    fn run(
-        _repo: GitRepo,
-        resolver: ResolverLLVMExternal,
-        force: bool,
-        filter: Vec<String>,
-    ) -> Result<()> {
-        // prepare the environment
-        let mut workdir = PATH_STUDIO.to_path_buf();
-        workdir.extend(PATH_WORKSPACE);
-        if workdir.exists() {
-            if !force {
-                info!("Prior testing result exists");
-                return Ok(());
-            }
-            fs::remove_dir_all(&workdir)?;
-        }
-        fs::create_dir_all(&workdir)?;
+impl TestSuite<TestCaseExternal, ResolverLLVMExternal> for DepLLVMExternal {
+    fn wks_path_from_studio() -> &'static [&'static str] {
+        PATH_WORKSPACE.as_ref()
+    }
 
-        // check instances
-        let commands = Self::parse_compile_database(&resolver)?;
-        let test_cases = Self::lit_test_discovery(&resolver, commands)?;
-        info!("Number of test cases discovered: {}", test_cases.len());
-
-        // run the tests
-        let ctxt = Context::new()?;
-        let consolidated: Vec<_> = if *PARALLEL && filter.is_empty() {
-            test_cases
-                .into_par_iter()
-                .map(|test| test.run_libra(&ctxt, &workdir))
-                .collect::<Result<_>>()?
-        } else {
-            // serial execution will halt on first failure caused by potential bugs
-            let mut results = vec![];
-            for test in test_cases {
-                // apply filter if necessary
-                if !filter.is_empty() && !filter.contains(&test.name) {
-                    continue;
-                }
-
-                // actual execution
-                let output = test.run_libra(&ctxt, &workdir)?;
-
-                // check errors to halt on first failure caused by potential bugs
-                if let Some(Err(err)) = output.1.as_ref() {
-                    match err {
-                        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => (),
-                        EngineError::LLVMLoadingError(reason)
-                        | EngineError::InvalidAssumption(reason)
-                        | EngineError::InvariantViolation(reason) => {
-                            bail!("potential bug: {}", reason);
-                        }
-                    }
-                }
-                results.push(output);
-            }
-            results
-        };
-
-        // summarize the result
-        let summary = Summary::new(consolidated);
-        summary.show();
-
-        let path_summary = workdir.join("summary.json");
-        summary.save(&path_summary)?;
-        info!("Summary saved at: {}", path_summary.to_string_lossy());
-        Ok(())
+    fn discover_test_cases(
+        _repo: &GitRepo,
+        resolver: &ResolverLLVMExternal,
+    ) -> Result<Vec<TestCaseExternal>> {
+        let commands = Self::parse_compile_database(resolver)?;
+        Self::lit_test_discovery(resolver, commands)
     }
 }
 
@@ -394,7 +335,10 @@ impl TestCaseExternal {
 }
 
 impl TestCase for TestCaseExternal {
-    /// Run the test case through libra workflow (internal)
+    fn name(&self) -> &str {
+        &self.name
+    }
+
     fn run_libra(
         &self,
         ctxt: &Context,
