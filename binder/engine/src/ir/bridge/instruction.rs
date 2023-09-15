@@ -341,7 +341,7 @@ impl CompareOperator {
             "f_ole" | "f_ule" => Self::Pred(ComparePredicate::LE, NumRepr::Float),
             "f_ord" => Self::Ord(true),
             "f_uno" => Self::Ord(false),
-            "f_f" | "f_t" => {
+            "f_false" | "f_true" => {
                 return Err(EngineError::NotSupportedYet(
                     Unsupported::FloatingPointOrdering,
                 ))
@@ -1776,13 +1776,6 @@ impl<'a> Context<'a> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
 
-        // all terminator instructions have a void type
-        if !matches!(inst.ty, AdaptedType::Void) {
-            return Err(EngineError::InvalidAssumption(
-                "all terminator instructions must have void type".into(),
-            ));
-        }
-
         let term = match &inst.repr {
             AdaptedInst::Return { value } => match (value, &self.ret) {
                 (None, None) => Terminator::Return { val: None },
@@ -1957,6 +1950,15 @@ impl<'a> Context<'a> {
                 ));
             }
         };
+
+        // all terminator instructions have a void type
+        // TODO: this does not apply to exception handling
+        if !matches!(inst.ty, AdaptedType::Void) {
+            return Err(EngineError::InvalidAssumption(
+                "all terminator instructions must have void type".into(),
+            ));
+        }
+
         Ok(term)
     }
 }
