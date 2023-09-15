@@ -58,8 +58,6 @@ json::Object serialize_type(const Type &type) {
     break;
   case Type::FixedVectorTyID:
   case Type::ScalableVectorTyID:
-  case Type::X86_AMXTyID:
-  case Type::X86_MMXTyID:
     result["Vector"] = serialize_type_vector(cast<VectorType>(type));
     break;
   case Type::TargetExtTyID:
@@ -73,6 +71,9 @@ json::Object serialize_type(const Type &type) {
     result["Label"] = json::Value(nullptr);
     break;
   case Type::TokenTyID:
+    // TODO: it is arguable whether X86_* types should be token
+  case Type::X86_AMXTyID:
+  case Type::X86_MMXTyID:
     result["Token"] = json::Value(nullptr);
     break;
   case Type::MetadataTyID:
