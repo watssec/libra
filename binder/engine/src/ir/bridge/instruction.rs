@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use rug::Integer;
+
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::constant::{Constant, NumValue};
@@ -390,7 +392,7 @@ pub enum Terminator {
     /// switch
     Switch {
         cond: Value,
-        cases: BTreeMap<u128, BlockLabel>,
+        cases: BTreeMap<Integer, BlockLabel>,
         default: Option<BlockLabel>,
     },
     /// enters an unreachable state
@@ -1873,14 +1875,7 @@ impl<'a> Context<'a> {
                         Constant::NumOne {
                             bits: _,
                             value: NumValue::Int(label_val),
-                        } => match label_val.to_u128() {
-                            None => {
-                                return Err(EngineError::InvalidAssumption(
-                                    "switch casing label larger than u128".into(),
-                                ));
-                            }
-                            Some(v) => v,
-                        },
+                        } => label_val,
                         _ => {
                             return Err(EngineError::InvariantViolation(
                                 "switch case is not a constant int".into(),

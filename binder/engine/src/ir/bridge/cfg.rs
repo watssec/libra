@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use petgraph::algo::is_isomorphic_matching;
 use petgraph::graph::{DiGraph, NodeIndex};
+use rug::Integer;
 
 use crate::error::{EngineError, EngineResult};
 use crate::ir::adapter;
@@ -25,7 +26,7 @@ pub struct Block {
 pub enum Edge {
     Goto,
     Branch(bool),
-    Switch(BTreeSet<Option<u128>>),
+    Switch(BTreeSet<Option<Integer>>),
 }
 
 /// An adapted representation of an LLVM control-flow graph
@@ -171,7 +172,7 @@ impl ControlFlowGraph {
                             .or_insert_with(|| Edge::Switch(BTreeSet::new()));
                         match edge_switch {
                             Edge::Switch(set) => {
-                                if !set.insert(Some(*case_id)) {
+                                if !set.insert(Some(case_id.clone())) {
                                     return Err(EngineError::InvariantViolation(
                                         "duplicated edge in CFG".into(),
                                     ));
