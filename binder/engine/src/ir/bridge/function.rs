@@ -169,7 +169,7 @@ impl Function {
         // convert the name
         let ident: Identifier = name
             .as_ref()
-            .ok_or_else(|| EngineError::InvalidAssumption("no anonymous function".into()))?
+            .ok_or(EngineError::NotSupportedYet(Unsupported::AnonymousFunction))?
             .into();
 
         // filter intrinsics

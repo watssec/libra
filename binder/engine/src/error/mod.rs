@@ -23,6 +23,7 @@ pub enum Unsupported {
     PointerAddressSpace,
     OutOfBoundConstantGEP,
     InterfaceResolver,
+    AnonymousFunction,
     IndirectJump,
     IntrinsicsExperimentalGC,
     IntrinsicsPreAllocated,
@@ -90,6 +91,9 @@ impl Display for Unsupported {
             }
             Self::InterfaceResolver => {
                 write!(f, "load-time interface resolving")
+            }
+            Self::AnonymousFunction => {
+                write!(f, "anonymous function")
             }
             Self::IndirectJump => {
                 write!(f, "indirect jump (e.g., through register)")
