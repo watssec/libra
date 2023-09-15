@@ -54,10 +54,10 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
           serialize_inst_call_intrinsic(cast<IntrinsicInst>(call_inst));
     } else if (call_inst.isInlineAsm()) {
       result["Asm"] = serialize_inst_call_asm(call_inst);
-    } else if (call_inst.getCalledFunction() == nullptr) {
-      result["CallIndirect"] = serialize_inst_call_indirect(call_inst);
-    } else {
+    } else if (isa<Function>(call_inst.getCalledOperand())) {
       result["CallDirect"] = serialize_inst_call_direct(call_inst);
+    } else {
+      result["CallIndirect"] = serialize_inst_call_indirect(call_inst);
     }
   }
 
