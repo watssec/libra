@@ -26,8 +26,9 @@ pub enum Unsupported {
     AnonymousFunction,
     OpaqueType,
     IndirectJump,
-    IntrinsicsExperimentalGC,
     IntrinsicsPreAllocated,
+    IntrinsicsConvergence,
+    IntrinsicsGC,
     AtomicInstruction,
     ExceptionHandling,
     MetadataSystem,
@@ -102,11 +103,14 @@ impl Display for Unsupported {
             Self::IndirectJump => {
                 write!(f, "indirect jump (e.g., through register)")
             }
-            Self::IntrinsicsExperimentalGC => {
-                write!(f, "llvm.experimental.gc.*")
-            }
             Self::IntrinsicsPreAllocated => {
                 write!(f, "llvm.call.preallocated.*")
+            }
+            Self::IntrinsicsConvergence => {
+                write!(f, "llvm.experimental.convergence.*")
+            }
+            Self::IntrinsicsGC => {
+                write!(f, "llvm.experimental.gc.*")
             }
             Self::AtomicInstruction => {
                 write!(f, "atomic instruction")
