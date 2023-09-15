@@ -24,6 +24,7 @@ pub enum Unsupported {
     OutOfBoundConstantGEP,
     InterfaceResolver,
     IndirectJump,
+    IntrinsicsExperimentalGC,
     AtomicInstruction,
     ExceptionHandling,
     MetadataSystem,
@@ -91,6 +92,9 @@ impl Display for Unsupported {
             }
             Self::IndirectJump => {
                 write!(f, "indirect jump (e.g., through register)")
+            }
+            Self::IntrinsicsExperimentalGC => {
+                write!(f, "llvm.experimental.gc.*")
             }
             Self::AtomicInstruction => {
                 write!(f, "atomic instruction")

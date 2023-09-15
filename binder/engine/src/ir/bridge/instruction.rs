@@ -659,6 +659,49 @@ impl<'a> Context<'a> {
                             ));
                         }
 
+                        // TODO: better distinguish calls
+                        let callee_new = self.parse_value(callee, &Type::Pointer)?;
+                        let callee_result = if matches!(
+                            repr,
+                            AdaptedInst::CallDirect { .. } | AdaptedInst::Intrinsic { .. }
+                        ) {
+                            match callee_new {
+                                Value::Constant(Constant::Function { name: callee_name }) => {
+                                    // early filtering of unsupported intrinsics
+                                    let name = callee_name.as_ref();
+                                    match name.strip_prefix("llvm.experimental.gc.") {
+                                        None => (),
+                                        Some(_) => {
+                                            // NOTE: involves `token` type
+                                            return Err(EngineError::NotSupportedYet(
+                                                Unsupported::IntrinsicsExperimentalGC,
+                                            ));
+                                        }
+                                    }
+                                    Ok(callee_name)
+                                }
+                                _ => {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "direct or intrinsic call should target a named function"
+                                            .into(),
+                                    ));
+                                }
+                            }
+                        } else {
+                            if !matches!(repr, AdaptedInst::CallIndirect { .. }) {
+                                return Err(EngineError::InvariantViolation(
+                                    "expecting an indirect call but found some other call type"
+                                        .into(),
+                                ));
+                            }
+                            if matches!(callee_new, Value::Constant(Constant::Function { .. })) {
+                                return Err(EngineError::InvalidAssumption(
+                                    "indirect call should not target a named function".into(),
+                                ));
+                            }
+                            Err(callee_new)
+                        };
+
                         // conversion
                         let args_new: Vec<_> = params
                             .iter()
@@ -684,45 +727,19 @@ impl<'a> Context<'a> {
                                 Some(inst_ty)
                             }
                         };
-                        let callee_new = self.parse_value(callee, &Type::Pointer)?;
 
-                        // TODO: better distinguish calls
-                        if matches!(
-                            repr,
-                            AdaptedInst::CallDirect { .. } | AdaptedInst::Intrinsic { .. }
-                        ) {
-                            match callee_new {
-                                Value::Constant(Constant::Function { name: callee_name }) => {
-                                    Instruction::CallDirect {
-                                        function: callee_name,
-                                        args: args_new,
-                                        result: ret_ty.map(|t| (t, index.into())),
-                                    }
-                                }
-                                _ => {
-                                    return Err(EngineError::InvalidAssumption(
-                                        "direct or intrinsic call should target a named function"
-                                            .into(),
-                                    ));
-                                }
-                            }
-                        } else {
-                            if !matches!(repr, AdaptedInst::CallIndirect { .. }) {
-                                return Err(EngineError::InvariantViolation(
-                                    "expecting an indirect call but found some other call type"
-                                        .into(),
-                                ));
-                            }
-                            if matches!(callee_new, Value::Constant(Constant::Function { .. })) {
-                                return Err(EngineError::InvalidAssumption(
-                                    "indirect call should not target a named function".into(),
-                                ));
-                            }
-                            Instruction::CallIndirect {
-                                callee: callee_new,
+                        // construction
+                        match callee_result {
+                            Ok(callee_name) => Instruction::CallDirect {
+                                function: callee_name,
                                 args: args_new,
                                 result: ret_ty.map(|t| (t, index.into())),
-                            }
+                            },
+                            Err(callee_value) => Instruction::CallIndirect {
+                                callee: callee_value,
+                                args: args_new,
+                                result: ret_ty.map(|t| (t, index.into())),
+                            },
                         }
                     }
                     _ => {
