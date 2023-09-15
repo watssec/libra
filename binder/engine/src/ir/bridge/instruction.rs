@@ -628,17 +628,18 @@ impl<'a> Context<'a> {
                 callee,
                 target_type,
                 args,
-            }
-            | AdaptedInst::CallIndirect {
-                callee,
-                target_type,
-                args,
-            }
-            | AdaptedInst::Intrinsic {
-                callee,
-                target_type,
-                args,
             } => {
+                // extract the name of the called function
+                let callee_new = self.parse_value(callee, &Type::Pointer)?;
+                let callee_name = match callee_new {
+                    Value::Constant(Constant::Function { name: callee_name }) => callee_name,
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "CallDirect should target a named function".into(),
+                        ));
+                    }
+                };
+
                 let func_ty = self.typing.convert(target_type)?;
                 match &func_ty {
                     Type::Function {
@@ -650,57 +651,14 @@ impl<'a> Context<'a> {
                         if *variadic {
                             if args.len() < params.len() {
                                 return Err(EngineError::InvalidAssumption(
-                                    "CallInst number of arguments mismatch (variadic)".into(),
+                                    "CallDirect number of arguments mismatch (variadic)".into(),
                                 ));
                             }
                         } else if params.len() != args.len() {
                             return Err(EngineError::InvalidAssumption(
-                                "CallInst number of arguments mismatch (exact)".into(),
+                                "CallDirect number of arguments mismatch (exact)".into(),
                             ));
                         }
-
-                        // TODO: better distinguish calls
-                        let callee_new = self.parse_value(callee, &Type::Pointer)?;
-                        let callee_result = if matches!(
-                            repr,
-                            AdaptedInst::CallDirect { .. } | AdaptedInst::Intrinsic { .. }
-                        ) {
-                            match callee_new {
-                                Value::Constant(Constant::Function { name: callee_name }) => {
-                                    // early filtering of unsupported intrinsics
-                                    let name = callee_name.as_ref();
-                                    match name.strip_prefix("llvm.experimental.gc.") {
-                                        None => (),
-                                        Some(_) => {
-                                            // NOTE: involves `token` type
-                                            return Err(EngineError::NotSupportedYet(
-                                                Unsupported::IntrinsicsExperimentalGC,
-                                            ));
-                                        }
-                                    }
-                                    Ok(callee_name)
-                                }
-                                _ => {
-                                    return Err(EngineError::InvalidAssumption(
-                                        "direct or intrinsic call should target a named function"
-                                            .into(),
-                                    ));
-                                }
-                            }
-                        } else {
-                            if !matches!(repr, AdaptedInst::CallIndirect { .. }) {
-                                return Err(EngineError::InvariantViolation(
-                                    "expecting an indirect call but found some other call type"
-                                        .into(),
-                                ));
-                            }
-                            if matches!(callee_new, Value::Constant(Constant::Function { .. })) {
-                                return Err(EngineError::InvalidAssumption(
-                                    "indirect call should not target a named function".into(),
-                                ));
-                            }
-                            Err(callee_new)
-                        };
 
                         // conversion
                         let args_new: Vec<_> = params
@@ -712,7 +670,7 @@ impl<'a> Context<'a> {
                             None => {
                                 if !matches!(ty, AdaptedType::Void) {
                                     return Err(EngineError::InvalidAssumption(
-                                        "CallInst return type mismatch".into(),
+                                        "CallDirect return type mismatch".into(),
                                     ));
                                 }
                                 None
@@ -721,7 +679,7 @@ impl<'a> Context<'a> {
                                 let inst_ty = self.typing.convert(ty)?;
                                 if t.as_ref() != &inst_ty {
                                     return Err(EngineError::InvalidAssumption(
-                                        "CallInst return type mismatch".into(),
+                                        "CallDirect return type mismatch".into(),
                                     ));
                                 }
                                 Some(inst_ty)
@@ -729,22 +687,176 @@ impl<'a> Context<'a> {
                         };
 
                         // construction
-                        match callee_result {
-                            Ok(callee_name) => Instruction::CallDirect {
-                                function: callee_name,
-                                args: args_new,
-                                result: ret_ty.map(|t| (t, index.into())),
-                            },
-                            Err(callee_value) => Instruction::CallIndirect {
-                                callee: callee_value,
-                                args: args_new,
-                                result: ret_ty.map(|t| (t, index.into())),
-                            },
+                        Instruction::CallDirect {
+                            function: callee_name,
+                            args: args_new,
+                            result: ret_ty.map(|t| (t, index.into())),
                         }
                     }
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "CallInst refer to a non-function callee".into(),
+                            "CallDirect refer to a non-function callee".into(),
+                        ));
+                    }
+                }
+            }
+            AdaptedInst::CallIndirect {
+                callee,
+                target_type,
+                args,
+            } => {
+                // extract the indirect callee
+                let callee_new = self.parse_value(callee, &Type::Pointer)?;
+                if matches!(callee_new, Value::Constant(Constant::Function { .. })) {
+                    return Err(EngineError::InvalidAssumption(
+                        "CallIndirect should not target a named function".into(),
+                    ));
+                }
+
+                let func_ty = self.typing.convert(target_type)?;
+                match &func_ty {
+                    Type::Function {
+                        params,
+                        variadic,
+                        ret,
+                    } => {
+                        // sanity check
+                        if *variadic {
+                            if args.len() < params.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "CallIndirect number of arguments mismatch (variadic)".into(),
+                                ));
+                            }
+                        } else if params.len() != args.len() {
+                            return Err(EngineError::InvalidAssumption(
+                                "CallIndirect number of arguments mismatch (exact)".into(),
+                            ));
+                        }
+
+                        // conversion
+                        let args_new: Vec<_> = params
+                            .iter()
+                            .zip(args.iter())
+                            .map(|(t, v)| self.parse_value(v, t))
+                            .collect::<EngineResult<_>>()?;
+                        let ret_ty = match ret {
+                            None => {
+                                if !matches!(ty, AdaptedType::Void) {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "CallIndirect return type mismatch".into(),
+                                    ));
+                                }
+                                None
+                            }
+                            Some(t) => {
+                                let inst_ty = self.typing.convert(ty)?;
+                                if t.as_ref() != &inst_ty {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "CallIndirect return type mismatch".into(),
+                                    ));
+                                }
+                                Some(inst_ty)
+                            }
+                        };
+
+                        // construction
+                        Instruction::CallIndirect {
+                            callee: callee_new,
+                            args: args_new,
+                            result: ret_ty.map(|t| (t, index.into())),
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "CallIndirect refer to a non-function callee".into(),
+                        ));
+                    }
+                }
+            }
+            AdaptedInst::Intrinsic {
+                callee,
+                target_type,
+                args,
+            } => {
+                // early filtering of unsupported intrinsics
+                let callee_new = self.parse_value(callee, &Type::Pointer)?;
+                let callee_name = match callee_new {
+                    Value::Constant(Constant::Function { name: callee_name }) => {
+                        let name = callee_name.as_ref();
+                        match name.strip_prefix("llvm.experimental.gc.") {
+                            None => (),
+                            Some(_) => {
+                                // NOTE: involves `token` type
+                                return Err(EngineError::NotSupportedYet(
+                                    Unsupported::IntrinsicsExperimentalGC,
+                                ));
+                            }
+                        }
+                        callee_name
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "CallIntrinsic should target a named function".into(),
+                        ));
+                    }
+                };
+
+                let func_ty = self.typing.convert(target_type)?;
+                match &func_ty {
+                    Type::Function {
+                        params,
+                        variadic,
+                        ret,
+                    } => {
+                        // sanity check
+                        if *variadic {
+                            if args.len() < params.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "CallIntrinsic number of arguments mismatch (variadic)".into(),
+                                ));
+                            }
+                        } else if params.len() != args.len() {
+                            return Err(EngineError::InvalidAssumption(
+                                "CallIntrinsic number of arguments mismatch (exact)".into(),
+                            ));
+                        }
+
+                        // conversion
+                        let args_new: Vec<_> = params
+                            .iter()
+                            .zip(args.iter())
+                            .map(|(t, v)| self.parse_value(v, t))
+                            .collect::<EngineResult<_>>()?;
+                        let ret_ty = match ret {
+                            None => {
+                                if !matches!(ty, AdaptedType::Void) {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "CallIntrinsic return type mismatch".into(),
+                                    ));
+                                }
+                                None
+                            }
+                            Some(t) => {
+                                let inst_ty = self.typing.convert(ty)?;
+                                if t.as_ref() != &inst_ty {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "CallIntrinsic return type mismatch".into(),
+                                    ));
+                                }
+                                Some(inst_ty)
+                            }
+                        };
+
+                        // construction
+                        Instruction::CallDirect {
+                            function: callee_name,
+                            args: args_new,
+                            result: ret_ty.map(|t| (t, index.into())),
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "CallIntrinsic refer to a non-function callee".into(),
                         ));
                     }
                 }

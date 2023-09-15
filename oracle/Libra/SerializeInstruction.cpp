@@ -10,7 +10,7 @@ std::string get_sync_scope_name(SyncScope::ID scope) {
   case SyncScope::SingleThread:
     return "thread";
   default:
-    LOG->fatal("invalid sync scope");
+    LOG->fatal("invalid sync scope: {0}", scope);
   }
 }
 
