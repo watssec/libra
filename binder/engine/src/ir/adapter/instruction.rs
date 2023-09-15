@@ -148,6 +148,15 @@ pub enum Inst {
         scope: String,
         address_space: usize,
     },
+    // exception handling
+    LandingPad {
+        clauses: Vec<Constant>,
+        is_cleanup: bool,
+    },
+    CatchPad,
+    CleanupPad,
+    // very rare cases
+    CallBranch,
     // terminator
     Return {
         value: Option<Value>,
@@ -166,6 +175,19 @@ pub enum Inst {
         address: Value,
         targets: Vec<usize>,
     },
+    Invoke {
+        callee: Value,
+        target_type: Type,
+        args: Vec<Value>,
+        normal: usize,
+        unwind: usize,
+    },
+    Resume {
+        value: Value,
+    },
+    CatchSwitch,
+    CatchReturn,
+    CleanupReturn,
     Unreachable,
 }
 

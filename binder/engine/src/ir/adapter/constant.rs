@@ -20,6 +20,7 @@ pub enum Const {
     Function { name: Option<String> },
     Alias { name: Option<String> },
     Interface { name: Option<String> },
+    Marker { wrap: Box<Constant> },
     PC,
     Expr { inst: Box<Inst> },
 }

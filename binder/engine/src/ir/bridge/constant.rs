@@ -444,6 +444,9 @@ impl Constant {
             AdaptedConst::Interface { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::InterfaceResolver));
             }
+            AdaptedConst::Marker { .. } => {
+                return Err(EngineError::NotSupportedYet(Unsupported::GlobalMarker));
+            }
             AdaptedConst::PC => {
                 return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
             }

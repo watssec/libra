@@ -45,11 +45,13 @@ json::Object serialize_constant(const Constant &val) {
 json::Object serialize_const(const Constant &val) {
   json::Object result;
 
-  // early filtering
+  // markers
   if (isa<DSOLocalEquivalent>(val)) {
-    LOG->fatal("serializing a dso_local marker");
+    result["Marker"] =
+        serialize_const_marker(*cast<DSOLocalEquivalent>(val).getGlobalValue());
   } else if (isa<NoCFIValue>(val)) {
-    LOG->fatal("serializing a no-CFI marker");
+    result["Marker"] =
+        serialize_const_marker(*cast<NoCFIValue>(val).getGlobalValue());
   }
 
   // constant data
@@ -163,6 +165,12 @@ json::Object serialize_const_pack_struct(const ConstantStruct &val) {
 
 json::Object serialize_const_pack_vector(const ConstantVector &val) {
   return serialize_const_pack_aggregate(val);
+}
+
+json::Object serialize_const_marker(const GlobalValue &val) {
+  json::Object result;
+  result["wrap"] = serialize_constant(val);
+  return result;
 }
 
 json::Object serialize_const_ref_global_variable(const GlobalVariable &val) {

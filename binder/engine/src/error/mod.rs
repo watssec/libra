@@ -7,6 +7,7 @@ pub enum Unsupported {
     ModuleLevelAssembly,
     InlineAssembly,
     GlobalAlias,
+    GlobalMarker,
     FloatingPointOrdering,
     VectorOfPointers,
     ScalableVector,
@@ -24,6 +25,7 @@ pub enum Unsupported {
     InterfaceResolver,
     IndirectJump,
     AtomicInstruction,
+    ExceptionHandling,
     MetadataSystem,
 }
 
@@ -38,6 +40,9 @@ impl Display for Unsupported {
             }
             Self::GlobalAlias => {
                 write!(f, "global alias")
+            }
+            Self::GlobalMarker => {
+                write!(f, "markers for global values")
             }
             Self::FloatingPointOrdering => {
                 write!(f, "floating point ordered comparison")
@@ -89,6 +94,9 @@ impl Display for Unsupported {
             }
             Self::AtomicInstruction => {
                 write!(f, "atomic instruction")
+            }
+            Self::ExceptionHandling => {
+                write!(f, "exception handling")
             }
             Self::MetadataSystem => {
                 write!(f, "metadata system")

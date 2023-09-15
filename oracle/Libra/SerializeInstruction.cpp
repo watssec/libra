@@ -113,14 +113,21 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   }
 
   // exception handling (non-terminator)
-  else if (isa<InvokeInst>(inst) || isa<CatchPadInst>(inst) ||
-           isa<LandingPadInst>(inst) || isa<CleanupPadInst>(inst)) {
-    LOG->fatal("exception handling not supported yet: {0}", inst);
+  else if (isa<LandingPadInst>(inst)) {
+    result["LandingPad"] =
+        serialize_inst_landing_pad(cast<LandingPadInst>(inst));
+  } else if (isa<CatchPadInst>(inst)) {
+    // TODO: give details on the CatchPadInst
+    result["CatchPad"] = json::Value(nullptr);
+  } else if (isa<CleanupPadInst>(inst)) {
+    // TODO: give details on the CleanupPadInst
+    result["CleanupPad"] = json::Value(nullptr);
   }
 
   // very rare cases (non-terminator)
   else if (isa<CallBrInst>(inst)) {
-    LOG->fatal("unable to handle CallBrInst");
+    // TODO: give details on the CallBrInst
+    result["CallBranch"] = json::Value(nullptr);
   }
 
   // terminators
@@ -133,14 +140,24 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   } else if (isa<IndirectBrInst>(inst)) {
     result["IndirectJump"] =
         serialize_inst_jump_indirect(cast<IndirectBrInst>(inst));
+  } else if (isa<InvokeInst>(inst)) {
+    result["Invoke"] = serialize_inst_invoke(cast<InvokeInst>(inst));
+  } else if (isa<ResumeInst>(inst)) {
+    result["Resume"] = serialize_inst_resume(cast<ResumeInst>(inst));
   } else if (isa<UnreachableInst>(inst)) {
     result["Unreachable"] = json::Value(nullptr);
   }
 
   // exception handling (terminator)
-  else if (isa<CatchSwitchInst>(inst) || isa<CatchReturnInst>(inst) ||
-           isa<ResumeInst>(inst) || isa<CleanupReturnInst>(inst)) {
-    LOG->fatal("exception handling not supported yet: {0}", inst);
+  else if (isa<CatchSwitchInst>(inst)) {
+    // TODO: give details on the CatchSwitchInst
+    result["CatchSwitch"] = json::Value(nullptr);
+  } else if (isa<CatchReturnInst>(inst)) {
+    // TODO: give details on the CatchReturnInst
+    result["CatchReturn"] = json::Value(nullptr);
+  } else if (isa<CleanupReturnInst>(inst)) {
+    // TODO: give details on the CleanupReturnInst
+    result["CleanupReturn"] = json::Value(nullptr);
   }
 
   // should have exhausted all valid cases
@@ -760,6 +777,20 @@ json::Object FunctionSerializationContext::serialize_inst_atomic_rmw(
   return result;
 }
 
+json::Object FunctionSerializationContext::serialize_inst_landing_pad(
+    const LandingPadInst &inst) const {
+  json::Object result;
+
+  json::Array clauses;
+  for (unsigned i = 0; i < inst.getNumClauses(); i++) {
+    clauses.push_back(serialize_constant(*inst.getClause(i)));
+  }
+  result["clauses"] = std::move(clauses);
+  result["is_cleanup"] = inst.isCleanup();
+
+  return result;
+}
+
 json::Object FunctionSerializationContext::serialize_inst_return(
     const ReturnInst &inst) const {
   json::Object result;
@@ -818,6 +849,30 @@ json::Object FunctionSerializationContext::serialize_inst_switch(
   if (default_case != inst.case_end()) {
     result["default"] = get_block(*default_case->getCaseSuccessor());
   }
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_invoke(
+    const InvokeInst &inst) const {
+  json::Object result;
+  result["callee"] = serialize_value(*inst.getCalledOperand());
+  result["target_type"] = serialize_type(*inst.getFunctionType());
+
+  json::Array args;
+  for (const auto &arg : inst.args()) {
+    args.push_back(serialize_value(*arg.get()));
+  }
+  result["args"] = std::move(args);
+
+  result["normal"] = get_block(*inst.getNormalDest());
+  result["unwind"] = get_block(*inst.getUnwindDest());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_resume(
+    const ResumeInst &inst) const {
+  json::Object result;
+  result["value"] = serialize_value(*inst.getValue());
   return result;
 }
 

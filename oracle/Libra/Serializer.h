@@ -39,6 +39,7 @@ serialize_const_data_vector(const ConstantDataVector &val);
 serialize_const_pack_struct(const ConstantStruct &val);
 [[nodiscard]] json::Object
 serialize_const_pack_vector(const ConstantVector &val);
+[[nodiscard]] json::Object serialize_const_marker(const GlobalValue &gval);
 [[nodiscard]] json::Object
 serialize_const_ref_global_variable(const GlobalVariable &val);
 [[nodiscard]] json::Object serialize_const_ref_function(const Function &val);
@@ -122,6 +123,8 @@ public:
   [[nodiscard]] json::Object
   serialize_inst_atomic_rmw(const AtomicRMWInst &inst) const;
   [[nodiscard]] json::Object
+  serialize_inst_landing_pad(const LandingPadInst &inst) const;
+  [[nodiscard]] json::Object
   serialize_inst_return(const ReturnInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_branch(const BranchInst &inst) const;
@@ -129,6 +132,10 @@ public:
   serialize_inst_jump_indirect(const IndirectBrInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_switch(const SwitchInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_invoke(const InvokeInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_resume(const ResumeInst &inst) const;
 
   [[nodiscard]] json::Object serialize_value(const Value &val) const;
   [[nodiscard]] json::Object

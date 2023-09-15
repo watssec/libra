@@ -1612,11 +1612,24 @@ impl<'a> Context<'a> {
             | AdaptedInst::AtomicRMW { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
             }
+            // exception
+            AdaptedInst::LandingPad { .. } | AdaptedInst::CatchPad | AdaptedInst::CleanupPad => {
+                return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+            }
+            // very rare cases
+            AdaptedInst::CallBranch => {
+                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+            }
             // terminators should never appear here
             AdaptedInst::Return { .. }
             | AdaptedInst::Branch { .. }
             | AdaptedInst::Switch { .. }
             | AdaptedInst::IndirectJump { .. }
+            | AdaptedInst::Invoke { .. }
+            | AdaptedInst::Resume { .. }
+            | AdaptedInst::CatchSwitch
+            | AdaptedInst::CatchReturn
+            | AdaptedInst::CleanupReturn
             | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with terminator instruction in the body".into(),
@@ -1771,7 +1784,14 @@ impl<'a> Context<'a> {
                 }
             }
             AdaptedInst::IndirectJump { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
+                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+            }
+            AdaptedInst::Invoke { .. }
+            | AdaptedInst::Resume { .. }
+            | AdaptedInst::CatchSwitch
+            | AdaptedInst::CatchReturn
+            | AdaptedInst::CleanupReturn => {
+                return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
             }
             AdaptedInst::Unreachable => Terminator::Unreachable,
             // explicitly list the rest of the instructions
@@ -1798,7 +1818,11 @@ impl<'a> Context<'a> {
             | AdaptedInst::ShuffleVector { .. }
             | AdaptedInst::Fence { .. }
             | AdaptedInst::AtomicCmpXchg { .. }
-            | AdaptedInst::AtomicRMW { .. } => {
+            | AdaptedInst::AtomicRMW { .. }
+            | AdaptedInst::LandingPad { .. }
+            | AdaptedInst::CatchPad
+            | AdaptedInst::CleanupPad
+            | AdaptedInst::CallBranch => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));
