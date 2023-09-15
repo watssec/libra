@@ -419,11 +419,7 @@ impl TypeRegistry {
                 .into();
             let items = fields
                 .as_ref()
-                .ok_or_else(|| {
-                    EngineError::InvalidAssumption(
-                        "user-defined struct type cannot be opaque".into(),
-                    )
-                })?
+                .ok_or(EngineError::NotSupportedYet(Unsupported::OpaqueType))?
                 .clone();
 
             match type_ident_to_fields.insert(ident, items) {

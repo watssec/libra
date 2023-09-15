@@ -24,6 +24,7 @@ pub enum Unsupported {
     OutOfBoundConstantGEP,
     InterfaceResolver,
     AnonymousFunction,
+    OpaqueType,
     IndirectJump,
     IntrinsicsExperimentalGC,
     IntrinsicsPreAllocated,
@@ -94,6 +95,9 @@ impl Display for Unsupported {
             }
             Self::AnonymousFunction => {
                 write!(f, "anonymous function")
+            }
+            Self::OpaqueType => {
+                write!(f, "opaque type")
             }
             Self::IndirectJump => {
                 write!(f, "indirect jump (e.g., through register)")
