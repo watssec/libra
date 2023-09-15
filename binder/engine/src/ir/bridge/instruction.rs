@@ -390,7 +390,7 @@ pub enum Terminator {
     /// switch
     Switch {
         cond: Value,
-        cases: BTreeMap<u64, BlockLabel>,
+        cases: BTreeMap<u128, BlockLabel>,
         default: Option<BlockLabel>,
     },
     /// enters an unreachable state
@@ -1873,10 +1873,10 @@ impl<'a> Context<'a> {
                         Constant::NumOne {
                             bits: _,
                             value: NumValue::Int(label_val),
-                        } => match label_val.to_u64() {
+                        } => match label_val.to_u128() {
                             None => {
                                 return Err(EngineError::InvalidAssumption(
-                                    "switch casing label larger than u64".into(),
+                                    "switch casing label larger than u128".into(),
                                 ));
                             }
                             Some(v) => v,

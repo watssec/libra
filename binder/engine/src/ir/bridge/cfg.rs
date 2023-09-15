@@ -25,7 +25,7 @@ pub struct Block {
 pub enum Edge {
     Goto,
     Branch(bool),
-    Switch(BTreeSet<Option<u64>>),
+    Switch(BTreeSet<Option<u128>>),
 }
 
 /// An adapted representation of an LLVM control-flow graph
