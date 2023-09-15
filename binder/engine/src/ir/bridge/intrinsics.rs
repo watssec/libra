@@ -24,5 +24,15 @@ pub fn filter_intrinsics(name: &str) -> EngineResult<()> {
             return Err(EngineError::NotSupportedYet(Unsupported::IntrinsicsGC));
         }
     }
+
+    // exception handling
+    match name.strip_prefix("llvm.eh.exceptionpointer.") {
+        None => (),
+        Some(_) => {
+            return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+        }
+    }
+
+    // other intrinsics are okay
     Ok(())
 }
