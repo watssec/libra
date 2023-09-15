@@ -23,6 +23,14 @@ json::Object serialize_type(const Type &type) {
   case Type::TypeID::IntegerTyID:
     result["Int"] = serialize_type_int(cast<IntegerType>(type));
     break;
+  case Type::X86_MMXTyID:
+    result["Int"] =
+        serialize_type_int(*IntegerType::get(type.getContext(), 64));
+    break;
+  case Type::X86_AMXTyID:
+    result["Int"] =
+        serialize_type_int(*IntegerType::get(type.getContext(), 8192));
+    break;
   case Type::TypeID::HalfTyID:
     result["Float"] = mk_float(16, "half");
     break;
@@ -71,9 +79,6 @@ json::Object serialize_type(const Type &type) {
     result["Label"] = json::Value(nullptr);
     break;
   case Type::TokenTyID:
-    // TODO: it is arguable whether X86_* types should be token
-  case Type::X86_AMXTyID:
-  case Type::X86_MMXTyID:
     result["Token"] = json::Value(nullptr);
     break;
   case Type::MetadataTyID:
