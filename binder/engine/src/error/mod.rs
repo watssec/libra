@@ -24,6 +24,7 @@ pub enum Unsupported {
     OutOfBoundConstantGEP,
     InterfaceResolver,
     AnonymousFunction,
+    AnonymousGlobalVariable,
     OpaqueType,
     IndirectJump,
     IntrinsicsPreAllocated,
@@ -96,6 +97,9 @@ impl Display for Unsupported {
             }
             Self::AnonymousFunction => {
                 write!(f, "anonymous function")
+            }
+            Self::AnonymousGlobalVariable => {
+                write!(f, "anonymous global variable")
             }
             Self::OpaqueType => {
                 write!(f, "opaque type")
