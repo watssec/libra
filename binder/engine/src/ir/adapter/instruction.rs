@@ -155,8 +155,6 @@ pub enum Inst {
     },
     CatchPad,
     CleanupPad,
-    // very rare cases
-    CallBranch,
     // terminator
     Return {
         value: Option<Value>,
@@ -188,6 +186,7 @@ pub enum Inst {
     CatchSwitch,
     CatchReturn,
     CleanupReturn,
+    CallBranch,
     Unreachable,
 }
 

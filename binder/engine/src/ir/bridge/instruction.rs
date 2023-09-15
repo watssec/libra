@@ -1748,10 +1748,6 @@ impl<'a> Context<'a> {
             AdaptedInst::LandingPad { .. } | AdaptedInst::CatchPad | AdaptedInst::CleanupPad => {
                 return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
             }
-            // very rare cases
-            AdaptedInst::CallBranch => {
-                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
-            }
             // terminators should never appear here
             AdaptedInst::Return { .. }
             | AdaptedInst::Branch { .. }
@@ -1762,6 +1758,7 @@ impl<'a> Context<'a> {
             | AdaptedInst::CatchSwitch
             | AdaptedInst::CatchReturn
             | AdaptedInst::CleanupReturn
+            | AdaptedInst::CallBranch
             | AdaptedInst::Unreachable => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with terminator instruction in the body".into(),
@@ -1918,6 +1915,9 @@ impl<'a> Context<'a> {
             | AdaptedInst::CleanupReturn => {
                 return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
             }
+            AdaptedInst::CallBranch => {
+                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+            }
             AdaptedInst::Unreachable => Terminator::Unreachable,
             // explicitly list the rest of the instructions
             AdaptedInst::Alloca { .. }
@@ -1946,8 +1946,7 @@ impl<'a> Context<'a> {
             | AdaptedInst::AtomicRMW { .. }
             | AdaptedInst::LandingPad { .. }
             | AdaptedInst::CatchPad
-            | AdaptedInst::CleanupPad
-            | AdaptedInst::CallBranch => {
+            | AdaptedInst::CleanupPad => {
                 return Err(EngineError::InvariantViolation(
                     "malformed block with non-terminator instruction".into(),
                 ));

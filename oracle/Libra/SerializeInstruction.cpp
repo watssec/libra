@@ -125,12 +125,6 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["CleanupPad"] = json::Value(nullptr);
   }
 
-  // very rare cases (non-terminator)
-  else if (isa<CallBrInst>(inst)) {
-    // TODO: give details on the CallBrInst
-    result["CallBranch"] = json::Value(nullptr);
-  }
-
   // terminators
   else if (isa<ReturnInst>(inst)) {
     result["Return"] = serialize_inst_return(cast<ReturnInst>(inst));
@@ -159,6 +153,12 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
   } else if (isa<CleanupReturnInst>(inst)) {
     // TODO: give details on the CleanupReturnInst
     result["CleanupReturn"] = json::Value(nullptr);
+  }
+
+  // very rare cases (terminator)
+  else if (isa<CallBrInst>(inst)) {
+    // TODO: give details on the CallBrInst
+    result["CallBranch"] = json::Value(nullptr);
   }
 
   // should have exhausted all valid cases
