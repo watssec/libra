@@ -25,6 +25,7 @@ pub enum Unsupported {
     InterfaceResolver,
     IndirectJump,
     IntrinsicsExperimentalGC,
+    IntrinsicsPreAllocated,
     AtomicInstruction,
     ExceptionHandling,
     MetadataSystem,
@@ -95,6 +96,9 @@ impl Display for Unsupported {
             }
             Self::IntrinsicsExperimentalGC => {
                 write!(f, "llvm.experimental.gc.*")
+            }
+            Self::IntrinsicsPreAllocated => {
+                write!(f, "llvm.call.preallocated.*")
             }
             Self::AtomicInstruction => {
                 write!(f, "atomic instruction")
