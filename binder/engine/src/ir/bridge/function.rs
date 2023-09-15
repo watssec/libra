@@ -1,6 +1,7 @@
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::cfg::ControlFlowGraph;
+use crate::ir::bridge::intrinsics::filter_intrinsics;
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 
@@ -170,6 +171,9 @@ impl Function {
             .as_ref()
             .ok_or_else(|| EngineError::InvalidAssumption("no anonymous function".into()))?
             .into();
+
+        // filter intrinsics
+        filter_intrinsics(ident.as_ref())?;
 
         // convert the signature
         let func_ty = typing.convert(ty)?;

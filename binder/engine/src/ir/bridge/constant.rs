@@ -582,6 +582,10 @@ pub enum Expression {
         offset: Constant,
         indices: Vec<GEPConstIndex>,
     },
+    GEPNop {
+        pointee_type: Type,
+        pointer: Constant,
+    },
     // choice
     ITEOne {
         cond: Constant,
@@ -871,6 +875,17 @@ impl Expression {
                     pointer: pointer.expect_constant()?,
                     offset: offset.expect_constant()?,
                     indices: indices_new,
+                }
+            }
+            Instruction::GEPNop {
+                pointee_type,
+                pointer,
+                result,
+            } => {
+                assert!(result == usize::MAX.into());
+                Self::GEPNop {
+                    pointee_type,
+                    pointer: pointer.expect_constant()?,
                 }
             }
             Instruction::ITEOne {

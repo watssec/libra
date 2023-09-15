@@ -3,6 +3,7 @@ pub mod constant;
 pub mod function;
 pub mod global;
 pub mod instruction;
+pub mod intrinsics;
 pub mod module;
 pub mod shared;
 pub mod typing;

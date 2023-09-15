@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::constant::{Constant, NumValue};
+use crate::ir::bridge::intrinsics::filter_intrinsics;
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{NumRepr, Type, TypeRegistry};
 use crate::ir::bridge::value::{BlockLabel, RegisterSlot, Value};
@@ -164,6 +165,11 @@ pub enum Instruction {
         pointer: Value,
         offset: Value,
         indices: Vec<GEPIndex>,
+        result: RegisterSlot,
+    },
+    GEPNop {
+        pointee_type: Type,
+        pointer: Value,
         result: RegisterSlot,
     },
     // selection
@@ -782,16 +788,7 @@ impl<'a> Context<'a> {
                 let callee_new = self.parse_value(callee, &Type::Pointer)?;
                 let callee_name = match callee_new {
                     Value::Constant(Constant::Function { name: callee_name }) => {
-                        let name = callee_name.as_ref();
-                        match name.strip_prefix("llvm.experimental.gc.") {
-                            None => (),
-                            Some(_) => {
-                                // NOTE: involves `token` type
-                                return Err(EngineError::NotSupportedYet(
-                                    Unsupported::IntrinsicsExperimentalGC,
-                                ));
-                            }
-                        }
+                        filter_intrinsics(callee_name.as_ref())?;
                         callee_name
                     }
                     _ => {
@@ -1341,12 +1338,20 @@ impl<'a> Context<'a> {
 
                 let src_ty = self.typing.convert(src_pointee_ty)?;
                 let dst_ty = self.typing.convert(dst_pointee_ty)?;
+                let pointer_new = self.parse_value(pointer, &Type::Pointer)?;
 
                 // walk-down the tree
                 if indices.is_empty() {
-                    return Err(EngineError::InvalidAssumption(
-                        "GEP contains no index".into(),
-                    ));
+                    if src_ty != dst_ty {
+                        return Err(EngineError::InvalidAssumption(
+                            "GEP destination type mismatch".into(),
+                        ));
+                    }
+                    return Ok(Instruction::GEPNop {
+                        pointee_type: dst_ty,
+                        pointer: pointer_new,
+                        result: index.into(),
+                    });
                 }
 
                 let offset = indices.first().unwrap();
@@ -1420,8 +1425,6 @@ impl<'a> Context<'a> {
                         "GEP destination type mismatch".into(),
                     ));
                 }
-
-                let pointer_new = self.parse_value(pointer, &Type::Pointer)?;
                 Instruction::GEP {
                     src_pointee_type: src_ty,
                     dst_pointee_type: dst_ty,
