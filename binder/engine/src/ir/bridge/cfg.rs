@@ -130,21 +130,34 @@ impl ControlFlowGraph {
                     then_case,
                     else_case,
                 } => {
-                    if edges
-                        .insert((label.into(), *then_case), Edge::Branch(true))
-                        .is_some()
-                    {
-                        return Err(EngineError::InvariantViolation(
-                            "duplicated edge in CFG".into(),
-                        ));
-                    }
-                    if edges
-                        .insert((label.into(), *else_case), Edge::Branch(false))
-                        .is_some()
-                    {
-                        return Err(EngineError::InvariantViolation(
-                            "duplicated edge in CFG".into(),
-                        ));
+                    if then_case == else_case {
+                        // it is possible to have both `then` and `else` edges pointing to the same
+                        // basic block in manually constructed bitcode
+                        if edges
+                            .insert((label.into(), *then_case), Edge::Goto)
+                            .is_some()
+                        {
+                            return Err(EngineError::InvariantViolation(
+                                "duplicated edge in CFG".into(),
+                            ));
+                        }
+                    } else {
+                        if edges
+                            .insert((label.into(), *then_case), Edge::Branch(true))
+                            .is_some()
+                        {
+                            return Err(EngineError::InvariantViolation(
+                                "duplicated edge in CFG".into(),
+                            ));
+                        }
+                        if edges
+                            .insert((label.into(), *else_case), Edge::Branch(false))
+                            .is_some()
+                        {
+                            return Err(EngineError::InvariantViolation(
+                                "duplicated edge in CFG".into(),
+                            ));
+                        }
                     }
                 }
                 Terminator::Switch {
