@@ -482,6 +482,9 @@ impl<'a> Context<'a> {
             AdaptedValue::Metadata => {
                 return Err(EngineError::NotSupportedYet(Unsupported::MetadataSystem));
             }
+            AdaptedValue::Label => {
+                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+            }
         };
         Ok(converted)
     }

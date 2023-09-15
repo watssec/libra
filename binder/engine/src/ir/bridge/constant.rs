@@ -447,7 +447,7 @@ impl Constant {
             AdaptedConst::Marker { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::GlobalMarker));
             }
-            AdaptedConst::PC => {
+            AdaptedConst::Label => {
                 return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
             }
             AdaptedConst::Expr { inst } => {

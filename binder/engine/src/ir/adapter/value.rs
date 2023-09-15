@@ -13,6 +13,8 @@ pub enum Value {
     Instruction { ty: Type, index: usize },
     /// metadata
     Metadata,
+    /// block address
+    Label,
 }
 
 impl Value {
@@ -23,6 +25,7 @@ impl Value {
             Self::Instruction { ty, .. } => ty,
             // TODO: support metadata system
             Self::Metadata => &Type::Metadata,
+            Self::Label => &Type::Label,
         }
     }
 }

@@ -14,14 +14,15 @@ FunctionSerializationContext::serialize_value(const Value &val) const {
   } else if (isa<MetadataAsValue>(val)) {
     // TODO: metadata system is not ready
     result["Metadata"] = json::Value(nullptr);
+  } else if (isa<BasicBlock>(val)) {
+    // TODO: assign each block a unique id
+    result["Label"] = json::Value(nullptr);
   } else if (isa<InlineAsm>(val)) {
     LOG->fatal("unexpected asm as value");
   } else if (isa<Operator>(val)) {
     LOG->fatal("unexpected operator as value");
   } else if (isa<MemoryAccess>(val)) {
     LOG->fatal("unexpected memory SSA as value");
-  } else if (isa<BasicBlock>(val)) {
-    LOG->fatal("unexpected block as value");
   } else {
     LOG->fatal("unknown value type: {0}", val);
   }

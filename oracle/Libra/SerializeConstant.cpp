@@ -115,7 +115,7 @@ json::Object serialize_const(const Constant &val) {
   // constant block address
   else if (isa<BlockAddress>(val)) {
     // TODO: assign each block a unique id
-    result["PC"] = json::Value(nullptr);
+    result["Label"] = json::Value(nullptr);
   }
 
   // constant expression
