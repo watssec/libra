@@ -53,7 +53,7 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
       result["Intrinsic"] =
           serialize_inst_call_intrinsic(cast<IntrinsicInst>(call_inst));
     } else if (call_inst.isInlineAsm()) {
-      result["Asm"] = serialize_inst_call_asm(call_inst);
+      result["CallAsm"] = serialize_inst_call_asm(call_inst);
     } else if (isa<Function>(call_inst.getCalledOperand())) {
       result["CallDirect"] = serialize_inst_call_direct(call_inst);
     } else {
@@ -136,7 +136,14 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["IndirectJump"] =
         serialize_inst_jump_indirect(cast<IndirectBrInst>(inst));
   } else if (isa<InvokeInst>(inst)) {
-    result["Invoke"] = serialize_inst_invoke(cast<InvokeInst>(inst));
+    const auto &invoke_inst = cast<InvokeInst>(inst);
+    if (invoke_inst.isInlineAsm()) {
+      result["InvokeAsm"] = serialize_inst_invoke_asm(invoke_inst);
+    } else if (isa<Function>(invoke_inst.getCalledOperand())) {
+      result["InvokeDirect"] = serialize_inst_invoke_direct(invoke_inst);
+    } else {
+      result["InvokeIndirect"] = serialize_inst_invoke_indirect(invoke_inst);
+    }
   } else if (isa<ResumeInst>(inst)) {
     result["Resume"] = serialize_inst_resume(cast<ResumeInst>(inst));
   } else if (isa<UnreachableInst>(inst)) {
@@ -853,7 +860,41 @@ json::Object FunctionSerializationContext::serialize_inst_switch(
   return result;
 }
 
-json::Object FunctionSerializationContext::serialize_inst_invoke(
+json::Object FunctionSerializationContext::serialize_inst_invoke_asm(
+    const InvokeInst &inst) const {
+  json::Object result;
+  result["asm"] =
+      serialize_inline_asm(*cast<InlineAsm>(inst.getCalledOperand()));
+
+  json::Array args;
+  for (const auto &arg : inst.args()) {
+    args.push_back(serialize_value(*arg.get()));
+  }
+  result["args"] = std::move(args);
+
+  result["normal"] = get_block(*inst.getNormalDest());
+  result["unwind"] = get_block(*inst.getUnwindDest());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_invoke_direct(
+    const InvokeInst &inst) const {
+  json::Object result;
+  result["callee"] = serialize_value(*inst.getCalledOperand());
+  result["target_type"] = serialize_type(*inst.getFunctionType());
+
+  json::Array args;
+  for (const auto &arg : inst.args()) {
+    args.push_back(serialize_value(*arg.get()));
+  }
+  result["args"] = std::move(args);
+
+  result["normal"] = get_block(*inst.getNormalDest());
+  result["unwind"] = get_block(*inst.getUnwindDest());
+  return result;
+}
+
+json::Object FunctionSerializationContext::serialize_inst_invoke_indirect(
     const InvokeInst &inst) const {
   json::Object result;
   result["callee"] = serialize_value(*inst.getCalledOperand());

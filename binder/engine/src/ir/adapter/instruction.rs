@@ -46,7 +46,7 @@ pub enum Inst {
         target_type: Type,
         args: Vec<Value>,
     },
-    Asm {
+    CallAsm {
         asm: InlineAsm,
         args: Vec<Value>,
     },
@@ -173,9 +173,22 @@ pub enum Inst {
         address: Value,
         targets: Vec<usize>,
     },
-    Invoke {
+    InvokeDirect {
         callee: Value,
         target_type: Type,
+        args: Vec<Value>,
+        normal: usize,
+        unwind: usize,
+    },
+    InvokeIndirect {
+        callee: Value,
+        target_type: Type,
+        args: Vec<Value>,
+        normal: usize,
+        unwind: usize,
+    },
+    InvokeAsm {
+        asm: InlineAsm,
         args: Vec<Value>,
         normal: usize,
         unwind: usize,

@@ -133,7 +133,11 @@ public:
   [[nodiscard]] json::Object
   serialize_inst_switch(const SwitchInst &inst) const;
   [[nodiscard]] json::Object
-  serialize_inst_invoke(const InvokeInst &inst) const;
+  serialize_inst_invoke_asm(const InvokeInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_invoke_direct(const InvokeInst &inst) const;
+  [[nodiscard]] json::Object
+  serialize_inst_invoke_indirect(const InvokeInst &inst) const;
   [[nodiscard]] json::Object
   serialize_inst_resume(const ResumeInst &inst) const;
 

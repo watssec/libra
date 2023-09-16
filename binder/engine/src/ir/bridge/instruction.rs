@@ -863,7 +863,7 @@ impl<'a> Context<'a> {
                     }
                 }
             }
-            AdaptedInst::Asm { .. } => {
+            AdaptedInst::CallAsm { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::InlineAssembly));
             }
             // unary
@@ -1758,7 +1758,9 @@ impl<'a> Context<'a> {
             | AdaptedInst::Branch { .. }
             | AdaptedInst::Switch { .. }
             | AdaptedInst::IndirectJump { .. }
-            | AdaptedInst::Invoke { .. }
+            | AdaptedInst::InvokeDirect { .. }
+            | AdaptedInst::InvokeIndirect { .. }
+            | AdaptedInst::InvokeAsm { .. }
             | AdaptedInst::Resume { .. }
             | AdaptedInst::CatchSwitch
             | AdaptedInst::CatchReturn
@@ -1906,7 +1908,9 @@ impl<'a> Context<'a> {
             AdaptedInst::IndirectJump { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
             }
-            AdaptedInst::Invoke { .. }
+            AdaptedInst::InvokeDirect { .. }
+            | AdaptedInst::InvokeIndirect { .. }
+            | AdaptedInst::InvokeAsm { .. }
             | AdaptedInst::Resume { .. }
             | AdaptedInst::CatchSwitch
             | AdaptedInst::CatchReturn
@@ -1925,7 +1929,7 @@ impl<'a> Context<'a> {
             | AdaptedInst::Intrinsic { .. }
             | AdaptedInst::CallDirect { .. }
             | AdaptedInst::CallIndirect { .. }
-            | AdaptedInst::Asm { .. }
+            | AdaptedInst::CallAsm { .. }
             | AdaptedInst::Unary { .. }
             | AdaptedInst::Binary { .. }
             | AdaptedInst::Compare { .. }
