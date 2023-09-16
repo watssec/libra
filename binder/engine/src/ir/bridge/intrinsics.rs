@@ -40,7 +40,7 @@ pub fn filter_intrinsics(name: &str) -> EngineResult<()> {
     }
 
     // exception handling
-    match name.strip_prefix("llvm.eh.exceptionpointer.") {
+    match name.strip_prefix("llvm.eh.") {
         None => (),
         Some(_) => {
             return Err(EngineError::NotSupportedYet(Unsupported::IntrinsicsEH));
