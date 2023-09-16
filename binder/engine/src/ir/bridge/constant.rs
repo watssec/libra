@@ -396,8 +396,8 @@ impl Constant {
                 }
                 match name {
                     None => {
-                        return Err(EngineError::InvalidAssumption(
-                            "unexpected reference to an anonymous global variable".into(),
+                        return Err(EngineError::NotSupportedYet(
+                            Unsupported::AnonymousGlobalVariable,
                         ));
                     }
                     Some(n) => {
@@ -422,9 +422,7 @@ impl Constant {
                 }
                 match name {
                     None => {
-                        return Err(EngineError::InvalidAssumption(
-                            "unexpected reference to an anonymous function".into(),
-                        ));
+                        return Err(EngineError::NotSupportedYet(Unsupported::AnonymousFunction));
                     }
                     Some(n) => {
                         let ident = n.into();
