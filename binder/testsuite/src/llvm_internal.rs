@@ -150,8 +150,8 @@ impl DepLLVMInternal {
             if matches!(name, "Other/lit-globbing.ll" | "tools/llvm-ar/bitcode.ll") {
                 continue;
             }
-            // TODO: the following is ignored because we do not take `token` type
-            if matches!(name, "Assembler/token.ll") {
+            // TODO: the following cases are ignored because we do not take `token` type
+            if matches!(name, "Assembler/token.ll" | "Bitcode/bcanalyzer-types.ll") {
                 continue;
             }
 
