@@ -19,7 +19,7 @@ static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
 static PATH_WORKSPACE: [&str; 2] = ["testsuite", "internal"];
 
 /// Maximum number of fixedpoint optimization
-static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
+static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 4;
 
 /// Artifact path resolver for LLVM
 pub struct ResolverLLVMInternal {
