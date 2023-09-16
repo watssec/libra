@@ -71,17 +71,12 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
                     match shall_halt(&output) {
                         None => (),
                         Some(message) => {
-                            match HALT_PARALLEL_EXECUTION.compare_exchange(
-                                false,
-                                true,
-                                Ordering::SeqCst,
-                                Ordering::SeqCst,
-                            ) {
-                                Ok(_) => error!("potential bug: {}", message),
-                                Err(_) => {
-                                    // not reporting this one
-                                    return Ok((test.name().to_string(), None));
-                                }
+                            if HALT_PARALLEL_EXECUTION.swap(true, Ordering::SeqCst) {
+                                // not reporting this one
+                                return Ok((test.name().to_string(), None));
+                            } else {
+                                // report this one and we have marked the execution to halt
+                                error!("potential bug: {}", message);
                             }
                         }
                     }
