@@ -20,6 +20,7 @@ pub enum Unsupported {
     WeakFunction,
     ExternGlobalVariable,
     ExternFunction,
+    HugeConstAggregate,
     PointerAddressSpace,
     OutOfBoundConstantGEP,
     InterfaceResolver,
@@ -87,6 +88,9 @@ impl Display for Unsupported {
             }
             Self::ExternFunction => {
                 write!(f, "function externally defined")
+            }
+            Self::HugeConstAggregate => {
+                write!(f, "huge constant aggregates")
             }
             Self::PointerAddressSpace => {
                 write!(f, "address space of a pointer")

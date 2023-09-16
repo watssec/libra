@@ -12,6 +12,9 @@ use crate::ir::bridge::instruction::{
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{NumRepr, Type, TypeRegistry};
 
+/// Limit of a constant aggregate
+static CONSTANT_AGGREGATE_LENGTH_MAX: usize = u16::MAX as usize;
+
 /// The underlying representation of the bitvec
 #[derive(Eq, PartialEq, Clone)]
 pub enum NumValue {
@@ -63,38 +66,56 @@ impl Constant {
                     bits: *bits,
                     value: NumValue::Int(Integer::ZERO),
                 },
-                (NumRepr::Int, Some(len)) => Self::NumVec {
-                    bits: *bits,
-                    number: NumRepr::Int,
-                    elements: (0..*len)
-                        .map(|_| Self::NumOne {
-                            bits: *bits,
-                            value: NumValue::Int(Integer::ZERO),
-                        })
-                        .collect(),
-                },
+                (NumRepr::Int, Some(len)) => {
+                    if *len > CONSTANT_AGGREGATE_LENGTH_MAX {
+                        return Err(EngineError::NotSupportedYet(
+                            Unsupported::HugeConstAggregate,
+                        ));
+                    }
+                    Self::NumVec {
+                        bits: *bits,
+                        number: NumRepr::Int,
+                        elements: (0..*len)
+                            .map(|_| Self::NumOne {
+                                bits: *bits,
+                                value: NumValue::Int(Integer::ZERO),
+                            })
+                            .collect(),
+                    }
+                }
                 (NumRepr::Float, None) => Self::NumOne {
                     bits: *bits,
                     value: NumValue::Float(Some(Rational::ZERO.clone())),
                 },
-                (NumRepr::Float, Some(len)) => Self::NumVec {
-                    bits: *bits,
-                    number: NumRepr::Float,
-                    elements: (0..*len)
-                        .map(|_| Self::NumOne {
-                            bits: *bits,
-                            value: NumValue::Float(Some(Rational::ZERO.clone())),
-                        })
-                        .collect(),
-                },
+                (NumRepr::Float, Some(len)) => {
+                    if *len > CONSTANT_AGGREGATE_LENGTH_MAX {
+                        return Err(EngineError::NotSupportedYet(
+                            Unsupported::HugeConstAggregate,
+                        ));
+                    }
+                    Self::NumVec {
+                        bits: *bits,
+                        number: NumRepr::Float,
+                        elements: (0..*len)
+                            .map(|_| Self::NumOne {
+                                bits: *bits,
+                                value: NumValue::Float(Some(Rational::ZERO.clone())),
+                            })
+                            .collect(),
+                    }
+                }
             },
             Type::Array { element, length } => {
-                let elements = (0..*length)
-                    .map(|_| Self::default_from_type(element))
-                    .collect::<EngineResult<_>>()?;
+                if *length > CONSTANT_AGGREGATE_LENGTH_MAX {
+                    return Err(EngineError::NotSupportedYet(
+                        Unsupported::HugeConstAggregate,
+                    ));
+                }
                 Self::Array {
                     sub: element.as_ref().clone(),
-                    elements,
+                    elements: (0..*length)
+                        .map(|_| Self::default_from_type(element))
+                        .collect::<EngineResult<_>>()?,
                 }
             }
             Type::Struct { name, fields } => {
@@ -129,37 +150,58 @@ impl Constant {
                     bits: *bits,
                     value: NumValue::IntUndef,
                 },
-                (NumRepr::Int, Some(len)) => Self::NumVec {
-                    bits: *bits,
-                    number: NumRepr::Int,
-                    elements: (0..*len)
-                        .map(|_| Self::NumOne {
-                            bits: *bits,
-                            value: NumValue::IntUndef,
-                        })
-                        .collect(),
-                },
+                (NumRepr::Int, Some(len)) => {
+                    if *len > CONSTANT_AGGREGATE_LENGTH_MAX {
+                        return Err(EngineError::NotSupportedYet(
+                            Unsupported::HugeConstAggregate,
+                        ));
+                    }
+                    Self::NumVec {
+                        bits: *bits,
+                        number: NumRepr::Int,
+                        elements: (0..*len)
+                            .map(|_| Self::NumOne {
+                                bits: *bits,
+                                value: NumValue::IntUndef,
+                            })
+                            .collect(),
+                    }
+                }
                 (NumRepr::Float, None) => Self::NumOne {
                     bits: *bits,
                     value: NumValue::FloatUndef,
                 },
-                (NumRepr::Float, Some(len)) => Self::NumVec {
-                    bits: *bits,
-                    number: NumRepr::Float,
-                    elements: (0..*len)
-                        .map(|_| Self::NumOne {
-                            bits: *bits,
-                            value: NumValue::FloatUndef,
-                        })
-                        .collect(),
-                },
+                (NumRepr::Float, Some(len)) => {
+                    if *len > CONSTANT_AGGREGATE_LENGTH_MAX {
+                        return Err(EngineError::NotSupportedYet(
+                            Unsupported::HugeConstAggregate,
+                        ));
+                    }
+                    Self::NumVec {
+                        bits: *bits,
+                        number: NumRepr::Float,
+                        elements: (0..*len)
+                            .map(|_| Self::NumOne {
+                                bits: *bits,
+                                value: NumValue::FloatUndef,
+                            })
+                            .collect(),
+                    }
+                }
             },
-            Type::Array { element, length } => Self::Array {
-                sub: element.as_ref().clone(),
-                elements: (0..*length)
-                    .map(|_| Self::undef_from_type(element))
-                    .collect::<EngineResult<_>>()?,
-            },
+            Type::Array { element, length } => {
+                if *length > CONSTANT_AGGREGATE_LENGTH_MAX {
+                    return Err(EngineError::NotSupportedYet(
+                        Unsupported::HugeConstAggregate,
+                    ));
+                }
+                Self::Array {
+                    sub: element.as_ref().clone(),
+                    elements: (0..*length)
+                        .map(|_| Self::undef_from_type(element))
+                        .collect::<EngineResult<_>>()?,
+                }
+            }
             Type::Struct { name, fields } => Self::Struct {
                 name: name.clone(),
                 fields: fields
