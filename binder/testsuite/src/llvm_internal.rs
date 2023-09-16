@@ -141,8 +141,12 @@ impl DepLLVMInternal {
             if "ll" != ext {
                 continue;
             }
-            // ignores machine code
+            // ignore machine code
             if name.starts_with("MC/") {
+                continue;
+            }
+            // ignore architecture-specific codegen
+            if name.starts_with("CodeGen/") {
                 continue;
             }
             // ignore deny-listed ones
