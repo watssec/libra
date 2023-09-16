@@ -29,6 +29,8 @@ pub enum Unsupported {
     IndirectJump,
     IntrinsicsPreAllocated,
     IntrinsicsConvergence,
+    IntrinsicsCoroutine,
+    IntrinsicsEH,
     IntrinsicsGC,
     AtomicInstruction,
     ExceptionHandling,
@@ -112,6 +114,12 @@ impl Display for Unsupported {
             }
             Self::IntrinsicsConvergence => {
                 write!(f, "llvm.experimental.convergence.*")
+            }
+            Self::IntrinsicsCoroutine => {
+                write!(f, "llvm.coro.*")
+            }
+            Self::IntrinsicsEH => {
+                write!(f, "llvm.eh.exceptionpointer.*")
             }
             Self::IntrinsicsGC => {
                 write!(f, "llvm.experimental.gc.*")

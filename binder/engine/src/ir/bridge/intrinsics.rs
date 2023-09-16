@@ -1,7 +1,7 @@
 use crate::error::{EngineError, EngineResult, Unsupported};
 
 pub fn filter_intrinsics(name: &str) -> EngineResult<()> {
-    // NOTE: involves `token` type
+    // pre-allocated args
     match name.strip_prefix("llvm.call.preallocated.") {
         None => (),
         Some(_) => {
@@ -10,6 +10,8 @@ pub fn filter_intrinsics(name: &str) -> EngineResult<()> {
             ));
         }
     }
+
+    // convergence
     match name.strip_prefix("llvm.experimental.convergence.") {
         None => (),
         Some(_) => {
@@ -18,6 +20,18 @@ pub fn filter_intrinsics(name: &str) -> EngineResult<()> {
             ));
         }
     }
+
+    // coroutine
+    match name.strip_prefix("llvm.coro.") {
+        None => (),
+        Some(_) => {
+            return Err(EngineError::NotSupportedYet(
+                Unsupported::IntrinsicsCoroutine,
+            ));
+        }
+    }
+
+    // garbage collection
     match name.strip_prefix("llvm.experimental.gc.") {
         None => (),
         Some(_) => {
@@ -29,7 +43,7 @@ pub fn filter_intrinsics(name: &str) -> EngineResult<()> {
     match name.strip_prefix("llvm.eh.exceptionpointer.") {
         None => (),
         Some(_) => {
-            return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+            return Err(EngineError::NotSupportedYet(Unsupported::IntrinsicsEH));
         }
     }
 
