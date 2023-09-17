@@ -71,8 +71,27 @@ performs either static analysis or dynamic interpretation from there.
     cargo run -- external build --force
     cargo run -- external run --force
     ```
+    **Expected output:**
+    - a vast majority of tests pass
+    - a few tests are skipped
+    - a small portion of tests are not supported (with a breakdown of reasons)
+    - **NO** failure cases for whatever reason
+
   - For `internal` test cases
-    - WIP (mengxu)
+    ```bash
+    cd <libra>/binder/testsuite
+    cargo run -- internal run
+    ```
+    *NOTE*: If a prior run fails or you want to force a re-run, use
+    ```bash
+    cargo run -- internal run --force
+    ```
+    **Expected output:**
+    - a vast majority of tests pass
+    - a few tests are skipped
+    - a small portion of tests are not supported (with a breakdown of reasons)
+    - a few tests fail due to compilation error
+    - **NO** other failure cases
 
 ### Troubleshooting
 
@@ -156,6 +175,15 @@ NOTES
 |   |
 |   |   # CLI for running various test suites
 |   |-- testsuite/
+|   |
+|   |   # source code of the testing infrastructure
+|   |-- src
+|   |   |
+|   |   |   # test against the test cases in `llvm-test-suite`
+|   |   |-- llvm_external.rs
+|   |   |
+|   |   |   # test against the test cases in `llvm-project/llvm/test`
+|   |   |-- llvm_internal.rs
 |   |
 |   |   # Shared functionalities
 |   |-- shared/
