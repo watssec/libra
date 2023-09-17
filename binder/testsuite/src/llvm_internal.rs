@@ -155,7 +155,12 @@ impl DepLLVMInternal {
                 continue;
             }
             // TODO: the following cases are ignored because we do not take `token` type
-            if matches!(name, "Assembler/token.ll" | "Bitcode/bcanalyzer-types.ll") {
+            if matches!(
+                name,
+                "Assembler/token.ll"
+                    | "Bitcode/bcanalyzer-types.ll"
+                    | "tools/llvm-reduce/reduce-instructions-token.ll"
+            ) {
                 continue;
             }
 

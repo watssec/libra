@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use libra_engine::error::{EngineError, EngineResult};
 use libra_engine::flow::shared::Context;
-use libra_shared::config::{PARALLEL, PATH_STUDIO};
+use libra_shared::config::{CONTINUE, PARALLEL, PATH_STUDIO};
 use libra_shared::dep::Resolver;
 use libra_shared::git::GitRepo;
 
@@ -71,12 +71,14 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
                     match shall_halt(&output) {
                         None => (),
                         Some(message) => {
-                            if HALT_PARALLEL_EXECUTION.swap(true, Ordering::SeqCst) {
-                                // not reporting this one
-                                return Ok((test.name().to_string(), None));
-                            } else {
-                                // report this one and we have marked the execution to halt
-                                error!("potential bug: {}", message);
+                            if !*CONTINUE {
+                                if HALT_PARALLEL_EXECUTION.swap(true, Ordering::SeqCst) {
+                                    // not reporting this one
+                                    return Ok((test.name().to_string(), None));
+                                } else {
+                                    // report this one and we have marked the execution to halt
+                                    error!("potential bug: {}", message);
+                                }
                             }
                         }
                     }
@@ -84,7 +86,6 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
                 })
                 .collect::<Result<_>>()?
         } else {
-            // serial execution will halt on first failure caused by potential bugs
             let mut results = vec![];
             for test in test_cases {
                 // apply filter if necessary
@@ -95,12 +96,17 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
                 // actual execution
                 let (name, output) = test.run_libra(&ctxt, &workdir)?;
 
-                // check errors to halt on first failure caused by potential bugs
+                // check errors
                 match shall_halt(&output) {
                     None => (),
-                    Some(message) => bail!("potential bug: {}", message),
+                    Some(message) => {
+                        error!("potential bug: {}", message);
+                        if !*CONTINUE {
+                            // halt on first failure caused by potential bugs
+                            bail!("halting sequential execution for potential bugs");
+                        }
+                    }
                 }
-
                 results.push((name, output));
             }
             results

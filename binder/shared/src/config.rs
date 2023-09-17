@@ -24,6 +24,7 @@ lazy_static! {
         }
     };
     pub static ref PARALLEL: bool = matches!(env::var("LIBRA_PARALLEL"), Ok(val) if val == "1");
+    pub static ref CONTINUE: bool = matches!(env::var("LIBRA_CONTINUE"), Ok(val) if val == "1");
 }
 
 // platform-specific constants
