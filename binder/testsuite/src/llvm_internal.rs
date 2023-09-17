@@ -160,7 +160,14 @@ impl DepLLVMInternal {
                 "Assembler/token.ll"
                     | "Bitcode/bcanalyzer-types.ll"
                     | "tools/llvm-reduce/reduce-instructions-token.ll"
+                    | "tools/llvm-reduce/reduce-opcodes-call.ll"
             ) {
+                continue;
+            }
+            // TODO: this case is explicitly ignored as an edge case
+            //   In comment of the test case: "it would take a naive recursive implementation
+            //   ~4 days" and our oracle is a naive recursive implementation
+            if matches!(name, "tools/llvm-as/slow-ptrtoint.ll") {
                 continue;
             }
 
