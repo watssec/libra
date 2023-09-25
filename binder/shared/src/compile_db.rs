@@ -112,6 +112,9 @@ pub enum ClangArg {
     Arch(String),
     /// -march=<token>
     MachineArch(String),
+    #[cfg(target_os = "macos")]
+    /// -mmacosx-<key>=<value>, e.g., -mmmacosx-version-min=12.4
+    MacOSX(String, Option<String>),
     /// -g, --debug
     Debug,
     /// -f<key>{=<value>}
@@ -232,6 +235,12 @@ impl ClangArg {
                             let item = t.strip_prefix("-march=").unwrap();
                             Self::MachineArch(Self::expect_plain(item)?)
                         }
+                        #[cfg(target_os = "macos")]
+                        t if t.starts_with("-mmacosx-") => {
+                            let item = t.strip_prefix("-mmacosx-").unwrap();
+                            let (k, v) = Self::parse_maybe_key_value(item, stream)?;
+                            Self::MacOSX(k, v)
+                        }
                         "-g" | "--debug" => Self::Debug,
                         "-isysroot" => Self::IncludeSysroot(Self::unescape_quotes(
                             stream.next_expect_token()?,
@@ -273,6 +282,10 @@ impl Display for ClangArg {
             Self::Optimization(v) => write!(f, "-O{}", v),
             Self::Arch(v) => write!(f, "-arch {}", v),
             Self::MachineArch(v) => write!(f, "-march={}", v),
+            #[cfg(target_os = "macos")]
+            Self::MacOSX(k, None) => write!(f, "-mmacosx-{}", k),
+            #[cfg(target_os = "macos")]
+            Self::MacOSX(k, Some(v)) => write!(f, "-mmacosx-{}={}", k, v),
             Self::Debug => write!(f, "-g"),
             Self::Flag(k, None) => write!(f, "-f{}", k),
             Self::Flag(k, Some(v)) => write!(f, "-f{}={}", k, v),
@@ -314,6 +327,14 @@ impl ClangArg {
             }
             Self::MachineArch(v) => {
                 args.push(format!("-march={}", v));
+            }
+            #[cfg(target_os = "macos")]
+            Self::MacOSX(k, None) => {
+                args.push(format!("-mmacosx-{}", k));
+            }
+            #[cfg(target_os = "macos")]
+            Self::MacOSX(k, Some(v)) => {
+                args.push(format!("-mmacosx-{}={}", k, v));
             }
             Self::Debug => {
                 // NOTE: libra handles metadata itself
