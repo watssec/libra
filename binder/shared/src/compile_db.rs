@@ -113,7 +113,7 @@ pub enum ClangArg {
     /// -march=<token>
     MachineArch(String),
     #[cfg(target_os = "macos")]
-    /// -mmacosx-<key>=<value>, e.g., -mmmacosx-version-min=12.4
+    /// -mmacosx-<key>=<value>, e.g., -mmacosx-version-min=12.4
     MacOSX(String, Option<String>),
     /// -g, --debug
     Debug,
