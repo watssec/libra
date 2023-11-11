@@ -816,8 +816,8 @@ json::Object FunctionSerializationContext::serialize_inst_branch(
     result["cond"] = serialize_value(*inst.getCondition());
   }
   json::Array targets;
-  for (const auto *succ : inst.successors()) {
-    targets.push_back(get_block(*succ));
+  for (unsigned i = 0; i < inst.getNumSuccessors(); i++) {
+    targets.push_back(get_block(*inst.getSuccessor(i)));
   }
   result["targets"] = std::move(targets);
   return result;
