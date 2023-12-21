@@ -26,7 +26,7 @@ bool is_intrinsic_function(const Function &func) {
   if (intrinsic_id != Intrinsic::not_intrinsic) {
     return true;
   }
-  if (func.hasName() && func.getName().startswith("llvm.")) {
+  if (func.hasName() && func.getName().starts_with("llvm.")) {
     return true;
   }
   return false;
