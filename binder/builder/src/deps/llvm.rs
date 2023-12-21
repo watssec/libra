@@ -17,21 +17,11 @@ fn baseline_cmake_options() -> Vec<String> {
         "-DBUILD_SHARED_LIBS=ON".into(),
         format!(
             "-DLLVM_ENABLE_PROJECTS={}",
-            [
-                "clang",
-                "clang-tools-extra",
-                "libc",
-                "compiler-rt",
-                "lld",
-                "lldb",
-                "polly",
-                "mlir",
-            ]
-            .join(";")
+            ["clang", "clang-tools-extra", "libc", "lld", "lldb", "polly",].join(";")
         ),
         format!(
             "-DLLVM_ENABLE_RUNTIMES={}",
-            ["libcxx", "libcxxabi"].join(";")
+            ["compiler-rt", "libcxx", "libcxxabi"].join(";")
         ),
         "-DLLVM_ENABLE_RTTI=ON".into(),
         "-DLIBC_ENABLE_USE_BY_CLANG=ON".into(),
