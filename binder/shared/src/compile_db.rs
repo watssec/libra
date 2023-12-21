@@ -117,6 +117,8 @@ pub enum ClangArg {
     MacOSX(String, Option<String>),
     /// -g, --debug
     Debug,
+    /// -mllvm -<key>{=<value>}
+    Backend(String, Option<String>),
     /// -f<key>{=<value>}
     Flag(String, Option<String>),
     /// -W<key>{=<value>}
@@ -246,6 +248,12 @@ impl ClangArg {
                             stream.next_expect_token()?,
                             stream,
                         )?),
+                        "-mllvm" => {
+                            let next = Self::expect_plain(stream.next_expect_token()?)?;
+                            let item = next.strip_prefix('-').unwrap();
+                            let (k, v) = Self::parse_maybe_key_value(item, stream)?;
+                            Self::Backend(k, v)
+                        }
                         t if t.starts_with("-f") => {
                             let item = t.strip_prefix("-f").unwrap();
                             let (k, v) = Self::parse_maybe_key_value(item, stream)?;
@@ -287,6 +295,8 @@ impl Display for ClangArg {
             #[cfg(target_os = "macos")]
             Self::MacOSX(k, Some(v)) => write!(f, "-mmacosx-{}={}", k, v),
             Self::Debug => write!(f, "-g"),
+            Self::Backend(k, None) => write!(f, "-mllvm -{}", k),
+            Self::Backend(k, Some(v)) => write!(f, "-mllvm -{}={}", k, v),
             Self::Flag(k, None) => write!(f, "-f{}", k),
             Self::Flag(k, Some(v)) => write!(f, "-f{}={}", k, v),
             Self::Warning(k, None) => write!(f, "-W{}", k),
@@ -338,6 +348,14 @@ impl ClangArg {
             }
             Self::Debug => {
                 // NOTE: libra handles metadata itself
+            }
+            Self::Backend(k, None) => {
+                args.push("-mllvm".to_string());
+                args.push(format!("-{}", k));
+            }
+            Self::Backend(k, Some(v)) => {
+                args.push("-mllvm".to_string());
+                args.push(format!("-{}={}", k, v));
             }
             Self::Flag(k, None) => {
                 args.push(format!("-f{}", k));
