@@ -14,7 +14,7 @@ pub struct GlobalVariable {
     /// mutability
     pub is_constant: bool,
     /// initializer
-    pub initializer: Constant,
+    pub initializer: Option<Constant>,
 }
 
 impl GlobalVariable {
@@ -36,11 +36,6 @@ impl GlobalVariable {
         } = gvar;
 
         // filter out unsupported cases
-        if *is_extern || !*is_defined {
-            return Err(EngineError::NotSupportedYet(
-                Unsupported::ExternGlobalVariable,
-            ));
-        }
         if !*is_exact {
             return Err(EngineError::NotSupportedYet(
                 Unsupported::WeakGlobalVariable,
@@ -71,12 +66,35 @@ impl GlobalVariable {
         // convert the initializer (if any)
         let gvar_init = match initializer {
             None => {
-                return Err(EngineError::InvalidAssumption(format!(
-                    "must have an initializer for a defined global: {}",
-                    name.as_ref().map_or("<unknown>", |e| e.as_str())
-                )));
+                if *is_defined {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "defined global must have an initializer: {}",
+                        ident
+                    )));
+                }
+                if !*is_extern {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "undefined global must have be externally initialized: {}",
+                        ident
+                    )));
+                }
+                None
             }
-            Some(constant) => Constant::convert(constant, &gvar_ty, typing, symbols)?,
+            Some(constant) => {
+                if !*is_defined {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "initializer found for an undefined global: {}",
+                        ident
+                    )));
+                }
+                if *is_extern {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "initializer found for an external global: {}",
+                        ident
+                    )));
+                }
+                Some(Constant::convert(constant, &gvar_ty, typing, symbols)?)
+            }
         };
 
         // done with the construction

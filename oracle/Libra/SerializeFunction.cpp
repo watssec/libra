@@ -28,14 +28,14 @@ json::Object serialize_function(const Function &func) {
 
   // first label the blocks, instructions, and arguments
   FunctionSerializationContext ctxt;
+  for (const auto &arg : func.args()) {
+    ctxt.add_argument(arg);
+  }
   for (const auto &block : func) {
     ctxt.add_block(block);
     for (const auto &inst : block) {
       ctxt.add_instruction(inst);
     }
-  }
-  for (const auto &arg : func.args()) {
-    ctxt.add_argument(arg);
   }
 
   // deserialize the block
