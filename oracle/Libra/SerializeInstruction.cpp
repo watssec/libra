@@ -10,7 +10,7 @@ std::string get_sync_scope_name(SyncScope::ID scope) {
   case SyncScope::SingleThread:
     return "thread";
   default:
-    // TODO: handle different SyncScope ID vallues
+    // TODO: handle different SyncScope ID values
     return "unknown";
   }
 }
@@ -376,7 +376,7 @@ FunctionSerializationContext::serialize_inst_binary_operator(
     LOG->fatal("unexpected end of binary ops");
   }
   }
-  // TODO: flags (NSW, NUW, Exact)? Maybe not needed?
+  // TODO: flags (NSW, NUW, Exact)? maybe not needed?
   result["lhs"] = serialize_value(*inst.getOperand(0));
   result["rhs"] = serialize_value(*inst.getOperand(1));
   return result;
