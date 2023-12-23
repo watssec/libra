@@ -13,7 +13,7 @@ use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{NumRepr, Type, TypeRegistry};
 
 /// Limit of a constant aggregate
-static CONSTANT_AGGREGATE_LENGTH_MAX: usize = u16::MAX as usize;
+static CONSTANT_AGGREGATE_LENGTH_MAX: usize = 1 << 20;
 
 /// The underlying representation of the bitvec
 #[derive(Eq, PartialEq, Clone)]
