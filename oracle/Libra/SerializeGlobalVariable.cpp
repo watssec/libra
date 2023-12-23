@@ -14,10 +14,9 @@ json::Object serialize_global_variable(const GlobalVariable &gvar) {
   result["ty"] = serialize_type(*gvar.getValueType());
 
   // attributes
-  result["is_extern"] = gvar.isExternallyInitialized();
-  result["is_const"] = gvar.isConstant();
   result["is_defined"] = !gvar.isDeclaration();
   result["is_exact"] = gvar.isDefinitionExact();
+  result["is_const"] = gvar.isConstant();
   result["is_thread_local"] = gvar.isThreadLocal();
   result["address_space"] = gvar.getAddressSpace();
   // TODO: additional attributes or metadata?

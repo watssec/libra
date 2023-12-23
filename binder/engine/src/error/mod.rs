@@ -18,8 +18,6 @@ pub enum Unsupported {
     ThreadLocalStorage,
     WeakGlobalVariable,
     WeakFunction,
-    ExternGlobalVariable,
-    ExternFunction,
     HugeConstAggregate,
     PointerAddressSpace,
     OutOfBoundConstantGEP,
@@ -82,12 +80,6 @@ impl Display for Unsupported {
             }
             Self::WeakFunction => {
                 write!(f, "weak definition for function")
-            }
-            Self::ExternGlobalVariable => {
-                write!(f, "global variable externally initialized")
-            }
-            Self::ExternFunction => {
-                write!(f, "function externally defined")
             }
             Self::HugeConstAggregate => {
                 write!(f, "huge constant aggregates")

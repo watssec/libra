@@ -26,7 +26,6 @@ impl GlobalVariable {
         let adapter::global::GlobalVariable {
             name,
             ty,
-            is_extern,
             is_const,
             is_defined,
             is_exact,
@@ -72,24 +71,12 @@ impl GlobalVariable {
                         ident
                     )));
                 }
-                if !*is_extern {
-                    return Err(EngineError::InvalidAssumption(format!(
-                        "undefined global must have be externally initialized: {}",
-                        ident
-                    )));
-                }
                 None
             }
             Some(constant) => {
                 if !*is_defined {
                     return Err(EngineError::InvalidAssumption(format!(
                         "initializer found for an undefined global: {}",
-                        ident
-                    )));
-                }
-                if *is_extern {
-                    return Err(EngineError::InvalidAssumption(format!(
-                        "initializer found for an external global: {}",
                         ident
                     )));
                 }

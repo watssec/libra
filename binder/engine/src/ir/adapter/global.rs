@@ -10,14 +10,12 @@ pub struct GlobalVariable {
     pub name: Option<String>,
     /// variable type
     pub ty: Type,
-    /// is externally initialized
-    pub is_extern: bool,
-    /// is constant (immutable) during execution
-    pub is_const: bool,
     /// is not just a declaration
     pub is_defined: bool,
     /// the definition (initialization) is exact
     pub is_exact: bool,
+    /// is constant (immutable) during execution
+    pub is_const: bool,
     /// is thread-local (one copy per thread)
     pub is_thread_local: bool,
     /// address space of the global variable
