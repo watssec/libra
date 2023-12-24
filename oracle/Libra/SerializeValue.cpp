@@ -39,17 +39,22 @@ json::Object FunctionSerializationContext::serialize_value_argument(
 json::Object FunctionSerializationContext::serialize_value_block(
     const BasicBlock &block) const {
   // sanity checks
-  if (current_function == nullptr ||
-      block.getParent() != current_function->func_) {
-    LOG->fatal("block address out of scope");
-  }
-  if (!current_function->func_->hasName()) {
+  const auto *func = block.getParent();
+  if (!func->hasName()) {
     LOG->fatal("block address referring to an unnamed function");
   }
 
+  // lookup context
+  const auto iter = contexts.find(func);
+  if (iter == contexts.cend()) {
+    LOG->fatal("function context not ready");
+  }
+  const auto &ctxt = iter->second;
+
+  // dump the result
   json::Object result;
-  result["func"] = current_function->func_->getName();
-  result["block"] = current_function->get_block(block);
+  result["func"] = func->getName();
+  result["block"] = ctxt.get_block(block);
   return result;
 }
 

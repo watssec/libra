@@ -190,24 +190,29 @@ json::Object serialize_const_ref_interface(const GlobalIFunc &val) {
 
 json::Object serialize_block_address(const BlockAddress &addr) {
   // sanity checks
-  if (current_function == nullptr ||
-      addr.getFunction() != current_function->func_) {
-    LOG->fatal("block address out of scope");
-  }
-  if (!current_function->func_->hasName()) {
+  const auto *func = addr.getFunction();
+  if (!func->hasName()) {
     LOG->fatal("block address referring to an unnamed function");
   }
 
+  // lookup context
+  const auto iter = contexts.find(func);
+  if (iter == contexts.cend()) {
+    LOG->fatal("function context not ready");
+  }
+  const auto &ctxt = iter->second;
+
+  // dump the result
   json::Object result;
-  result["func"] = current_function->func_->getName();
-  result["block"] = current_function->get_block(*addr.getBasicBlock());
+  result["func"] = func->getName();
+  result["block"] = ctxt.get_block(*addr.getBasicBlock());
   return result;
 }
 
 json::Object serialize_const_expr(const ConstantExpr &expr) {
   json::Object result;
 
-  FunctionSerializationContext ctxt(dummy_function);
+  FunctionSerializationContext ctxt;
   const auto *inst = expr.getAsInstruction(dummy_instruction);
   result["inst"] = ctxt.serialize_inst(*inst);
 

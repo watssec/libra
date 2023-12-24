@@ -5,23 +5,12 @@ namespace libra {
 json::Object serialize_function(const Function &func) {
   json::Object result;
 
-  // first label the blocks, instructions, and arguments
-  FunctionSerializationContext ctxt(&func);
-  for (const auto &arg : func.args()) {
-    ctxt.add_argument(arg);
+  // retrieve the context
+  const auto iter = contexts.find(&func);
+  if (iter == contexts.cend()) {
+    LOG->fatal("function context not ready");
   }
-  for (const auto &block : func) {
-    ctxt.add_block(block);
-    for (const auto &inst : block) {
-      ctxt.add_instruction(inst);
-    }
-  }
-
-  // set the context
-  if (current_function != nullptr) {
-    LOG->fatal("already in function context");
-  }
-  current_function = &ctxt;
+  const auto &ctxt = iter->second;
 
   // basics
   if (func.hasName()) {
@@ -50,9 +39,6 @@ json::Object serialize_function(const Function &func) {
     blocks.push_back(ctxt.serialize_block(block));
   }
   result["blocks"] = std::move(blocks);
-
-  // reset the cursor
-  current_function = nullptr;
 
   return result;
 }

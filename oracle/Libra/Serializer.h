@@ -59,17 +59,13 @@ serialize_global_variable(const GlobalVariable &gvar);
 [[nodiscard]] json::Object serialize_inline_asm(const InlineAsm &assembly);
 
 class FunctionSerializationContext {
-public:
-  const Function *func_;
-
 private:
   std::map<const BasicBlock *, uint64_t> block_labels_;
   std::map<const Instruction *, uint64_t> inst_labels_;
   std::map<const Argument *, uint64_t> arg_labels_;
 
 public:
-  FunctionSerializationContext(const Function *func)
-      : func_(func), block_labels_(), inst_labels_(), arg_labels_() {}
+  FunctionSerializationContext() = default;
 
 public:
   void add_block(const BasicBlock &block);
@@ -157,7 +153,7 @@ public:
 
 // TODO: use a more elegant design
 // module-level context
-extern FunctionSerializationContext *current_function;
+extern std::map<const Function *, FunctionSerializationContext> contexts;
 
 } // namespace libra
 
