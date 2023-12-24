@@ -1758,15 +1758,19 @@ impl<'a> Context<'a> {
                     }
                 }
             }
+            // exception
+            AdaptedInst::LandingPad { .. } => {
+                return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+            }
             // concurrency
             AdaptedInst::Fence { .. }
             | AdaptedInst::AtomicCmpXchg { .. }
             | AdaptedInst::AtomicRMW { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::AtomicInstruction));
             }
-            // exception
-            AdaptedInst::LandingPad { .. } | AdaptedInst::CatchPad | AdaptedInst::CleanupPad => {
-                return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+            // windows-style exception
+            AdaptedInst::CatchPad | AdaptedInst::CleanupPad => {
+                return Err(EngineError::NotSupportedYet(Unsupported::WindowsEH));
             }
             // terminators should never appear here
             AdaptedInst::Return { .. }
@@ -1940,11 +1944,11 @@ impl<'a> Context<'a> {
             AdaptedInst::InvokeDirect { .. }
             | AdaptedInst::InvokeIndirect { .. }
             | AdaptedInst::InvokeAsm { .. }
-            | AdaptedInst::Resume { .. }
-            | AdaptedInst::CatchSwitch
-            | AdaptedInst::CatchReturn
-            | AdaptedInst::CleanupReturn => {
+            | AdaptedInst::Resume { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+            }
+            AdaptedInst::CatchSwitch | AdaptedInst::CatchReturn | AdaptedInst::CleanupReturn => {
+                return Err(EngineError::NotSupportedYet(Unsupported::WindowsEH));
             }
             AdaptedInst::CallBranch => {
                 return Err(EngineError::NotSupportedYet(Unsupported::CallBranch));

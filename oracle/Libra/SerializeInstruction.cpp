@@ -118,10 +118,10 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
     result["LandingPad"] =
         serialize_inst_landing_pad(cast<LandingPadInst>(inst));
   } else if (isa<CatchPadInst>(inst)) {
-    // TODO: give details on the CatchPadInst
+    // TODO: (Windows EH) give details on the CatchPadInst
     result["CatchPad"] = json::Value(nullptr);
   } else if (isa<CleanupPadInst>(inst)) {
-    // TODO: give details on the CleanupPadInst
+    // TODO: (Windows EH) give details on the CleanupPadInst
     result["CleanupPad"] = json::Value(nullptr);
   }
 
@@ -152,13 +152,13 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
 
   // exception handling (terminator)
   else if (isa<CatchSwitchInst>(inst)) {
-    // TODO: give details on the CatchSwitchInst
+    // TODO: (Windows EH) give details on the CatchSwitchInst
     result["CatchSwitch"] = json::Value(nullptr);
   } else if (isa<CatchReturnInst>(inst)) {
-    // TODO: give details on the CatchReturnInst
+    // TODO: (Windows EH) give details on the CatchReturnInst
     result["CatchReturn"] = json::Value(nullptr);
   } else if (isa<CleanupReturnInst>(inst)) {
-    // TODO: give details on the CleanupReturnInst
+    // TODO: (Windows EH) give details on the CleanupReturnInst
     result["CleanupReturn"] = json::Value(nullptr);
   }
 
