@@ -802,19 +802,23 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
       }
       item["Catch"] = serialize_global_variable(*cast<GlobalVariable>(clause));
     } else if (inst.isFilter(i)) {
-      if (!isa<ConstantArray>(clause)) {
-        LOG->fatal("filter clause does not refer to a constant array");
-      }
-      const auto *entries = cast<ConstantArray>(clause);
-
       json::Array elements;
-      for (unsigned e = 0; e < entries->getNumOperands(); e++) {
-        const auto *entry = entries->getOperand(e);
-        if (!isa<GlobalVariable>(entry)) {
-          LOG->fatal("filter clause does not include global variables");
+
+      // "[0 x ptr] undef" represents for a filter which cannot throw
+      if (isa<UndefValue>(clause)) {
+        if (!isa<ConstantArray>(clause)) {
+          LOG->fatal("filter clause does not refer to a constant array");
         }
-        elements.push_back(
-            serialize_global_variable(*cast<GlobalVariable>(entry)));
+        const auto *entries = cast<ConstantArray>(clause);
+
+        for (unsigned e = 0; e < entries->getNumOperands(); e++) {
+          const auto *entry = entries->getOperand(e);
+          if (!isa<GlobalVariable>(entry)) {
+            LOG->fatal("filter clause does not include global variables");
+          }
+          elements.push_back(
+              serialize_global_variable(*cast<GlobalVariable>(entry)));
+        }
       }
       item["Filter"] = std::move(elements);
     } else {
