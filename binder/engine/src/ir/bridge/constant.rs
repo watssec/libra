@@ -50,6 +50,8 @@ pub enum Constant {
     Variable { name: Identifier },
     /// Function
     Function { name: Identifier },
+    /// Basic block
+    Block { func: Identifier, block: usize },
     /// Expression
     Expr(Box<Expression>),
 }
@@ -478,6 +480,19 @@ impl Constant {
                     }
                 }
             }
+            AdaptedConst::Label { func, block } => {
+                let ident = func.into();
+                if !symbols.has_function(&ident) {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "unexpected reference to an unknown function: {}",
+                        ident
+                    )));
+                }
+                Self::Block {
+                    func: ident,
+                    block: *block,
+                }
+            }
             AdaptedConst::Alias { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::GlobalAlias));
             }
@@ -486,9 +501,6 @@ impl Constant {
             }
             AdaptedConst::Marker { .. } => {
                 return Err(EngineError::NotSupportedYet(Unsupported::GlobalMarker));
-            }
-            AdaptedConst::Label => {
-                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
             }
             AdaptedConst::Expr { inst } => {
                 check_type(ty)?;

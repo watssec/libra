@@ -21,7 +21,7 @@ pub enum Const {
     Alias { name: Option<String> },
     Interface { name: Option<String> },
     Marker { wrap: Box<Constant> },
-    Label,
+    Label { func: String, block: usize },
     Expr { inst: Box<Inst> },
 }
 

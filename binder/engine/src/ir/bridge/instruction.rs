@@ -484,8 +484,18 @@ impl<'a> Context<'a> {
             AdaptedValue::Metadata => {
                 return Err(EngineError::NotSupportedYet(Unsupported::MetadataSystem));
             }
-            AdaptedValue::Label => {
-                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+            AdaptedValue::Label { func, block } => {
+                let ident = func.into();
+                if !self.symbols.has_function(&ident) {
+                    return Err(EngineError::InvalidAssumption(format!(
+                        "unexpected reference to an unknown function: {}",
+                        ident
+                    )));
+                }
+                Value::Constant(Constant::Block {
+                    func: ident,
+                    block: *block,
+                })
             }
         };
         Ok(converted)

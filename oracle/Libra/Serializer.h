@@ -47,6 +47,7 @@ serialize_const_ref_global_variable(const GlobalVariable &val);
 serialize_const_ref_global_alias(const GlobalAlias &val);
 [[nodiscard]] json::Object
 serialize_const_ref_interface(const GlobalIFunc &val);
+[[nodiscard]] json::Object serialize_block_address(const BlockAddress &addr);
 [[nodiscard]] json::Object serialize_const_expr(const ConstantExpr &expr);
 
 [[nodiscard]] json::Object
@@ -58,20 +59,24 @@ serialize_global_variable(const GlobalVariable &gvar);
 [[nodiscard]] json::Object serialize_inline_asm(const InlineAsm &assembly);
 
 class FunctionSerializationContext {
+public:
+  const Function *func_;
+
 private:
   std::map<const BasicBlock *, uint64_t> block_labels_;
   std::map<const Instruction *, uint64_t> inst_labels_;
   std::map<const Argument *, uint64_t> arg_labels_;
 
 public:
-  FunctionSerializationContext() = default;
+  FunctionSerializationContext(const Function *func)
+      : func_(func), block_labels_(), inst_labels_(), arg_labels_() {}
 
 public:
   void add_block(const BasicBlock &block);
   void add_instruction(const Instruction &inst);
   void add_argument(const Argument &arg);
 
-private:
+public:
   [[nodiscard]] uint64_t get_block(const BasicBlock &block) const;
   [[nodiscard]] uint64_t get_instruction(const Instruction &inst) const;
   [[nodiscard]] uint64_t get_argument(const Argument &arg) const;
@@ -145,8 +150,14 @@ public:
   [[nodiscard]] json::Object
   serialize_value_argument(const Argument &arg) const;
   [[nodiscard]] json::Object
+  serialize_value_block(const BasicBlock &block) const;
+  [[nodiscard]] json::Object
   serialize_value_instruction(const Instruction &inst) const;
 };
+
+// TODO: use a more elegant design
+// module-level context
+extern FunctionSerializationContext *current_function;
 
 } // namespace libra
 

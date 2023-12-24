@@ -48,4 +48,6 @@ uint64_t FunctionSerializationContext::get_argument(const Argument &arg) const {
   return arg_labels_.at(&arg);
 }
 
+FunctionSerializationContext *current_function = nullptr;
+
 } // namespace libra

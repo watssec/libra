@@ -11,10 +11,10 @@ pub enum Value {
     Argument { ty: Type, index: usize },
     /// reference to an instruction
     Instruction { ty: Type, index: usize },
+    /// block address
+    Label { func: String, block: usize },
     /// metadata
     Metadata,
-    /// block address
-    Label,
 }
 
 impl Value {
@@ -23,9 +23,9 @@ impl Value {
             Self::Constant(constant) => &constant.ty,
             Self::Argument { ty, .. } => ty,
             Self::Instruction { ty, .. } => ty,
+            Self::Label { .. } => &Type::Label,
             // TODO: support metadata system
             Self::Metadata => &Type::Metadata,
-            Self::Label => &Type::Label,
         }
     }
 }

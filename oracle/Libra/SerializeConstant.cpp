@@ -114,8 +114,7 @@ json::Object serialize_const(const Constant &val) {
 
   // constant block address
   else if (isa<BlockAddress>(val)) {
-    // TODO: assign each block a unique id
-    result["Label"] = json::Value(nullptr);
+    result["Label"] = serialize_block_address(cast<BlockAddress>(val));
   }
 
   // constant expression
@@ -189,10 +188,26 @@ json::Object serialize_const_ref_interface(const GlobalIFunc &val) {
   return serialize_const_ref_global(val);
 }
 
+json::Object serialize_block_address(const BlockAddress &addr) {
+  // sanity checks
+  if (current_function == nullptr ||
+      addr.getFunction() != current_function->func_) {
+    LOG->fatal("block address out of scope");
+  }
+  if (!current_function->func_->hasName()) {
+    LOG->fatal("block address referring to an unnamed function");
+  }
+
+  json::Object result;
+  result["func"] = current_function->func_->getName();
+  result["block"] = current_function->get_block(*addr.getBasicBlock());
+  return result;
+}
+
 json::Object serialize_const_expr(const ConstantExpr &expr) {
   json::Object result;
 
-  FunctionSerializationContext ctxt;
+  FunctionSerializationContext ctxt(dummy_function);
   const auto *inst = expr.getAsInstruction(dummy_instruction);
   result["inst"] = ctxt.serialize_inst(*inst);
 
