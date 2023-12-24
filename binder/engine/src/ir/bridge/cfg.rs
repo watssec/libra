@@ -27,6 +27,7 @@ pub enum Edge {
     Goto,
     Branch(bool),
     Switch(BTreeSet<Option<Integer>>),
+    Indirect,
 }
 
 /// An adapted representation of an LLVM control-flow graph
@@ -178,7 +179,7 @@ impl ControlFlowGraph {
                                     ));
                                 }
                             }
-                            Edge::Goto | Edge::Branch(..) => {
+                            Edge::Goto | Edge::Branch(..) | Edge::Indirect => {
                                 return Err(EngineError::InvariantViolation(
                                     "unexpected edge type for switch statement".into(),
                                 ));
@@ -199,12 +200,27 @@ impl ControlFlowGraph {
                                         ));
                                     }
                                 }
-                                Edge::Goto | Edge::Branch(..) => {
+                                Edge::Goto | Edge::Branch(..) | Edge::Indirect => {
                                     return Err(EngineError::InvariantViolation(
                                         "unexpected edge type for switch statement".into(),
                                     ));
                                 }
                             }
+                        }
+                    }
+                }
+                Terminator::Indirect {
+                    address: _,
+                    targets,
+                } => {
+                    for target in targets {
+                        if edges
+                            .insert((label.into(), *target), Edge::Indirect)
+                            .is_some()
+                        {
+                            return Err(EngineError::InvariantViolation(
+                                "duplicated edge in CFG".into(),
+                            ));
                         }
                     }
                 }

@@ -395,6 +395,11 @@ pub enum Terminator {
         cases: BTreeMap<Integer, BlockLabel>,
         default: Option<BlockLabel>,
     },
+    /// indirect jump
+    Indirect {
+        address: Value,
+        targets: Vec<BlockLabel>,
+    },
     /// enters an unreachable state
     Unreachable,
 }
@@ -1915,8 +1920,22 @@ impl<'a> Context<'a> {
                     default: default_new,
                 }
             }
-            AdaptedInst::IndirectJump { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+            AdaptedInst::IndirectJump { address, targets } => {
+                let address_new = self.parse_value(address, &Type::Pointer)?;
+                let mut targets_new = vec![];
+                for target in targets {
+                    if !self.blocks.contains(target) {
+                        return Err(EngineError::InvalidAssumption(
+                            "indirect jump into an invalid block".into(),
+                        ));
+                    }
+                    targets_new.push(target.into());
+                }
+
+                Terminator::Indirect {
+                    address: address_new,
+                    targets: targets_new,
+                }
             }
             AdaptedInst::InvokeDirect { .. }
             | AdaptedInst::InvokeIndirect { .. }
