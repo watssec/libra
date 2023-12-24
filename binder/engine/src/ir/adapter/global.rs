@@ -4,7 +4,7 @@ use crate::ir::adapter::constant::Constant;
 use crate::ir::adapter::typing::Type;
 
 /// An adapted representation of an LLVM global variable
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GlobalVariable {
     /// variable name
     pub name: Option<String>,

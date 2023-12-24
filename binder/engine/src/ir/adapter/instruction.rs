@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::ir::adapter::constant::Constant;
+use crate::ir::adapter::global::GlobalVariable;
 use crate::ir::adapter::typing::Type;
 use crate::ir::adapter::value::{InlineAsm, Value};
 
@@ -150,7 +151,7 @@ pub enum Inst {
     },
     // exception handling
     LandingPad {
-        clauses: Vec<Constant>,
+        clauses: Vec<ExceptionClause>,
         is_cleanup: bool,
     },
     CatchPad,
@@ -229,4 +230,10 @@ pub struct SwitchCase {
     pub block: usize,
     /// value
     pub value: Constant,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub enum ExceptionClause {
+    Catch(GlobalVariable),
+    Filter(Vec<GlobalVariable>),
 }

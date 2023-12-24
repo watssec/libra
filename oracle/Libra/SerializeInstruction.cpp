@@ -793,8 +793,37 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
 
   json::Array clauses;
   for (unsigned i = 0; i < inst.getNumClauses(); i++) {
-    clauses.push_back(serialize_constant(*inst.getClause(i)));
+    json::Object item;
+
+    const auto *clause = inst.getClause(i);
+    if (inst.isCatch(i)) {
+      if (!isa<GlobalVariable>(clause)) {
+        LOG->fatal("catch clause does not refer to a global variable");
+      }
+      item["Catch"] = serialize_global_variable(*cast<GlobalVariable>(clause));
+    } else if (inst.isFilter(i)) {
+      if (!isa<ConstantArray>(clause)) {
+        LOG->fatal("filter clause does not refer to a constant array");
+      }
+      const auto *entries = cast<ConstantArray>(clause);
+
+      json::Array elements;
+      for (unsigned e = 0; e < entries->getNumOperands(); e++) {
+        const auto *entry = entries->getOperand(e);
+        if (!isa<GlobalVariable>(entry)) {
+          LOG->fatal("filter clause does not include global variables");
+        }
+        elements.push_back(
+            serialize_global_variable(*cast<GlobalVariable>(entry)));
+      }
+      item["Filter"] = std::move(elements);
+    } else {
+      LOG->fatal("landing pad clause is neither a catch nor filter");
+    }
+
+    clauses.push_back(std::move(item));
   }
+
   result["clauses"] = std::move(clauses);
   result["is_cleanup"] = inst.isCleanup();
 
