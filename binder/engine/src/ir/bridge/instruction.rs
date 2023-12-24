@@ -1947,7 +1947,7 @@ impl<'a> Context<'a> {
                 return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
             }
             AdaptedInst::CallBranch => {
-                return Err(EngineError::NotSupportedYet(Unsupported::IndirectJump));
+                return Err(EngineError::NotSupportedYet(Unsupported::CallBranch));
             }
             AdaptedInst::Unreachable => Terminator::Unreachable,
             // explicitly list the rest of the instructions

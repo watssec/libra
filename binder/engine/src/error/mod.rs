@@ -6,6 +6,7 @@ use std::fmt::{Display, Formatter};
 pub enum Unsupported {
     ModuleLevelAssembly,
     InlineAssembly,
+    CallBranch,
     GlobalAlias,
     GlobalMarker,
     FloatingPointOrdering,
@@ -25,7 +26,6 @@ pub enum Unsupported {
     AnonymousFunction,
     AnonymousGlobalVariable,
     OpaqueType,
-    IndirectJump,
     IntrinsicsPreAllocated,
     IntrinsicsConvergence,
     IntrinsicsCoroutine,
@@ -44,6 +44,9 @@ impl Display for Unsupported {
             }
             Self::InlineAssembly => {
                 write!(f, "inline assembly")
+            }
+            Self::CallBranch => {
+                write!(f, "call branch")
             }
             Self::GlobalAlias => {
                 write!(f, "global alias")
@@ -101,9 +104,6 @@ impl Display for Unsupported {
             }
             Self::OpaqueType => {
                 write!(f, "opaque type")
-            }
-            Self::IndirectJump => {
-                write!(f, "indirect jump (e.g., through register)")
             }
             Self::IntrinsicsPreAllocated => {
                 write!(f, "llvm.call.preallocated.*")
