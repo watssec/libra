@@ -214,13 +214,13 @@ impl ControlFlowGraph {
                     targets,
                 } => {
                     for target in targets {
-                        if edges
-                            .insert((label.into(), *target), Edge::Indirect)
-                            .is_some()
-                        {
-                            return Err(EngineError::InvariantViolation(
-                                "duplicated edge in CFG".into(),
-                            ));
+                        match edges.insert((label.into(), *target), Edge::Indirect) {
+                            None | Some(Edge::Indirect) => (),
+                            Some(Edge::Goto | Edge::Branch(_) | Edge::Switch(_)) => {
+                                return Err(EngineError::InvariantViolation(
+                                    "duplicated edge in CFG".into(),
+                                ));
+                            }
                         }
                     }
                 }
