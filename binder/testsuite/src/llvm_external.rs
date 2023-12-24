@@ -354,7 +354,9 @@ impl TestCase for TestCaseExternal {
         match command.infer_language() {
             None => bail!("unable to infer input language"),
             Some(lang) => match lang {
-                ClangSupportedLanguage::C | ClangSupportedLanguage::Bitcode => (),
+                ClangSupportedLanguage::C
+                | ClangSupportedLanguage::CPP
+                | ClangSupportedLanguage::Bitcode => (),
                 _ => return Ok((name.to_string(), None)),
             },
         }
