@@ -164,7 +164,9 @@ FunctionSerializationContext::serialize_inst(const Instruction &inst) const {
 
   // very rare cases (terminator)
   else if (isa<CallBrInst>(inst)) {
-    // TODO: give details on the CallBrInst
+    // TODO: not handled due to rarity, as noted from LLVM reference,
+    //   "This instruction should only be used to implement the `goto` feature
+    //   of gcc style inline assembly."
     result["CallBranch"] = json::Value(nullptr);
   }
 
