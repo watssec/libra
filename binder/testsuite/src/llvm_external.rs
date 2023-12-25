@@ -24,6 +24,12 @@ static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
 /// Maximum number of fixedpoint optimization
 static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
 
+/// Test cases to be ignored
+static IGNORED_TEST_CASES: [&str; 1] = [
+    // deserialization recursion limit exceeded
+    "SingleSource/Benchmarks/Misc-C++-EH/spirit.test",
+];
+
 /// Get baseline cmake command
 fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
     let ctxt = Context::new()?;
@@ -350,7 +356,7 @@ impl TestCase for TestCaseExternal {
             command,
         } = self;
 
-        // TODO: support other languages like C++ and ObjC
+        // TODO: support other languages like ObjC
         match command.infer_language() {
             None => bail!("unable to infer input language"),
             Some(lang) => match lang {
@@ -368,6 +374,11 @@ impl TestCase for TestCaseExternal {
             bail!("expect one and only one input");
         }
         let input = inputs.into_iter().next().unwrap();
+
+        // do not execute test cases that should be ignored
+        if IGNORED_TEST_CASES.contains(&input) {
+            return Ok((name.to_string(), None));
+        }
 
         // report progress
         debug!("running test case: {}", name);
