@@ -2254,40 +2254,17 @@ impl<'a> Context<'a> {
                 }
 
                 // conversion
-                let converted = match value {
-                    AdaptedValue::Instruction { ty, index } => {
-                        let exception_ty = self.typing.convert(ty)?;
-                        match self.insts.get(index) {
-                            None => {
-                                return Err(EngineError::InvalidAssumption(
-                                    "Resume instructions does not refer to any slot".into(),
-                                ));
-                            }
-                            Some(None) => {
-                                return Err(EngineError::InvalidAssumption(
-                                    "Resume instructions refers to a void slot".into(),
-                                ));
-                            }
-                            Some(Some(t)) => {
-                                if t != &exception_ty {
-                                    return Err(EngineError::InvalidAssumption(
-                                        "Resume instructions refers to a mal-typed slot".into(),
-                                    ));
-                                }
-                                Value::Register {
-                                    index: index.into(),
-                                    ty: exception_ty,
-                                }
-                            }
-                        }
-                    }
+                let expected_ty = match value {
+                    AdaptedValue::Instruction { ty, index: _ } => self.typing.convert(ty)?,
                     _ => {
                         return Err(EngineError::InvalidAssumption(
-                            "Resume instructions must return a LandingPad slot".into(),
+                            "Resume instructions must return a slot".into(),
                         ));
                     }
                 };
-                Terminator::Resume { val: converted }
+                Terminator::Resume {
+                    val: self.parse_value(value, &expected_ty)?,
+                }
             }
             AdaptedInst::CatchSwitch | AdaptedInst::CatchReturn | AdaptedInst::CleanupReturn => {
                 return Err(EngineError::NotSupportedYet(Unsupported::WindowsEH));
