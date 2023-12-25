@@ -28,6 +28,7 @@ pub enum Edge {
     Branch(bool),
     Switch(BTreeSet<Option<Integer>>),
     Indirect,
+    Invoke(bool),
 }
 
 /// An adapted representation of an LLVM control-flow graph
@@ -179,7 +180,7 @@ impl ControlFlowGraph {
                                     ));
                                 }
                             }
-                            Edge::Goto | Edge::Branch(..) | Edge::Indirect => {
+                            Edge::Goto | Edge::Branch(_) | Edge::Indirect | Edge::Invoke(_) => {
                                 return Err(EngineError::InvariantViolation(
                                     "unexpected edge type for switch statement".into(),
                                 ));
@@ -200,7 +201,7 @@ impl ControlFlowGraph {
                                         ));
                                     }
                                 }
-                                Edge::Goto | Edge::Branch(..) | Edge::Indirect => {
+                                Edge::Goto | Edge::Branch(_) | Edge::Indirect | Edge::Invoke(_) => {
                                     return Err(EngineError::InvariantViolation(
                                         "unexpected edge type for switch statement".into(),
                                     ));
@@ -216,7 +217,9 @@ impl ControlFlowGraph {
                     for target in targets {
                         match edges.insert((label.into(), *target), Edge::Indirect) {
                             None | Some(Edge::Indirect) => (),
-                            Some(Edge::Goto | Edge::Branch(_) | Edge::Switch(_)) => {
+                            Some(
+                                Edge::Goto | Edge::Branch(_) | Edge::Switch(_) | Edge::Invoke(_),
+                            ) => {
                                 return Err(EngineError::InvariantViolation(
                                     "duplicated edge in CFG".into(),
                                 ));
@@ -224,7 +227,27 @@ impl ControlFlowGraph {
                         }
                     }
                 }
-                Terminator::Return { .. } | Terminator::Unreachable => (),
+                Terminator::InvokeDirect { normal, unwind, .. }
+                | Terminator::InvokeIndirect { normal, unwind, .. } => {
+                    if edges
+                        .insert((label.into(), *normal), Edge::Invoke(true))
+                        .is_some()
+                    {
+                        return Err(EngineError::InvariantViolation(
+                            "duplicated edge in CFG".into(),
+                        ));
+                    }
+                    if edges
+                        .insert((label.into(), *unwind), Edge::Invoke(false))
+                        .is_some()
+                    {
+                        return Err(EngineError::InvariantViolation(
+                            "duplicated edge in CFG".into(),
+                        ));
+                    }
+                }
+                Terminator::Return { .. } | Terminator::Resume { .. } | Terminator::Unreachable => {
+                }
             }
 
             // construct the new block

@@ -234,6 +234,11 @@ pub enum Instruction {
         mask: Vec<i128>,
         result: RegisterSlot,
     },
+    // exception
+    LandingPad {
+        directives: Vec<ExceptionDirective>,
+        is_cleanup: bool,
+    },
 }
 
 #[derive(Eq, PartialEq, Clone)]
@@ -376,6 +381,13 @@ pub enum GEPIndex {
     Vector(Value),
 }
 
+/// Represents an exception clause
+#[derive(Eq, PartialEq)]
+pub enum ExceptionDirective {
+    Catch(Option<Identifier>),
+    Filter(Vec<Identifier>),
+}
+
 /// An naive translation of an LLVM terminator instruction
 #[derive(Eq, PartialEq)]
 pub enum Terminator {
@@ -400,6 +412,24 @@ pub enum Terminator {
         address: Value,
         targets: Vec<BlockLabel>,
     },
+    /// direct invoke
+    InvokeDirect {
+        function: Identifier,
+        args: Vec<Value>,
+        result: Option<(Type, RegisterSlot)>,
+        normal: BlockLabel,
+        unwind: BlockLabel,
+    },
+    /// indirect invoke
+    InvokeIndirect {
+        callee: Value,
+        args: Vec<Value>,
+        result: Option<(Type, RegisterSlot)>,
+        normal: BlockLabel,
+        unwind: BlockLabel,
+    },
+    /// exception unwinding
+    Resume { val: Value },
     /// enters an unreachable state
     Unreachable,
 }
@@ -1759,8 +1789,51 @@ impl<'a> Context<'a> {
                 }
             }
             // exception
-            AdaptedInst::LandingPad { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+            AdaptedInst::LandingPad {
+                clauses,
+                is_cleanup,
+            } => {
+                let mut directives = vec![];
+                for clause in clauses {
+                    let directive = match clause {
+                        adapter::instruction::ExceptionClause::Catch(None) => {
+                            ExceptionDirective::Catch(None)
+                        }
+                        adapter::instruction::ExceptionClause::Catch(Some(name)) => {
+                            let ident = name.into();
+                            if !self.symbols.has_global(&ident) {
+                                return Err(EngineError::InvariantViolation(format!(
+                                    "unknown catch target {}",
+                                    name
+                                )));
+                            }
+                            ExceptionDirective::Catch(Some(ident))
+                        }
+                        adapter::instruction::ExceptionClause::Filter(None) => {
+                            ExceptionDirective::Filter(vec![])
+                        }
+                        adapter::instruction::ExceptionClause::Filter(Some(names)) => {
+                            let mut idents = vec![];
+                            for name in names {
+                                let ident = name.into();
+                                if !self.symbols.has_global(&ident) {
+                                    return Err(EngineError::InvariantViolation(format!(
+                                        "unknown filter target {}",
+                                        name
+                                    )));
+                                }
+                                idents.push(ident);
+                            }
+                            ExceptionDirective::Filter(idents)
+                        }
+                    };
+                    directives.push(directive);
+                }
+
+                Instruction::LandingPad {
+                    directives,
+                    is_cleanup: *is_cleanup,
+                }
             }
             // concurrency
             AdaptedInst::Fence { .. }
@@ -1802,71 +1875,106 @@ impl<'a> Context<'a> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
 
-        let term = match &inst.repr {
-            AdaptedInst::Return { value } => match (value, &self.ret) {
-                (None, None) => Terminator::Return { val: None },
-                (Some(_), None) | (None, Some(_)) => {
-                    return Err(EngineError::InvariantViolation(
-                        "return type mismatch".into(),
+        let adapter::instruction::Instruction {
+            name: _,
+            ty,
+            index,
+            repr,
+        } = inst;
+
+        let term = match repr {
+            AdaptedInst::Return { value } => {
+                // sanity check
+                if !matches!(ty, AdaptedType::Void) {
+                    return Err(EngineError::InvalidAssumption(
+                        "Return instructions must have void type".into(),
                     ));
                 }
-                (Some(val), Some(ty)) => {
-                    let converted = self.parse_value(val, &ty.clone())?;
-                    Terminator::Return {
-                        val: Some(converted),
+
+                // conversion
+                match (value, &self.ret) {
+                    (None, None) => Terminator::Return { val: None },
+                    (Some(_), None) | (None, Some(_)) => {
+                        return Err(EngineError::InvariantViolation(
+                            "return type mismatch".into(),
+                        ));
+                    }
+                    (Some(val), Some(ty)) => {
+                        let converted = self.parse_value(val, &ty.clone())?;
+                        Terminator::Return {
+                            val: Some(converted),
+                        }
                     }
                 }
-            },
-            AdaptedInst::Branch { cond, targets } => match cond {
-                None => {
-                    if targets.len() != 1 {
-                        return Err(EngineError::InvalidAssumption(
-                            "unconditional branch should have exactly one target".into(),
-                        ));
+            }
+            AdaptedInst::Branch { cond, targets } => {
+                // sanity check
+                if !matches!(ty, AdaptedType::Void) {
+                    return Err(EngineError::InvalidAssumption(
+                        "Branch instructions must have void type".into(),
+                    ));
+                }
+
+                // conversion
+                match cond {
+                    None => {
+                        if targets.len() != 1 {
+                            return Err(EngineError::InvalidAssumption(
+                                "unconditional branch should have exactly one target".into(),
+                            ));
+                        }
+                        let target = targets.first().unwrap();
+                        if !self.blocks.contains(target) {
+                            return Err(EngineError::InvalidAssumption(
+                                "unconditional branch to unknown target".into(),
+                            ));
+                        }
+                        Terminator::Goto {
+                            target: target.into(),
+                        }
                     }
-                    let target = targets.first().unwrap();
-                    if !self.blocks.contains(target) {
-                        return Err(EngineError::InvalidAssumption(
-                            "unconditional branch to unknown target".into(),
-                        ));
-                    }
-                    Terminator::Goto {
-                        target: target.into(),
+                    Some(val) => {
+                        let cond_new = self.parse_value_int1(val)?;
+                        if targets.len() != 2 {
+                            return Err(EngineError::InvalidAssumption(
+                                "conditional branch should have exactly two targets".into(),
+                            ));
+                        }
+                        #[allow(clippy::get_first)] // for symmetry
+                        let target_then = targets.get(0).unwrap();
+                        if !self.blocks.contains(target_then) {
+                            return Err(EngineError::InvalidAssumption(
+                                "conditional branch to unknown then target".into(),
+                            ));
+                        }
+                        let target_else = targets.get(1).unwrap();
+                        if !self.blocks.contains(target_else) {
+                            return Err(EngineError::InvalidAssumption(
+                                "conditional branch to unknown else target".into(),
+                            ));
+                        }
+                        Terminator::Branch {
+                            cond: cond_new,
+                            then_case: target_then.into(),
+                            else_case: target_else.into(),
+                        }
                     }
                 }
-                Some(val) => {
-                    let cond_new = self.parse_value_int1(val)?;
-                    if targets.len() != 2 {
-                        return Err(EngineError::InvalidAssumption(
-                            "conditional branch should have exactly two targets".into(),
-                        ));
-                    }
-                    #[allow(clippy::get_first)] // for symmetry
-                    let target_then = targets.get(0).unwrap();
-                    if !self.blocks.contains(target_then) {
-                        return Err(EngineError::InvalidAssumption(
-                            "conditional branch to unknown then target".into(),
-                        ));
-                    }
-                    let target_else = targets.get(1).unwrap();
-                    if !self.blocks.contains(target_else) {
-                        return Err(EngineError::InvalidAssumption(
-                            "conditional branch to unknown else target".into(),
-                        ));
-                    }
-                    Terminator::Branch {
-                        cond: cond_new,
-                        then_case: target_then.into(),
-                        else_case: target_else.into(),
-                    }
-                }
-            },
+            }
             AdaptedInst::Switch {
                 cond,
                 cond_ty,
                 cases,
                 default,
             } => {
+                // sanity check
+                if !matches!(ty, AdaptedType::Void) {
+                    return Err(EngineError::InvalidAssumption(
+                        "Switch instructions must have void type".into(),
+                    ));
+                }
+
+                // conversion
                 let cond_ty_new = self.typing.convert(cond_ty)?;
                 if !matches!(
                     cond_ty_new,
@@ -1925,6 +2033,14 @@ impl<'a> Context<'a> {
                 }
             }
             AdaptedInst::IndirectJump { address, targets } => {
+                // sanity check
+                if !matches!(ty, AdaptedType::Void) {
+                    return Err(EngineError::InvalidAssumption(
+                        "IndirectJump instructions must have void type".into(),
+                    ));
+                }
+
+                // conversion
                 let address_new = self.parse_value(address, &Type::Pointer)?;
                 let mut targets_new = vec![];
                 for target in targets {
@@ -1941,14 +2057,203 @@ impl<'a> Context<'a> {
                     targets: targets_new,
                 }
             }
-            AdaptedInst::InvokeDirect { .. }
-            | AdaptedInst::InvokeIndirect { .. }
-            | AdaptedInst::InvokeAsm { .. }
-            | AdaptedInst::Resume { .. } => {
-                return Err(EngineError::NotSupportedYet(Unsupported::ExceptionHandling));
+            AdaptedInst::InvokeDirect {
+                callee,
+                target_type,
+                args,
+                normal,
+                unwind,
+            } => {
+                // extract the name of the called function
+                let callee_new = self.parse_value(callee, &Type::Pointer)?;
+                let callee_name = match callee_new {
+                    Value::Constant(Constant::Function { name: callee_name }) => callee_name,
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "InvokeDirect should target a named function".into(),
+                        ));
+                    }
+                };
+
+                let func_ty = self.typing.convert(target_type)?;
+                match &func_ty {
+                    Type::Function {
+                        params,
+                        variadic,
+                        ret,
+                    } => {
+                        // sanity check
+                        if *variadic {
+                            if args.len() < params.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "InvokeDirect number of arguments mismatch (variadic)".into(),
+                                ));
+                            }
+                        } else if params.len() != args.len() {
+                            return Err(EngineError::InvalidAssumption(
+                                "InvokeDirect number of arguments mismatch (exact)".into(),
+                            ));
+                        }
+
+                        // conversion
+                        let args_new: Vec<_> = params
+                            .iter()
+                            .zip(args.iter())
+                            .map(|(t, v)| self.parse_value(v, t))
+                            .collect::<EngineResult<_>>()?;
+                        let ret_ty = match ret {
+                            None => {
+                                if !matches!(ty, AdaptedType::Void) {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "InvokeDirect return type mismatch".into(),
+                                    ));
+                                }
+                                None
+                            }
+                            Some(t) => {
+                                let inst_ty = self.typing.convert(ty)?;
+                                if t.as_ref() != &inst_ty {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "InvokeDirect return type mismatch".into(),
+                                    ));
+                                }
+                                Some(inst_ty)
+                            }
+                        };
+
+                        // block labels
+                        if !self.blocks.contains(normal) {
+                            return Err(EngineError::InvalidAssumption(
+                                "InvokeDirect returns to an invalid block".into(),
+                            ));
+                        }
+                        let normal_label = normal.into();
+
+                        if !self.blocks.contains(unwind) {
+                            return Err(EngineError::InvalidAssumption(
+                                "InvokeDirect returns to an invalid block".into(),
+                            ));
+                        }
+                        let unwind_label = unwind.into();
+
+                        // construction
+                        Terminator::InvokeDirect {
+                            function: callee_name,
+                            args: args_new,
+                            result: ret_ty.map(|t| (t, index.into())),
+                            normal: normal_label,
+                            unwind: unwind_label,
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "InvokeDirect refer to a non-function callee".into(),
+                        ));
+                    }
+                }
+            }
+            AdaptedInst::InvokeIndirect {
+                callee,
+                target_type,
+                args,
+                normal,
+                unwind,
+            } => {
+                // extract the indirect callee
+                let callee_new = self.parse_value(callee, &Type::Pointer)?;
+                if matches!(callee_new, Value::Constant(Constant::Function { .. })) {
+                    return Err(EngineError::InvalidAssumption(
+                        "InvokeIndirect should not target a named function".into(),
+                    ));
+                }
+
+                let func_ty = self.typing.convert(target_type)?;
+                match &func_ty {
+                    Type::Function {
+                        params,
+                        variadic,
+                        ret,
+                    } => {
+                        // sanity check
+                        if *variadic {
+                            if args.len() < params.len() {
+                                return Err(EngineError::InvalidAssumption(
+                                    "InvokeIndirect number of arguments mismatch (variadic)".into(),
+                                ));
+                            }
+                        } else if params.len() != args.len() {
+                            return Err(EngineError::InvalidAssumption(
+                                "InvokeIndirect number of arguments mismatch (exact)".into(),
+                            ));
+                        }
+
+                        // conversion
+                        let args_new: Vec<_> = params
+                            .iter()
+                            .zip(args.iter())
+                            .map(|(t, v)| self.parse_value(v, t))
+                            .collect::<EngineResult<_>>()?;
+                        let ret_ty = match ret {
+                            None => {
+                                if !matches!(ty, AdaptedType::Void) {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "InvokeIndirect return type mismatch".into(),
+                                    ));
+                                }
+                                None
+                            }
+                            Some(t) => {
+                                let inst_ty = self.typing.convert(ty)?;
+                                if t.as_ref() != &inst_ty {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "InvokeIndirect return type mismatch".into(),
+                                    ));
+                                }
+                                Some(inst_ty)
+                            }
+                        };
+
+                        // block labels
+                        if !self.blocks.contains(normal) {
+                            return Err(EngineError::InvalidAssumption(
+                                "InvokeIndirect returns to an invalid block".into(),
+                            ));
+                        }
+                        let normal_label = normal.into();
+
+                        if !self.blocks.contains(unwind) {
+                            return Err(EngineError::InvalidAssumption(
+                                "InvokeIndirect returns to an invalid block".into(),
+                            ));
+                        }
+                        let unwind_label = unwind.into();
+
+                        // construction
+                        Terminator::InvokeIndirect {
+                            callee: callee_new,
+                            args: args_new,
+                            result: ret_ty.map(|t| (t, index.into())),
+                            normal: normal_label,
+                            unwind: unwind_label,
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "CallIndirect refer to a non-function callee".into(),
+                        ));
+                    }
+                }
+            }
+            AdaptedInst::Resume { value } => {
+                let val_ty = self.typing.convert(ty)?;
+                let converted = self.parse_value(value, &val_ty)?;
+                Terminator::Resume { val: converted }
             }
             AdaptedInst::CatchSwitch | AdaptedInst::CatchReturn | AdaptedInst::CleanupReturn => {
                 return Err(EngineError::NotSupportedYet(Unsupported::WindowsEH));
+            }
+            AdaptedInst::InvokeAsm { .. } => {
+                return Err(EngineError::NotSupportedYet(Unsupported::InlineAssembly));
             }
             AdaptedInst::CallBranch => {
                 return Err(EngineError::NotSupportedYet(Unsupported::CallBranch));
@@ -1987,14 +2292,6 @@ impl<'a> Context<'a> {
                 ));
             }
         };
-
-        // all terminator instructions have a void type
-        // TODO: this does not apply to exception handling
-        if !matches!(inst.ty, AdaptedType::Void) {
-            return Err(EngineError::InvalidAssumption(
-                "all terminator instructions must have void type".into(),
-            ));
-        }
 
         Ok(term)
     }

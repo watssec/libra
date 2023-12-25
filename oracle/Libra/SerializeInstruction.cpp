@@ -804,7 +804,7 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
       // otherwise, this should be a global variable
       else if (isa<GlobalVariable>(clause)) {
         item["Catch"] =
-            serialize_global_variable(*cast<GlobalVariable>(clause));
+            serialize_const_ref_global_variable(*cast<GlobalVariable>(clause));
       }
       // no other cases are allowed
       else {
@@ -824,8 +824,8 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
           if (!isa<GlobalVariable>(entry)) {
             LOG->fatal("filter clause does not include global variables");
           }
-          elements.push_back(
-              serialize_global_variable(*cast<GlobalVariable>(entry)));
+          elements.push_back(serialize_const_ref_global_variable(
+              *cast<GlobalVariable>(entry)));
         }
         item["Filter"] = std::move(elements);
       }

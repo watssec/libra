@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::ir::adapter::constant::Constant;
-use crate::ir::adapter::global::GlobalVariable;
 use crate::ir::adapter::typing::Type;
 use crate::ir::adapter::value::{InlineAsm, Value};
 
@@ -234,6 +233,6 @@ pub struct SwitchCase {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum ExceptionClause {
-    Catch(Option<GlobalVariable>),
-    Filter(Option<Vec<GlobalVariable>>),
+    Catch(Option<String>),
+    Filter(Option<Vec<String>>),
 }

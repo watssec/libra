@@ -1065,7 +1065,8 @@ impl Expression {
             | Instruction::FreezeBitvec { .. }
             | Instruction::FreezePtr
             | Instruction::FreezeNop { .. }
-            | Instruction::Phi { .. } => {
+            | Instruction::Phi { .. }
+            | Instruction::LandingPad { .. } => {
                 return Err(EngineError::InvalidAssumption(
                     "unexpected instruction type for const expr".into(),
                 ))
