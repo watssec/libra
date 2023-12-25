@@ -356,6 +356,11 @@ impl TestCase for TestCaseExternal {
             command,
         } = self;
 
+        // TODO: investigate such test cases that should be ignored
+        if IGNORED_TEST_CASES.contains(&name.as_str()) {
+            return Ok((name.to_string(), None));
+        }
+
         // TODO: support other languages like ObjC
         match command.infer_language() {
             None => bail!("unable to infer input language"),
@@ -374,11 +379,6 @@ impl TestCase for TestCaseExternal {
             bail!("expect one and only one input");
         }
         let input = inputs.into_iter().next().unwrap();
-
-        // do not execute test cases that should be ignored
-        if IGNORED_TEST_CASES.contains(&input) {
-            return Ok((name.to_string(), None));
-        }
 
         // report progress
         debug!("running test case: {}", name);
