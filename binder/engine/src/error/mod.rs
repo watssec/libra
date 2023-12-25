@@ -32,7 +32,6 @@ pub enum Unsupported {
     IntrinsicsEH,
     IntrinsicsGC,
     AtomicInstruction,
-    ExceptionHandling,
     WindowsEH,
     MetadataSystem,
 }
@@ -123,9 +122,6 @@ impl Display for Unsupported {
             }
             Self::AtomicInstruction => {
                 write!(f, "atomic instruction")
-            }
-            Self::ExceptionHandling => {
-                write!(f, "generic exception handling")
             }
             Self::WindowsEH => {
                 write!(f, "exception handling on windows")
