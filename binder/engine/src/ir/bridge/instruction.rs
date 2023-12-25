@@ -1874,6 +1874,7 @@ impl<'a> Context<'a> {
     ) -> EngineResult<Terminator> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
+        use adapter::value::Value as AdaptedValue;
 
         let adapter::instruction::Instruction {
             name: _,
@@ -2245,8 +2246,47 @@ impl<'a> Context<'a> {
                 }
             }
             AdaptedInst::Resume { value } => {
-                let val_ty = self.typing.convert(ty)?;
-                let converted = self.parse_value(value, &val_ty)?;
+                // sanity check
+                if !matches!(ty, AdaptedType::Void) {
+                    return Err(EngineError::InvalidAssumption(
+                        "IndirectJump instructions must have void type".into(),
+                    ));
+                }
+
+                // conversion
+                let converted = match value {
+                    AdaptedValue::Instruction { ty, index } => {
+                        let exception_ty = self.typing.convert(ty)?;
+                        match self.insts.get(index) {
+                            None => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "Resume instructions does not refer to any slot".into(),
+                                ));
+                            }
+                            Some(None) => {
+                                return Err(EngineError::InvalidAssumption(
+                                    "Resume instructions refers to a void slot".into(),
+                                ));
+                            }
+                            Some(Some(t)) => {
+                                if t != &exception_ty {
+                                    return Err(EngineError::InvalidAssumption(
+                                        "Resume instructions refers to a mal-typed slot".into(),
+                                    ));
+                                }
+                                Value::Register {
+                                    index: index.into(),
+                                    ty: exception_ty,
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvalidAssumption(
+                            "Resume instructions must return a LandingPad slot".into(),
+                        ));
+                    }
+                };
                 Terminator::Resume { val: converted }
             }
             AdaptedInst::CatchSwitch | AdaptedInst::CatchReturn | AdaptedInst::CleanupReturn => {
