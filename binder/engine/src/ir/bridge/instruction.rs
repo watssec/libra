@@ -238,6 +238,7 @@ pub enum Instruction {
     LandingPad {
         directives: Vec<ExceptionDirective>,
         is_cleanup: bool,
+        result: RegisterSlot,
     },
 }
 
@@ -1835,6 +1836,7 @@ impl<'a> Context<'a> {
                 Instruction::LandingPad {
                     directives,
                     is_cleanup: *is_cleanup,
+                    result: index.into(),
                 }
             }
             // concurrency

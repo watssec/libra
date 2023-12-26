@@ -10,7 +10,7 @@ use crate::ir::bridge::function::Parameter;
 use crate::ir::bridge::instruction::{Context, Instruction, Terminator};
 use crate::ir::bridge::shared::SymbolRegistry;
 use crate::ir::bridge::typing::{Type, TypeRegistry};
-use crate::ir::bridge::value::BlockLabel;
+use crate::ir::bridge::value::{BlockLabel, Value};
 
 /// An adapted representation of an LLVM basic block
 #[derive(Eq, PartialEq)]
@@ -264,6 +264,67 @@ impl ControlFlowGraph {
             let src_index = block_label_to_index.get(&src).unwrap();
             let dst_index = block_label_to_index.get(&dst).unwrap();
             graph.add_edge(*src_index, *dst_index, edge);
+        }
+
+        // validate the cfg with exception handling parts
+        let mut landing_pads = BTreeSet::new();
+        for idx in graph.node_indices() {
+            let block = graph.node_weight(idx).unwrap();
+            match &block.terminator {
+                Terminator::InvokeDirect { unwind, .. }
+                | Terminator::InvokeIndirect { unwind, .. } => {
+                    let unwind_idx = *block_label_to_index.get(unwind).unwrap();
+                    let unwind_block = graph.node_weight(unwind_idx).unwrap();
+
+                    // obtain the landing pad slot
+                    let mut pad_slot = None;
+                    for inst in &unwind_block.sequence {
+                        match inst {
+                            Instruction::Phi { .. } => (),
+                            Instruction::LandingPad { result, .. } => {
+                                if pad_slot.is_some() {
+                                    return Err(EngineError::InvariantViolation(
+                                        "multiple landing pads in unwind block".into(),
+                                    ));
+                                }
+                                pad_slot = Some(*result);
+                            }
+                            _ => break,
+                        }
+                    }
+
+                    match pad_slot {
+                        None => {
+                            return Err(EngineError::InvariantViolation(
+                                "no landing pads in unwind block".into(),
+                            ));
+                        }
+                        Some(slot) => {
+                            landing_pads.insert(slot);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for idx in graph.node_indices() {
+            let block = graph.node_weight(idx).unwrap();
+            if let Terminator::Resume { val } = &block.terminator {
+                match val {
+                    Value::Register { index, ty: _ } => {
+                        if !landing_pads.contains(index) {
+                            return Err(EngineError::InvariantViolation(
+                                "resume does not refer to a landing pad slot".into(),
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(EngineError::InvariantViolation(
+                            "resume does not refer to an instruction slot".into(),
+                        ));
+                    }
+                }
+            }
         }
 
         // done with the construction
