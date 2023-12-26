@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use structopt::StructOpt;
 
 use libra_shared::dep::{DepState, Dependency, Resolver};
@@ -20,36 +20,27 @@ pub enum DepAction {
     },
 }
 
-#[derive(StructOpt)]
-pub struct DepArgs {
-    /// Name of the deps
-    name: String,
-
-    /// Subcommand
-    #[structopt(subcommand)]
-    action: DepAction,
-}
-
-impl DepArgs {
+impl DepAction {
     fn run_internal<R: Resolver, T: Dependency<R>>(self) -> Result<()> {
-        let Self {
-            name: _,
-            action: command,
-        } = self;
         let state: DepState<R, T> = DepState::new()?;
-
-        match command {
-            DepAction::Config => state.list_build_options()?,
-            DepAction::Build { force } => state.build(force)?,
+        match self {
+            Self::Config => state.list_build_options()?,
+            Self::Build { force } => state.build(force)?,
         }
         Ok(())
     }
+}
 
+#[derive(StructOpt)]
+#[allow(clippy::upper_case_acronyms)]
+pub enum DepArgs {
+    LLVM(DepAction),
+}
+
+impl DepArgs {
     pub fn run(self) -> Result<()> {
-        let name = self.name.as_str();
-        match name {
-            "llvm" => self.run_internal::<ResolverLLVM, DepLLVM>(),
-            _ => bail!("Invalid deps name: {}", name),
+        match self {
+            Self::LLVM(action) => action.run_internal::<ResolverLLVM, DepLLVM>(),
         }
     }
 }

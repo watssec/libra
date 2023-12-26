@@ -36,10 +36,9 @@ enum Command {
 
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
+    // setup
     let args = Args::from_args();
     let Args { command } = args;
-
-    // setup
     initialize();
 
     // run the command

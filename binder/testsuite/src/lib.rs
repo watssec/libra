@@ -2,7 +2,7 @@ mod common;
 mod llvm_external;
 mod llvm_internal;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use structopt::StructOpt;
 
 use libra_shared::config::initialize;
@@ -36,6 +36,31 @@ enum Command {
     },
 }
 
+impl Command {
+    fn run_internal<C: TestCase, R: Resolver, T: Dependency<R> + TestSuite<C, R>>(
+        self,
+    ) -> Result<()> {
+        let state: DepState<R, T> = DepState::new()?;
+        match self {
+            Self::Config => state.list_build_options()?,
+            Self::Build { force } => {
+                state.build(force)?;
+            }
+            Self::Run { force, selection } => {
+                let (repo, resolver) = state.into_source_and_artifact()?;
+                T::run(repo, resolver, force, selection)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(StructOpt)]
+enum Suite {
+    External(Command),
+    Internal(Command),
+}
+
 #[derive(StructOpt)]
 #[structopt(
     name = "libra-testsuite",
@@ -43,48 +68,25 @@ enum Command {
     rename_all = "kebab-case"
 )]
 struct Args {
-    /// Name of the test suite
-    name: String,
-
-    /// Subcommand
+    /// Test suite to run
     #[structopt(subcommand)]
-    command: Command,
+    suite: Suite,
 }
 
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
     let args = Args::from_args();
-    let Args { name, command } = args;
+    let Args { suite } = args;
     // setup
     initialize();
 
     // run the subcommand
-    match name.as_str() {
-        "external" => {
-            run_internal::<TestCaseExternal, ResolverLLVMExternal, DepLLVMExternal>(command)?
+    match suite {
+        Suite::External(command) => {
+            command.run_internal::<TestCaseExternal, ResolverLLVMExternal, DepLLVMExternal>()
         }
-        "internal" => {
-            run_internal::<TestCaseInternal, ResolverLLVMInternal, DepLLVMInternal>(command)?
-        }
-        _ => bail!("Invalid deps name: {}", name),
-    }
-
-    Ok(())
-}
-
-fn run_internal<C: TestCase, R: Resolver, T: Dependency<R> + TestSuite<C, R>>(
-    command: Command,
-) -> Result<()> {
-    let state: DepState<R, T> = DepState::new()?;
-    match command {
-        Command::Config => state.list_build_options()?,
-        Command::Build { force } => {
-            state.build(force)?;
-        }
-        Command::Run { force, selection } => {
-            let (repo, resolver) = state.into_source_and_artifact()?;
-            T::run(repo, resolver, force, selection)?;
+        Suite::Internal(command) => {
+            command.run_internal::<TestCaseInternal, ResolverLLVMInternal, DepLLVMInternal>()
         }
     }
-    Ok(())
 }

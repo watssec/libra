@@ -17,7 +17,7 @@ use libra_shared::config::PATH_STUDIO;
 use libra_shared::dep::Resolver;
 use libra_shared::git::GitRepo;
 
-/// Environment configurations
+// Environment configurations
 lazy_static! {
     static ref PARALLEL: bool = matches!(env::var("LIBRA_PARALLEL"), Ok(val) if val == "1");
     static ref CONTINUE: bool = matches!(env::var("LIBRA_CONTINUE"), Ok(val) if val == "1");

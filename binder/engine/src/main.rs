@@ -11,7 +11,6 @@ use tempfile::tempdir;
 
 use libra_engine::flow::shared::Context;
 use libra_shared::config::{initialize, PATH_STUDIO};
-use libra_shared::logging;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -63,6 +62,7 @@ impl FromStr for Action {
 }
 
 fn main() -> Result<()> {
+    // setup
     let args = Args::from_args();
     let Args {
         keep,
@@ -71,7 +71,6 @@ fn main() -> Result<()> {
         flags,
         depth,
     } = args;
-    // setup
     initialize();
 
     // decide on the workspace

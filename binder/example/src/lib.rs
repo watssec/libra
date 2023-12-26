@@ -22,9 +22,9 @@ struct Args {
 
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
+    // setup
     let args = Args::from_args();
     let Args { example } = args;
-    // setup
     initialize();
 
     // run the subcommand

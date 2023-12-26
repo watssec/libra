@@ -165,8 +165,9 @@ impl DepLLVMInternal {
                 continue;
             }
             // TODO: this case is explicitly ignored as an edge case
-            //   In comment of the test case: "it would take a naive recursive implementation
-            //   ~4 days" and our oracle is a naive recursive implementation
+            //   In comment of the test case:
+            //     "it would take a naive recursive implementation ~4 days"
+            //   and our oracle is a naive recursive implementation
             if matches!(name, "tools/llvm-as/slow-ptrtoint.ll") {
                 continue;
             }
@@ -177,6 +178,15 @@ impl DepLLVMInternal {
                 name,
                 "Transforms/LoopStrengthReduce/X86/eh-insertion-point-2.ll"
             ) {
+                continue;
+            }
+
+            // TODO: this case is explicitly ignored due to a potential bug with llvm
+            //    Quoting the comment of the test case
+            //      "There was optimization bug in ScalarEvolution,
+            //       that causes too long compute time and stack overflow crash"
+            //    It seems that ScalarEvolution might be okay but other passes are not
+            if matches!(name, "Analysis/ScalarEvolution/avoid-assume-hang.ll") {
                 continue;
             }
 
