@@ -25,10 +25,7 @@ static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
 static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
 
 // TODO: investigate these test cases that should be ignored
-static IGNORED_TEST_CASES: [&str; 1] = [
-    // deserialization (serde_json) recursion limit exceeded
-    "SingleSource/Benchmarks/Misc-C++-EH/spirit.test",
-];
+static IGNORED_TEST_CASES: [&str; 0] = [];
 
 /// Get baseline cmake command
 fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
