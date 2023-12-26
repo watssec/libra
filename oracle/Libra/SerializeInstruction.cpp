@@ -815,7 +815,7 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
       }
     } else if (inst.isFilter(i)) {
       // "[0 x ptr] undef" represents for a filter which cannot throw
-      if (isa<UndefValue>(clause)) {
+      if (isa<UndefValue>(clause) || isa<ConstantAggregateZero>(clause)) {
         item["FilterAll"] = json::Value(nullptr);
       }
       // otherwise it should be a constant array
