@@ -72,9 +72,9 @@ performs either static analysis or dynamic interpretation from there.
     cargo run -- external run --force
     ```
     **Expected output:**
-    - a vast majority of tests pass
-    - a few tests are skipped
-    - a small portion of tests are not supported (with a breakdown of reasons)
+    - a vast majority of tests ($> 99\\%$) pass
+    - a few tests ($< 10$) are skipped
+    - a small portion of tests ($< 1\\%$) are not supported (with a breakdown of reasons)
     - **NO** failure cases for whatever reason
 
   - For `internal` test cases
@@ -87,10 +87,10 @@ performs either static analysis or dynamic interpretation from there.
     cargo run -- internal run --force
     ```
     **Expected output:**
-    - a vast majority of tests pass
-    - a few tests are skipped
-    - a small portion of tests are not supported (with a breakdown of reasons)
-    - a few tests fail due to compilation error
+    - a vast majority of tests ($> 95\\%$) pass
+    - a few tests ($< 50$) are skipped
+    - a small portion of tests ($< 5\\%$) are not supported (with a breakdown of reasons)
+    - a few tests ($< 50$) fail due to compilation error
     - **NO** other failure cases
 
 ### Troubleshooting
