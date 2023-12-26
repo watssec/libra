@@ -820,10 +820,20 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
       }
       // otherwise it should be a constant array
       else if (isa<ConstantArray>(clause)) {
-        const auto *entries = cast<ConstantArray>(clause);
         json::Array elements;
+
+        bool shortcut = false;
+        const auto *entries = cast<ConstantArray>(clause);
         for (unsigned e = 0; e < entries->getNumOperands(); e++) {
           const auto *entry = entries->getOperand(e);
+
+          // short-circuit as filter all if we see a null
+          if (isa<ConstantPointerNull>(clause)) {
+            shortcut = true;
+            break;
+          }
+
+          // push the name to the list
           if (!isa<GlobalValue>(entry)) {
             LOG->fatal("filter clause does not include globals");
           }
@@ -833,7 +843,12 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
           }
           elements.push_back(handler->getName());
         }
-        item["FilterOne"] = std::move(elements);
+
+        if (shortcut) {
+          item["FilterAll"] = json::Value(nullptr);
+        } else {
+          item["FilterOne"] = std::move(elements);
+        }
       }
       // no other cases are allowed
       else {
