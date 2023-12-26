@@ -828,7 +828,7 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
           const auto *entry = entries->getOperand(e);
 
           // short-circuit as filter all if we see a null
-          if (isa<ConstantPointerNull>(clause)) {
+          if (isa<ConstantPointerNull>(entry)) {
             shortcut = true;
             break;
           }
