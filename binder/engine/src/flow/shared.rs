@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
+use serde::Deserialize;
+
 use libra_builder::{artifact_for_pass, ResolverLLVM};
 use libra_shared::dep::Resolver;
 
@@ -163,10 +165,15 @@ impl Context {
     fn deserialize(input: &Path) -> EngineResult<bridge::module::Module> {
         let content = fs::read_to_string(input)
             .map_err(|e| EngineError::LLVMLoadingError(format!("Corrupted JSON file: {}", e)))?;
-        let module_adapted: adapter::module::Module =
-            serde_json::from_str(&content).map_err(|e| {
+
+        // manually construct the deserializer in order to disable the recursion limit
+        let mut deserializer = serde_json::Deserializer::from_str(&content);
+        deserializer.disable_recursion_limit();
+        let module_adapted =
+            adapter::module::Module::deserialize(&mut deserializer).map_err(|e| {
                 EngineError::LLVMLoadingError(format!("Error during deserialization: {}", e))
             })?;
+
         let module_bridge = bridge::module::Module::convert(&module_adapted)?;
         Ok(module_bridge)
     }
