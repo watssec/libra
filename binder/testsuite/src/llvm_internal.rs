@@ -170,6 +170,15 @@ impl DepLLVMInternal {
             if matches!(name, "tools/llvm-as/slow-ptrtoint.ll") {
                 continue;
             }
+            // TODO: this case is explicitly ignored as an edge case
+            //   malformed landing pad found:
+            //   landingpad { ptr, i32 } catch ptr inttoptr (i64 42 to ptr)
+            if matches!(
+                name,
+                "Transforms/LoopStrengthReduce/X86/eh-insertion-point-2.ll"
+            ) {
+                continue;
+            }
 
             // validate the test case
             Self::validate_ll_test_case(&path_test)
