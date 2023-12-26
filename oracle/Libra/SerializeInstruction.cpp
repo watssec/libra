@@ -799,12 +799,15 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
     if (inst.isCatch(i)) {
       // If @ExcType is null, any exception matches
       if (isa<ConstantPointerNull>(clause)) {
-        item["Catch"] = json::Value(nullptr);
+        item["CatchAll"] = json::Value(nullptr);
       }
       // otherwise, this should be a global variable
       else if (isa<GlobalVariable>(clause)) {
-        item["Catch"] =
-            serialize_const_ref_global_variable(*cast<GlobalVariable>(clause));
+        const auto *gvar = cast<GlobalVariable>(clause);
+        if (!gvar->hasName()) {
+          LOG->fatal("catch clause does not refer to a named global variable");
+        }
+        item["CatchOne"] = gvar->getName();
       }
       // no other cases are allowed
       else {
@@ -813,7 +816,7 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
     } else if (inst.isFilter(i)) {
       // "[0 x ptr] undef" represents for a filter which cannot throw
       if (isa<UndefValue>(clause)) {
-        item["Filter"] = json::Value(nullptr);
+        item["FilterAll"] = json::Value(nullptr);
       }
       // otherwise it should be a constant array
       else if (isa<ConstantArray>(clause)) {
@@ -824,10 +827,14 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
           if (!isa<GlobalVariable>(entry)) {
             LOG->fatal("filter clause does not include global variables");
           }
-          elements.push_back(serialize_const_ref_global_variable(
-              *cast<GlobalVariable>(entry)));
+          const auto *gvar = cast<GlobalVariable>(entry);
+          if (!gvar->hasName()) {
+            LOG->fatal(
+                "filter clause does not refer to a named global variable");
+          }
+          elements.push_back(gvar->getName());
         }
-        item["Filter"] = std::move(elements);
+        item["FilterOne"] = std::move(elements);
       }
       // no other cases are allowed
       else {

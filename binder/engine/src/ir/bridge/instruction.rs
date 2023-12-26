@@ -384,8 +384,10 @@ pub enum GEPIndex {
 /// Represents an exception clause
 #[derive(Eq, PartialEq)]
 pub enum ExceptionDirective {
-    Catch(Option<Identifier>),
-    Filter(Vec<Identifier>),
+    CatchAll,
+    CatchOne(Identifier),
+    FilterAll,
+    FilterOne(Vec<Identifier>),
 }
 
 /// An naive translation of an LLVM terminator instruction
@@ -1796,10 +1798,10 @@ impl<'a> Context<'a> {
                 let mut directives = vec![];
                 for clause in clauses {
                     let directive = match clause {
-                        adapter::instruction::ExceptionClause::Catch(None) => {
-                            ExceptionDirective::Catch(None)
+                        adapter::instruction::ExceptionClause::CatchAll => {
+                            ExceptionDirective::CatchAll
                         }
-                        adapter::instruction::ExceptionClause::Catch(Some(name)) => {
+                        adapter::instruction::ExceptionClause::CatchOne(name) => {
                             let ident = name.into();
                             if !self.symbols.has_global(&ident) {
                                 return Err(EngineError::InvariantViolation(format!(
@@ -1807,12 +1809,12 @@ impl<'a> Context<'a> {
                                     name
                                 )));
                             }
-                            ExceptionDirective::Catch(Some(ident))
+                            ExceptionDirective::CatchOne(ident)
                         }
-                        adapter::instruction::ExceptionClause::Filter(None) => {
-                            ExceptionDirective::Filter(vec![])
+                        adapter::instruction::ExceptionClause::FilterAll => {
+                            ExceptionDirective::FilterAll
                         }
-                        adapter::instruction::ExceptionClause::Filter(Some(names)) => {
+                        adapter::instruction::ExceptionClause::FilterOne(names) => {
                             let mut idents = vec![];
                             for name in names {
                                 let ident = name.into();
@@ -1824,7 +1826,7 @@ impl<'a> Context<'a> {
                                 }
                                 idents.push(ident);
                             }
-                            ExceptionDirective::Filter(idents)
+                            ExceptionDirective::FilterOne(idents)
                         }
                     };
                     directives.push(directive);

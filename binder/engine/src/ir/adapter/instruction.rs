@@ -233,6 +233,8 @@ pub struct SwitchCase {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum ExceptionClause {
-    Catch(Option<String>),
-    Filter(Option<Vec<String>>),
+    CatchAll,
+    CatchOne(String),
+    FilterAll,
+    FilterOne(Vec<String>),
 }
