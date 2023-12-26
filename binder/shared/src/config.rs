@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 #[cfg(target_os = "macos")]
 use std::process::Command;
 
-// paths
+// environmental configs
 lazy_static! {
     pub static ref DOCERIZED: bool = matches!(env::var("DOCKER"), Ok(val) if val == "1");
     pub static ref PATH_ROOT: PathBuf = {

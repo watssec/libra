@@ -1,0 +1,18 @@
+[package]
+name = "libra-example"
+description = "Examples for using LIBRA for bug analysis"
+version = "0.1.0"
+authors = ["Meng Xu <meng.xu.cs@uwaterloo.ca>"]
+license = "GPL-3.0"
+edition = "2021"
+
+[build-dependencies]
+libra-builder = { path = "../builder" }
+libra-shared = { path = "../shared" }
+
+[dependencies]
+anyhow = "1.0.75"
+structopt = "0.3.26"
+libra-builder = { path = "../builder" }
+libra-engine = { path = "../engine" }
+libra-shared = { path = "../shared" }

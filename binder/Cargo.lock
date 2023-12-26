@@ -390,6 +390,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "libra-example"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libra-builder",
+ "libra-engine",
+ "libra-shared",
+ "structopt",
+]
+
+[[package]]
 name = "libra-shared"
 version = "0.1.0"
 dependencies = [

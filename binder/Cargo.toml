@@ -1,8 +1,9 @@
 [workspace]
 members = [
+    "shared",
     "builder",
     "engine",
-    "shared",
     "testsuite",
+    "example",
 ]
 resolver = "2"
