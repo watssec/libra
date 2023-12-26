@@ -10,7 +10,7 @@ use crate::ir::bridge::function::Parameter;
 use crate::ir::bridge::instruction::{Context, Instruction, Terminator};
 use crate::ir::bridge::shared::SymbolRegistry;
 use crate::ir::bridge::typing::{Type, TypeRegistry};
-use crate::ir::bridge::value::{BlockLabel, Value};
+use crate::ir::bridge::value::BlockLabel;
 
 /// An adapted representation of an LLVM basic block
 #[derive(Eq, PartialEq)]
@@ -267,7 +267,6 @@ impl ControlFlowGraph {
         }
 
         // validate the cfg with exception handling parts
-        let mut landing_pads = BTreeSet::new();
         for idx in graph.node_indices() {
             let block = graph.node_weight(idx).unwrap();
             match &block.terminator {
@@ -292,38 +291,13 @@ impl ControlFlowGraph {
                             _ => break,
                         }
                     }
-
-                    match pad_slot {
-                        None => {
-                            return Err(EngineError::InvariantViolation(
-                                "no landing pads in unwind block".into(),
-                            ));
-                        }
-                        Some(slot) => {
-                            landing_pads.insert(slot);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        for idx in graph.node_indices() {
-            let block = graph.node_weight(idx).unwrap();
-            if let Terminator::Resume { val } = &block.terminator {
-                match val {
-                    Value::Register { index, ty: _ } => {
-                        if !landing_pads.contains(index) {
-                            return Err(EngineError::InvariantViolation(
-                                "resume does not refer to a landing pad slot".into(),
-                            ));
-                        }
-                    }
-                    _ => {
+                    if pad_slot.is_none() {
                         return Err(EngineError::InvariantViolation(
-                            "resume does not refer to an instruction slot".into(),
+                            "no landing pads in unwind block".into(),
                         ));
                     }
                 }
+                _ => {}
             }
         }
 
