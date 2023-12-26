@@ -1,3 +1,5 @@
+mod apps;
+
 use anyhow::Result;
 use structopt::StructOpt;
 
