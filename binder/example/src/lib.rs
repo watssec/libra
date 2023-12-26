@@ -1,8 +1,10 @@
 mod apps;
+mod common;
 
 use anyhow::Result;
 use structopt::StructOpt;
 
+use crate::common::execute;
 use libra_shared::config::initialize;
 
 #[derive(StructOpt)]
@@ -31,8 +33,6 @@ pub fn entrypoint() -> Result<()> {
 
     // run the subcommand
     match example {
-        Example::ApacheHttpd => (),
+        Example::ApacheHttpd => execute::<apps::apache_httpd::Config>(),
     }
-
-    Ok(())
 }
