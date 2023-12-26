@@ -27,6 +27,8 @@ pub struct Function {
     pub variadic: bool,
     /// return type
     pub ret: Option<Type>,
+    /// one-definition rule (ODR)
+    pub is_weak: bool,
     /// body of the function (in terms of a CFG)
     pub body: Option<ControlFlowGraph>,
 }
@@ -161,11 +163,6 @@ impl Function {
             blocks,
         } = func;
 
-        // filter out unsupported cases
-        if !*is_exact {
-            return Err(EngineError::NotSupportedYet(Unsupported::WeakFunction));
-        }
-
         // convert the name
         let ident: Identifier = name
             .as_ref()
@@ -236,7 +233,46 @@ impl Function {
             params: params_new,
             variadic,
             ret: ret_ty,
+            is_weak: !*is_exact,
             body,
         })
+    }
+
+    /// Apply the one definition rule
+    pub fn apply_odr(entries: Vec<Self>) -> EngineResult<Self> {
+        // obtain the strongly defined symbol
+        let mut def = None;
+        let mut weak_defs = vec![];
+        for entry in entries {
+            if entry.is_weak {
+                weak_defs.push(entry);
+                continue;
+            }
+            if def.is_some() {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "no duplicated function: {}",
+                    entry.name
+                )));
+            }
+            def = Some(entry);
+        }
+        if let Some(v) = def {
+            return Ok(v);
+        }
+
+        // no strongly defined symbol found, try to unify weak symbols
+        let mut iter = weak_defs.into_iter();
+        let val = match iter.next() {
+            None => {
+                return Err(EngineError::InvariantViolation("no entries for ODR".into()));
+            }
+            Some(v) => v,
+        };
+        for entry in iter.by_ref() {
+            if entry != val {
+                return Err(EngineError::NotSupportedYet(Unsupported::WeakFunction));
+            }
+        }
+        Ok(val)
     }
 }

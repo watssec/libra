@@ -11,6 +11,8 @@ pub struct GlobalVariable {
     pub name: Identifier,
     /// variable type
     pub ty: Type,
+    /// one-definition rule (ODR)
+    pub is_weak: bool,
     /// mutability
     pub is_constant: bool,
     /// initializer
@@ -35,11 +37,6 @@ impl GlobalVariable {
         } = gvar;
 
         // filter out unsupported cases
-        if !*is_exact {
-            return Err(EngineError::NotSupportedYet(
-                Unsupported::WeakGlobalVariable,
-            ));
-        }
         if *is_thread_local {
             return Err(EngineError::NotSupportedYet(
                 Unsupported::ThreadLocalStorage,
@@ -88,8 +85,49 @@ impl GlobalVariable {
         Ok(Self {
             name: ident,
             ty: gvar_ty,
+            is_weak: !*is_exact,
             is_constant: *is_const,
             initializer: gvar_init,
         })
+    }
+
+    /// Apply the one definition rule
+    pub fn apply_odr(entries: Vec<Self>) -> EngineResult<Self> {
+        // obtain the strongly defined symbol
+        let mut def = None;
+        let mut weak_defs = vec![];
+        for entry in entries {
+            if entry.is_weak {
+                weak_defs.push(entry);
+                continue;
+            }
+            if def.is_some() {
+                return Err(EngineError::InvalidAssumption(format!(
+                    "no duplicated global variable: {}",
+                    entry.name
+                )));
+            }
+            def = Some(entry);
+        }
+        if let Some(v) = def {
+            return Ok(v);
+        }
+
+        // no strongly defined symbol found, try to unify weak symbols
+        let mut iter = weak_defs.into_iter();
+        let val = match iter.next() {
+            None => {
+                return Err(EngineError::InvariantViolation("no entries for ODR".into()));
+            }
+            Some(v) => v,
+        };
+        for entry in iter.by_ref() {
+            if entry != val {
+                return Err(EngineError::NotSupportedYet(
+                    Unsupported::WeakGlobalVariable,
+                ));
+            }
+        }
+        Ok(val)
     }
 }

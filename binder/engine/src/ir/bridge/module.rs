@@ -60,38 +60,41 @@ impl Module {
         let mut gvar_table = BTreeMap::new();
         for gvar in global_variables.iter() {
             let converted = GlobalVariable::convert(gvar, &typing, &symbols)?;
-            match gvar_table.insert(converted.name.clone(), converted) {
-                None => (),
-                Some(_) => {
-                    return Err(EngineError::InvalidAssumption(format!(
-                        "no duplicated global variable: {}",
-                        gvar.name.as_ref().unwrap()
-                    )));
-                }
-            }
+            gvar_table
+                .entry(converted.name.clone())
+                .or_insert_with(Vec::new)
+                .push(converted);
         }
 
         // collect functions
         let mut func_table = BTreeMap::new();
         for func in functions.iter() {
             let converted = Function::convert(func, &typing, &symbols)?;
-            match func_table.insert(converted.name.clone(), converted) {
-                None => (),
-                Some(_) => {
-                    return Err(EngineError::InvalidAssumption(format!(
-                        "no duplicated function: {}",
-                        func.name.as_ref().unwrap()
-                    )));
-                }
-            }
+            func_table
+                .entry(converted.name.clone())
+                .or_insert_with(Vec::new)
+                .push(converted);
+        }
+
+        // resolve strong and weak symbols
+        let mut globals = BTreeMap::new();
+        for (key, entries) in gvar_table {
+            let val = GlobalVariable::apply_odr(entries)?;
+            globals.insert(key, val);
+        }
+
+        let mut functions = BTreeMap::new();
+        for (key, entries) in func_table {
+            let val = Function::apply_odr(entries)?;
+            functions.insert(key, val);
         }
 
         // done
         Ok(Self {
             typing,
             symbols,
-            globals: gvar_table,
-            functions: func_table,
+            globals,
+            functions,
         })
     }
 }
