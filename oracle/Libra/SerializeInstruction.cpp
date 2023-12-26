@@ -802,16 +802,16 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
         item["CatchAll"] = json::Value(nullptr);
       }
       // otherwise, this should be a global variable
-      else if (isa<GlobalVariable>(clause)) {
-        const auto *gvar = cast<GlobalVariable>(clause);
-        if (!gvar->hasName()) {
-          LOG->fatal("catch clause does not refer to a named global variable");
+      else if (isa<Function>(clause)) {
+        const auto *handler = cast<Function>(clause);
+        if (!handler->hasName()) {
+          LOG->fatal("catch clause does not refer to a named function");
         }
-        item["CatchOne"] = gvar->getName();
+        item["CatchOne"] = handler->getName();
       }
       // no other cases are allowed
       else {
-        LOG->fatal("catch clause does not refer to a global variable");
+        LOG->fatal("catch clause does not refer to a function");
       }
     } else if (inst.isFilter(i)) {
       // "[0 x ptr] undef" represents for a filter which cannot throw
@@ -824,15 +824,14 @@ json::Object FunctionSerializationContext::serialize_inst_landing_pad(
         json::Array elements;
         for (unsigned e = 0; e < entries->getNumOperands(); e++) {
           const auto *entry = entries->getOperand(e);
-          if (!isa<GlobalVariable>(entry)) {
-            LOG->fatal("filter clause does not include global variables");
+          if (!isa<Function>(entry)) {
+            LOG->fatal("filter clause does not include functions");
           }
-          const auto *gvar = cast<GlobalVariable>(entry);
-          if (!gvar->hasName()) {
-            LOG->fatal(
-                "filter clause does not refer to a named global variable");
+          const auto *handler = cast<Function>(entry);
+          if (!handler->hasName()) {
+            LOG->fatal("filter clause does not refer to a named function");
           }
-          elements.push_back(gvar->getName());
+          elements.push_back(handler->getName());
         }
         item["FilterOne"] = std::move(elements);
       }

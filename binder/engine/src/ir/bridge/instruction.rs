@@ -1804,7 +1804,7 @@ impl<'a> Context<'a> {
                         }
                         adapter::instruction::ExceptionClause::CatchOne(name) => {
                             let ident = name.into();
-                            if !self.symbols.has_global(&ident) {
+                            if !self.symbols.has_function(&ident) {
                                 return Err(EngineError::InvariantViolation(format!(
                                     "unknown catch target {}",
                                     name
@@ -1819,7 +1819,7 @@ impl<'a> Context<'a> {
                             let mut idents = vec![];
                             for name in names {
                                 let ident = name.into();
-                                if !self.symbols.has_global(&ident) {
+                                if !self.symbols.has_function(&ident) {
                                     return Err(EngineError::InvariantViolation(format!(
                                         "unknown filter target {}",
                                         name
