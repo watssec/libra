@@ -10,6 +10,7 @@ use libra_shared::config::initialize;
 #[derive(StructOpt)]
 enum Example {
     ApacheHttpd,
+    PCRE2,
 }
 
 #[derive(StructOpt)]
@@ -34,5 +35,6 @@ pub fn entrypoint() -> Result<()> {
     // run the subcommand
     match example {
         Example::ApacheHttpd => execute::<apps::apache_httpd::Config>(),
+        Example::PCRE2 => execute::<apps::pcre2::Config>(),
     }
 }
