@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use structopt::StructOpt;
 
-use libra_shared::logging;
+use libra_shared::config::initialize;
 
 pub use crate::deps::llvm::ResolverLLVM;
 use crate::deps::DepArgs;
@@ -19,10 +19,6 @@ use crate::pass::PassArgs;
     rename_all = "kebab-case"
 )]
 struct Args {
-    /// Verbosity
-    #[structopt(short, long)]
-    verbose: Option<usize>,
-
     /// Subcommand
     #[structopt(subcommand)]
     command: Command,
@@ -41,9 +37,10 @@ enum Command {
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
     let args = Args::from_args();
-    let Args { verbose, command } = args;
-    // setup logging
-    logging::setup(verbose)?;
+    let Args { command } = args;
+
+    // setup
+    initialize();
 
     // run the command
     match command {

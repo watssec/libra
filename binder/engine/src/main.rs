@@ -10,7 +10,7 @@ use structopt::StructOpt;
 use tempfile::tempdir;
 
 use libra_engine::flow::shared::Context;
-use libra_shared::config::PATH_STUDIO;
+use libra_shared::config::{initialize, PATH_STUDIO};
 use libra_shared::logging;
 
 #[derive(StructOpt)]
@@ -20,10 +20,6 @@ use libra_shared::logging;
     rename_all = "kebab-case"
 )]
 struct Args {
-    /// Verbosity
-    #[structopt(short, long)]
-    verbose: Option<usize>,
-
     /// Keep the workflow artifacts in the studio
     #[structopt(short, long)]
     keep: bool,
@@ -69,15 +65,14 @@ impl FromStr for Action {
 fn main() -> Result<()> {
     let args = Args::from_args();
     let Args {
-        verbose,
         keep,
         mut actions,
         inputs,
         flags,
         depth,
     } = args;
-    // setup logging
-    logging::setup(verbose)?;
+    // setup
+    initialize();
 
     // decide on the workspace
     let (temp, output) = if keep {

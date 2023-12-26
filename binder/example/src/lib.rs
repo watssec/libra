@@ -1,7 +1,7 @@
 use anyhow::Result;
 use structopt::StructOpt;
 
-use libra_shared::logging;
+use libra_shared::config::initialize;
 
 #[derive(StructOpt)]
 enum Example {
@@ -15,10 +15,6 @@ enum Example {
     rename_all = "kebab-case"
 )]
 struct Args {
-    /// Verbosity
-    #[structopt(short, long)]
-    verbose: Option<usize>,
-
     /// Example
     #[structopt(subcommand)]
     example: Example,
@@ -27,9 +23,9 @@ struct Args {
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
     let args = Args::from_args();
-    let Args { verbose, example } = args;
-    // setup logging
-    logging::setup(verbose)?;
+    let Args { example } = args;
+    // setup
+    initialize();
 
     // run the subcommand
     match example {

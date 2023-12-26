@@ -5,8 +5,8 @@ mod llvm_internal;
 use anyhow::{bail, Result};
 use structopt::StructOpt;
 
+use libra_shared::config::initialize;
 use libra_shared::dep::{DepState, Dependency, Resolver};
-use libra_shared::logging;
 
 use crate::common::{TestCase, TestSuite};
 use crate::llvm_external::{DepLLVMExternal, ResolverLLVMExternal, TestCaseExternal};
@@ -43,10 +43,6 @@ enum Command {
     rename_all = "kebab-case"
 )]
 struct Args {
-    /// Verbosity
-    #[structopt(short, long)]
-    verbose: Option<usize>,
-
     /// Name of the test suite
     name: String,
 
@@ -58,13 +54,9 @@ struct Args {
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
     let args = Args::from_args();
-    let Args {
-        verbose,
-        name,
-        command,
-    } = args;
-    // setup logging
-    logging::setup(verbose)?;
+    let Args { name, command } = args;
+    // setup
+    initialize();
 
     // run the subcommand
     match name.as_str() {

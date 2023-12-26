@@ -1,9 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::env;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{bail, Result};
+use lazy_static::lazy_static;
 use log::{error, info};
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
@@ -11,9 +13,15 @@ use serde::{Deserialize, Serialize};
 
 use libra_engine::error::{EngineError, EngineResult};
 use libra_engine::flow::shared::Context;
-use libra_shared::config::{CONTINUE, PARALLEL, PATH_STUDIO};
+use libra_shared::config::PATH_STUDIO;
 use libra_shared::dep::Resolver;
 use libra_shared::git::GitRepo;
+
+/// Environment configurations
+lazy_static! {
+    static ref PARALLEL: bool = matches!(env::var("LIBRA_PARALLEL"), Ok(val) if val == "1");
+    static ref CONTINUE: bool = matches!(env::var("LIBRA_CONTINUE"), Ok(val) if val == "1");
+}
 
 /// Controls whether we need to halt the parallel execution
 static HALT_PARALLEL_EXECUTION: AtomicBool = AtomicBool::new(false);

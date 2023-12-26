@@ -419,6 +419,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "fs_extra",
+ "lazy_static",
  "libra-builder",
  "libra-engine",
  "libra-shared",
