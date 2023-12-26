@@ -1878,7 +1878,6 @@ impl<'a> Context<'a> {
     ) -> EngineResult<Terminator> {
         use adapter::instruction::Inst as AdaptedInst;
         use adapter::typing::Type as AdaptedType;
-        use adapter::value::Value as AdaptedValue;
 
         let adapter::instruction::Instruction {
             name: _,
@@ -2258,14 +2257,7 @@ impl<'a> Context<'a> {
                 }
 
                 // conversion
-                let expected_ty = match value {
-                    AdaptedValue::Instruction { ty, index: _ } => self.typing.convert(ty)?,
-                    _ => {
-                        return Err(EngineError::InvalidAssumption(
-                            "Resume instructions must return a slot".into(),
-                        ));
-                    }
-                };
+                let expected_ty = self.typing.convert(value.get_type())?;
                 Terminator::Resume {
                     val: self.parse_value(value, &expected_ty)?,
                 }
