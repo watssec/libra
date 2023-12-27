@@ -55,14 +55,14 @@ pub fn build_via_autoconf(
 
         // re-generate the configure script
         let mut cmd = Command::new("./configure");
-        cmd.env("CC", ctxt.path_llvm(["bin", "clang"])?)
-            .arg(format!(
-                "--prefix={}",
-                path_bin.to_str().ok_or_else(|| anyhow!("non-ascii path"))?
-            ))
-            .arg("--disable-silent-rules")
-            .args(configure_args)
-            .current_dir(path_src);
+        cmd.arg(format!(
+            "--prefix={}",
+            path_bin.to_str().ok_or_else(|| anyhow!("non-ascii path"))?
+        ))
+        .arg("--disable-silent-rules")
+        .args(configure_args)
+        .env("CC", ctxt.path_llvm(["bin", "clang"])?)
+        .current_dir(path_src);
         if !cmd.status()?.success() {
             bail!("unable to configure");
         }
@@ -72,6 +72,22 @@ pub fn build_via_autoconf(
     }
 
     // make
+    if rebuild || !path_bin.exists() {
+        let mut cmd = Command::new("make");
+        cmd.current_dir(path_src);
+        if !cmd.status()?.success() {
+            bail!("unable to make");
+        }
+
+        let mut cmd = Command::new("make");
+        cmd.arg("install").current_dir(path_src);
+        if !cmd.status()?.success() {
+            bail!("unable to make install");
+        }
+        rebuild = true;
+    } else {
+        debug!("skipped: make install")
+    }
 
     Ok(rebuild)
 }
