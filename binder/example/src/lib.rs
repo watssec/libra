@@ -1,5 +1,6 @@
 mod apps;
 mod common;
+mod snippet;
 
 use anyhow::Result;
 use structopt::StructOpt;
