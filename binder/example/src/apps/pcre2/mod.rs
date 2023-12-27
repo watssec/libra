@@ -29,7 +29,19 @@ impl WorkflowConfig for Config {
                 bail!("unable to clone source repository");
             }
         } else {
-            debug!("source code repository ready");
+            debug!("skipped: git clone <main>");
+        }
+
+        // configure
+        let path_configure = path_src.join("configure");
+        if !path_configure.exists() {
+            let mut cmd = Command::new("./autogen.sh");
+            cmd.current_dir(&path_src);
+            if !cmd.status()?.success() {
+                bail!("unable to autogen.sh");
+            }
+        } else {
+            debug!("skipped: autogen.sh")
         }
 
         Ok(())
