@@ -16,17 +16,17 @@ impl WorkflowConfig for Config {
     }
 
     fn run(self, workdir: &Path) -> Result<()> {
-        let mut rebuild = false;
         let path_src = workdir.join("src");
         let path_bin = workdir.join("bin");
 
-        // typical workflow
+        let mut rebuild = false;
         rebuild = snippet::git_clone(
             &path_src,
             "https://github.com/PCRE2Project/pcre2.git",
             rebuild,
         )?;
         snippet::build_via_autoconf(&path_src, &path_bin, &[], rebuild)?;
+
         Ok(())
     }
 }

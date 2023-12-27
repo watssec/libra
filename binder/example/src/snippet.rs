@@ -22,6 +22,21 @@ pub fn git_clone(path_src: &Path, repo: &str, mut rebuild: bool) -> Result<bool>
     Ok(rebuild)
 }
 
+/// Svn clone
+pub fn svn_clone(path_src: &Path, repo: &str, mut rebuild: bool) -> Result<bool> {
+    if rebuild || !path_src.exists() {
+        let mut cmd = Command::new("svn");
+        cmd.arg("checkout").arg(repo).arg(path_src);
+        if !cmd.status()?.success() {
+            bail!("unable to svn checkout {}", repo);
+        }
+        rebuild = true;
+    } else {
+        debug!("skipped: svn checkout {}", repo);
+    }
+    Ok(rebuild)
+}
+
 /// Build with autoconf process
 pub fn build_via_autoconf(
     path_src: &Path,
