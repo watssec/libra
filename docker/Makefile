@@ -1,9 +1,9 @@
 # help
 define cmdline
 Please choose one of the specific commands:
-  - build : build the docker image
+  - init  : create and initialize the docker image
   - once  : probe once into the docker image and discard the changes
-  - script: run a script over the docker image
+  - build : build the project from scratch
 endef
 export cmdline
 
@@ -19,8 +19,15 @@ project_dir := $(realpath $(current_dir)/..)
 tag = libra
 
 # targets
-build:
-	@docker build . -t $(tag)
+init:
+	@docker build . \
+		--no-cache \
+		-t $(tag)
+	@docker run --rm \
+		-v $(project_dir):/project \
+		-it \
+		$(tag) \
+		rm -rf /project/studio/docker
 
 once:
 	@docker run --rm \
@@ -29,10 +36,10 @@ once:
 		--entrypoint /bin/bash \
 		$(tag)
 
-script:
+build:
 	@docker run --rm \
 		-v $(project_dir):/project \
 		-it \
 		$(tag) \
-		bash /project/docker/script.sh
+		bash /project/docker/script/build.sh
 
