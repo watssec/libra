@@ -2,6 +2,7 @@
 
 # exit when any command fails
 set -e
+source /root/.profile
 
 # build the `binder`
 cd /project/binder

@@ -25,21 +25,20 @@ init:
 		-t $(tag)
 	@docker run --rm \
 		-v $(project_dir):/project \
-		-it \
 		$(tag) \
 		rm -rf /project/studio/docker
 
 once:
 	@docker run --rm \
 		-v $(project_dir):/project \
-		-it \
-		--entrypoint /bin/bash \
-		$(tag)
+		--interactive --tty \
+		$(tag) \
+		bash
 
 build:
 	@docker run --rm \
 		-v $(project_dir):/project \
-		-it \
+		--interactive --tty \
 		$(tag) \
 		bash /project/docker/script/build.sh
 
