@@ -55,8 +55,10 @@ impl WorkflowConfig for Config {
                 &format!(
                     "--with-pcre={}",
                     dep_pcre2
-                        .to_str()
-                        .ok_or_else(|| anyhow!("non-ascii path"))?
+                        .join("bin")
+                        .into_os_string()
+                        .into_string()
+                        .map_err(|_| anyhow!("non-ascii path"))?
                 ),
             ],
             rebuild,
