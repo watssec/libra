@@ -25,7 +25,7 @@ impl WorkflowConfig for Config {
             "https://github.com/PCRE2Project/pcre2.git",
             rebuild,
         )?;
-        snippet::build_via_autoconf(&path_src, &path_bin, &[], rebuild)?;
+        snippet::build_via_autoconf(&path_src, &path_bin, false, &[], rebuild)?;
 
         Ok(())
     }

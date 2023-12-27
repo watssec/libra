@@ -1,6 +1,8 @@
 use std::path::Path;
+use std::process::Command;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{retrieve_config, WorkflowConfig};
@@ -29,9 +31,25 @@ impl WorkflowConfig for Config {
             "https://svn.apache.org/repos/asf/apr/apr/trunk/",
             rebuild,
         )?;
+
+        // special configuration step for apache httpd
+        let path_configure = path_src.join("configure");
+        if rebuild || !path_configure.exists() {
+            let mut cmd = Command::new("./buildconf");
+            cmd.current_dir(&path_src);
+            if !cmd.status()?.success() {
+                bail!("unable to buildconf");
+            }
+            rebuild = true;
+        } else {
+            debug!("skipped: buildconf")
+        }
+
+        // resume normal autoconf procedure
         snippet::build_via_autoconf(
             &path_src,
             &path_bin,
+            true,
             &[
                 "--with-included-apr",
                 &format!(
