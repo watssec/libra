@@ -31,6 +31,8 @@ fn baseline_cmake_options() -> Vec<String> {
         "-DCMAKE_OSX_ARCHITECTURES=arm64".into(),
         #[cfg(target_os = "macos")]
         "-DLLDB_USE_SYSTEM_DEBUGSERVER=ON".into(),
+        #[cfg(target_os = "macos")]
+        "-DLLVM_LIBC_MPFR_INSTALL_PATH=/opt/homebrew/Cellar/mpfr".into(),
     ]
 }
 

@@ -2,12 +2,15 @@ use std::fs;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use log::{info, warn};
 use tempfile::tempdir;
 
 use crate::config::{PATH_ROOT, PATH_STUDIO};
 use crate::git::GitRepo;
+
+/// A mark for dep state
+static READY_MARK: &str = "ready";
 
 /// A trait that marks an artifact resolver
 pub trait Resolver: Sized {
@@ -51,10 +54,20 @@ impl<R: Resolver, T: Dependency<R>> Scratch<R, T> {
             _phantom_t,
         } = self;
 
+        let mark = artifact.with_extension(READY_MARK);
+
+        // build the artifact
         fs::create_dir_all(&artifact)?;
         let resolver = R::construct(artifact);
         T::build(repo.path(), &resolver)?;
 
+        // create the mark
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(mark)?;
+
+        // return the package
         Ok(Package {
             repo,
             artifact: resolver,
@@ -80,8 +93,22 @@ impl<R: Resolver, T: Dependency<R>> Package<R, T> {
         } = self;
 
         let path_artifact = artifact.destruct();
+
+        // remove the mark
+        let mark = path_artifact.with_extension(READY_MARK);
+        if !mark.exists() {
+            bail!(
+                "package artifact exists without mark: {}/{}",
+                T::repo_path_from_root().join("/"),
+                repo.commit()
+            );
+        }
+        fs::remove_file(mark)?;
+
+        // remove the artifact directory
         fs::remove_dir_all(&path_artifact)?;
 
+        // return the scratch
         Ok(Scratch {
             repo,
             artifact: path_artifact,
@@ -106,19 +133,34 @@ impl<R: Resolver, T: Dependency<R>> DepState<R, T> {
         let mut repo_path = PATH_ROOT.clone();
         repo_path.extend(segments);
         let repo = GitRepo::new(repo_path, None)?;
+        let commit = repo.commit();
 
         let mut artifact = PATH_STUDIO.to_path_buf();
         artifact.extend(segments);
-        artifact.push(repo.commit());
+        artifact.push(commit);
 
-        // check the existence of the pre-built package
-        let state = if artifact.exists() {
+        // a filesystem mark showing that the artifact is ready
+        let ready = artifact.with_extension(READY_MARK);
+
+        // derive the state
+        let state = if ready.exists() {
+            if !artifact.exists() {
+                bail!(
+                    "package mark exists without artifact: {}/{}",
+                    segments.join("/"),
+                    commit
+                );
+            }
             Self::Package(Package {
                 repo,
                 artifact: R::construct(artifact),
                 _phantom: PhantomData,
             })
         } else {
+            if artifact.exists() {
+                info!("Deleting unsuccessful build");
+                fs::remove_dir_all(&artifact)?;
+            }
             Self::Scratch(Scratch {
                 repo,
                 artifact,
