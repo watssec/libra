@@ -21,7 +21,7 @@ fn baseline_cmake_options() -> Vec<String> {
         ),
         format!(
             "-DLLVM_ENABLE_RUNTIMES={}",
-            ["compiler-rt", "libcxx", "libcxxabi"].join(";")
+            ["compiler-rt", "libcxx", "libcxxabi", "libunwind"].join(";")
         ),
         "-DLLVM_ENABLE_RTTI=ON".into(),
         "-DLLVM_ENABLE_LIBCXX=ON".into(),
