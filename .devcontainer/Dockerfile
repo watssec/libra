@@ -2,9 +2,9 @@
 FROM ubuntu:22.04
 
 # arguments
-ARG NAME=libra
-ARG UID
-ARG GID
+ARG USER=libra
+ARG UID=1000
+ARG GID=1000
 
 # pre-requisites
 RUN apt-get update
@@ -20,9 +20,9 @@ RUN chmod +x rustup.sh
 RUN ./rustup.sh -y
 
 # setup user
-RUN groupadd -g ${GID}
-RUN useradd -m -u ${UID} -g ${GID} -o -s /bin/bash ${NAME}
-USER ${NAME}
+RUN groupadd -g ${GID} ${USER}
+RUN useradd -m -u ${UID} -g ${GID} ${USER}
+USER ${USER}
 
 # prepare environment
 ENV DOCKER=1

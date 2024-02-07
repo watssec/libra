@@ -2,12 +2,10 @@
   "name": "libra",
   "build": {
     "dockerfile": "Dockerfile",
-    "args": {
-      "UID": "${localEnv:UID}",
-      "GID": "${localEnv:GID}"
-    }
   },
   "containerUser": "libra",
+  "remoteUser": "libra",
+  "updateRemoteUserUID": true,
   "hostRequirements": {
     "cpus": 4,
     "memory": "8gb",
