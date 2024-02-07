@@ -1,0 +1,17 @@
+{
+  "name": "libra",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "UID": "${localEnv:UID}",
+      "GID": "${localEnv:GID}"
+    }
+  },
+  "containerUser": "libra",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "64gb",
+    "gpu": false
+  }
+}
