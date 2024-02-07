@@ -20,7 +20,7 @@ RUN chmod +x rustup.sh
 RUN ./rustup.sh -y
 
 # setup user
-RUN groupadd -g ${GID} -o ${NAME}
+RUN groupadd -g ${GID}
 RUN useradd -m -u ${UID} -g ${GID} -o -s /bin/bash ${NAME}
 USER ${NAME}
 
