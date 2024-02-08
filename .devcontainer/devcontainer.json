@@ -3,6 +3,8 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "containerUser": "root",
+  "remoteUser": "libra",
   "hostRequirements": {
     "cpus": 4,
     "memory": "8gb",

@@ -19,7 +19,7 @@ def main() -> int:
     content = []
     with open(path_in) as reader:
         for line in reader:
-            line = line.strip()
+            line = line.rstrip()
             if line == "ARG UID":
                 line = "{}={}".format(line, uid)
             elif line == "ARG GID":
