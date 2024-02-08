@@ -11,7 +11,7 @@ RUN apt-get update
 RUN apt-get install -y \
     build-essential cmake ninja-build \
     git curl python3 \
-    flex bison bc cpio \
+    m4 flex bison bc cpio \
     libncurses-dev libssl-dev libelf-dev
 
 # install Rust
