@@ -3,8 +3,8 @@ FROM ubuntu:22.04
 
 # arguments
 ARG NAME=libra
-ARG UID={{UID}}
-ARG GID={{GID}}
+ARG UID
+ARG GID
 
 # pre-requisites
 RUN apt-get update

@@ -15,11 +15,22 @@ def main() -> int:
     uid = os.getuid()
     gid = os.getgid()
 
+    # instantiate the template
+    content = []
     with open(path_in) as reader:
+        for line in reader:
+            line = line.strip()
+            if line == "ARG UID":
+                line = "{}={}".format(line, uid)
+            elif line == "ARG GID":
+                line = "{}={}".format(line, gid)
+            content.append(line)
 
-        with open(path_out, "w") as writer:
+    with open(path_out, "w") as writer:
+        for line in content:
+            writer.write(line + os.linesep)
 
-
+    # done
     return 0
 
 

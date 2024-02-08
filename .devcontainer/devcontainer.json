@@ -1,11 +1,9 @@
 {
   "name": "libra",
+  initializeCommand: "python3 .devcontainer/setup.py",
   "build": {
-    "dockerfile": "Dockerfile",
+    "dockerfile": "Dockerfile"
   },
-  "containerUser": "root",
-  "remoteUser": "libra",
-  "updateRemoteUserUID": true,
   "hostRequirements": {
     "cpus": 4,
     "memory": "8gb",
