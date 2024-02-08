@@ -2,9 +2,9 @@
 FROM ubuntu:22.04
 
 # arguments
-ARG USER=libra
-ARG UID=1000
-ARG GID=1000
+ARG NAME=libra
+ARG UID={{UID}}
+ARG GID={{GID}}
 
 # pre-requisites
 RUN apt-get update
@@ -19,10 +19,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
 RUN chmod +x rustup.sh
 RUN ./rustup.sh -y
 
-# setup user
-RUN groupadd -g ${GID} ${USER}
-RUN useradd -m -u ${UID} -g ${GID} ${USER}
-USER ${USER}
-
 # prepare environment
 ENV DOCKER=1
+
+# setup user
+RUN groupadd -g ${GID} ${NAME}
+RUN useradd -m -u ${UID} -g ${GID} -s /bin/bash ${NAME}
+USER ${NAME}

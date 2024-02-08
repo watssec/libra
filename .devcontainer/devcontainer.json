@@ -3,7 +3,7 @@
   "build": {
     "dockerfile": "Dockerfile",
   },
-  "containerUser": "libra",
+  "containerUser": "root",
   "remoteUser": "libra",
   "updateRemoteUserUID": true,
   "hostRequirements": {
