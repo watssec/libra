@@ -1,10 +1,10 @@
-use std::path::Path;
 use std::process::Command;
 use std::{env, fs, process};
 
 use serde::{Deserialize, Serialize};
 
 use libra_engine::flow::shared::Context;
+use libra_example::COMMAND_EXTENSION;
 
 #[derive(Serialize, Deserialize)]
 enum ClangArg {
@@ -182,7 +182,7 @@ fn main() {
     }
     let path = match output {
         None => return,
-        Some(out) => Path::new(out),
+        Some(out) => format!("{}{}", out, COMMAND_EXTENSION),
     };
 
     // serialize

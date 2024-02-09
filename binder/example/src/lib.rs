@@ -1,12 +1,16 @@
+use anyhow::Result;
+use structopt::StructOpt;
+
+use libra_shared::config::initialize;
+
+use crate::common::execute;
+
 mod apps;
 mod common;
 mod snippet;
 
-use anyhow::Result;
-use structopt::StructOpt;
-
-use crate::common::execute;
-use libra_shared::config::initialize;
+/// Extension for our own command database
+pub static COMMAND_EXTENSION: &str = ".command.json";
 
 #[derive(StructOpt)]
 enum Example {
