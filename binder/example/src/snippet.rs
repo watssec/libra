@@ -5,7 +5,7 @@ use std::process::Command;
 use anyhow::{anyhow, bail, Result};
 use log::debug;
 
-use libra_engine::flow::shared::Context;
+use crate::common::CLANG_WRAP;
 
 /// Git clone
 pub fn git_clone(path_src: &Path, repo: &str, mut rebuild: bool) -> Result<bool> {
@@ -45,9 +45,6 @@ pub fn build_via_autoconf(
     configure_args: &[&str],
     mut rebuild: bool,
 ) -> Result<bool> {
-    // run the workflow
-    let ctxt = Context::new()?;
-
     // autogen.sh
     if !skip_autogen {
         let path_configure = path_src.join("configure");
@@ -79,7 +76,7 @@ pub fn build_via_autoconf(
         ))
         .arg("--disable-silent-rules")
         .args(configure_args)
-        .env("CC", ctxt.path_llvm(["bin", "clang"])?)
+        .env("CC", CLANG_WRAP.as_str())
         .current_dir(path_src);
         if !cmd.status()?.success() {
             bail!("unable to configure");

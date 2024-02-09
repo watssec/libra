@@ -5,6 +5,7 @@ version = "0.1.0"
 authors = ["Meng Xu <meng.xu.cs@uwaterloo.ca>"]
 license = "GPL-3.0"
 edition = "2021"
+default-run = "libra-example"
 
 [dependencies]
 anyhow = "1.0.79"

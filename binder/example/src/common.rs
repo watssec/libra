@@ -13,6 +13,17 @@ lazy_static! {
     static ref FORCE: bool = matches!(env::var("FORCE"), Ok(val) if val == "1");
 }
 
+lazy_static! {
+    pub static ref CLANG_WRAP: String = {
+        let mut target_dir = PathBuf::from(env!("LIBRA_TARGET_DIR"));
+        target_dir.push("clang_wrap");
+        target_dir
+            .into_os_string()
+            .into_string()
+            .expect("ASCII path only")
+    };
+}
+
 /// Common trait for workflow config
 pub trait WorkflowConfig: Serialize + DeserializeOwned {
     /// Obtain the application name
