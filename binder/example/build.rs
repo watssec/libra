@@ -3,27 +3,20 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    // skip environment variable tweaking for wrappers
-    match env::var_os("CARGO_BIN_NAME")
+    // decide whether we are compiling a wrapper
+    let is_main = env::var_os("CARGO_BIN_NAME")
         .as_ref()
         .and_then(|e| e.to_str())
-    {
-        None => (),
-        Some(name) => {
-            match name {
-                "clang_wrap" => return,
-                "libra_example" => {
-                    // compile wrappers first
-                    let status = Command::new(env!("CARGO"))
-                        .args(["build", "--bin", "clang_wrap"])
-                        .status()
-                        .expect("spawn to compile clang_wrap");
-                    if !status.success() {
-                        panic!("failed to compile clang_wrap");
-                    }
-                }
-                _ => (),
-            }
+        .map_or(false, |n| n == env!("CARGO_PKG_NAME"));
+
+    // compile wrappers first
+    if is_main {
+        let status = Command::new(env!("CARGO"))
+            .args(["build", "--bin", "clang_wrap"])
+            .status()
+            .expect("spawn to compile clang_wrap");
+        if !status.success() {
+            panic!("failed to compile clang_wrap");
         }
     }
 
