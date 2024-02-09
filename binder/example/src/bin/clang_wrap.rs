@@ -1,5 +1,6 @@
+use std::path::Path;
 use std::process::Command;
-use std::{env, process};
+use std::{env, fs, process};
 
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +26,10 @@ enum ClangArg {
     MachineArch(String),
     /// -g, --debug
     Debug,
+    /// -shared, --shared
+    LinkShared,
+    /// -static, --static
+    LinkStatic,
     /// -mllvm -<key>{=<value>}
     Backend(String, Option<String>),
     /// -f<key>{=<value>}
@@ -73,6 +78,12 @@ impl ClangArg {
             }
             "-g" | "--debug" => {
                 return Self::Debug;
+            }
+            "-shared" | "--shared" => {
+                return Self::LinkShared;
+            }
+            "-static" | "--static" => {
+                return Self::LinkStatic;
             }
             "-isysroot" => {
                 return Self::IncludeSysroot(Self::expect_next(stream));
@@ -157,5 +168,24 @@ fn main() {
     }
 
     // only process arguments upon successful invocation
-    ClangArg::collect(args.iter().map(|s| s.as_str()));
+    let parsed = ClangArg::collect(args.iter().map(|s| s.as_str()));
+
+    // check output
+    let mut output = None;
+    for item in &parsed {
+        if let ClangArg::Output(out) = item {
+            if output.is_some() {
+                panic!("more than one output specified: {}", args.join(" "));
+            }
+            output = Some(out);
+        }
+    }
+    let path = match output {
+        None => return,
+        Some(out) => Path::new(out),
+    };
+
+    // serialize
+    let content = serde_json::to_string_pretty(&parsed).expect("serialization error");
+    fs::write(path, content).expect("IO error");
 }
