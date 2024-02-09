@@ -42,6 +42,17 @@ enum ClangArg {
 }
 
 impl ClangArg {
+    pub fn collect<'a, I>(mut iter: I) -> Vec<Self>
+    where
+        I: Iterator<Item = &'a str>,
+    {
+        let mut args = vec![];
+        while let Some(token) = iter.next() {
+            args.push(Self::parse(token, &mut iter));
+        }
+        args
+    }
+
     fn parse<'a, I>(token: &'a str, stream: &mut I) -> Self
     where
         I: Iterator<Item = &'a str>,
@@ -109,10 +120,6 @@ impl ClangArg {
         panic!("unknown Clang option: {}", token);
     }
 
-    fn strip_prefix(cur: &str, prefix: &str) -> String {
-        cur.strip_prefix(prefix).unwrap().to_string()
-    }
-
     fn expect_next<'a, I>(stream: &mut I) -> String
     where
         I: Iterator<Item = &'a str>,
@@ -150,5 +157,5 @@ fn main() {
     }
 
     // only process arguments upon successful invocation
-    args.into_iter();
+    ClangArg::collect(args.iter().map(|s| s.as_str()));
 }
