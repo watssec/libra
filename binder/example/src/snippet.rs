@@ -41,22 +41,26 @@ pub fn svn_clone(path_src: &Path, repo: &str, mut rebuild: bool) -> Result<bool>
 pub fn build_via_autoconf(
     path_src: &Path,
     path_bin: &Path,
-    skip_autogen: bool,
-    configure_args: &[&str],
+    args_autogen: Option<&[&str]>,
+    args_configure: &[&str],
     mut rebuild: bool,
 ) -> Result<bool> {
     // autogen.sh
-    if !skip_autogen {
-        let path_configure = path_src.join("configure");
-        if rebuild || !path_configure.exists() {
-            let mut cmd = Command::new("./autogen.sh");
-            cmd.current_dir(path_src);
-            if !cmd.status()?.success() {
-                bail!("unable to autogen.sh");
+    match args_autogen {
+        None => { /* not applicable */ }
+        Some(args) => {
+            let path_configure = path_src.join("configure");
+            if rebuild || !path_configure.exists() {
+                let mut cmd = Command::new("./autogen.sh");
+                cmd.args(args);
+                cmd.current_dir(path_src);
+                if !cmd.status()?.success() {
+                    bail!("unable to autogen.sh");
+                }
+                rebuild = true;
+            } else {
+                debug!("skipped: autogen.sh")
             }
-            rebuild = true;
-        } else {
-            debug!("skipped: autogen.sh")
         }
     }
 
@@ -75,7 +79,7 @@ pub fn build_via_autoconf(
             path_bin.to_str().ok_or_else(|| anyhow!("non-ascii path"))?
         ))
         .arg("--disable-silent-rules")
-        .args(configure_args)
+        .args(args_configure)
         .env("CC", CLANG_WRAP.as_str())
         .current_dir(path_src);
         if !cmd.status()?.success() {

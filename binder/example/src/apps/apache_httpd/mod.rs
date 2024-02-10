@@ -49,7 +49,7 @@ impl WorkflowConfig for Config {
         snippet::build_via_autoconf(
             &path_src,
             &path_bin,
-            true,
+            None,
             &[
                 "--with-included-apr",
                 &format!(
