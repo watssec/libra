@@ -3,14 +3,16 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    // decide whether we are compiling a wrapper
-    let is_main = env::var_os("CARGO_BIN_NAME")
-        .as_ref()
-        .and_then(|e| e.to_str())
-        .map_or(false, |n| n == env!("CARGO_PKG_NAME"));
+    // decide whether we are compiling the main
+    let is_main_or_default = match env::var_os("CARGO_BIN_NAME") {
+        None => env::var_os("CARGO_PRIMARY_PACKAGE").is_some(),
+        Some(e) => {
+            e.to_str().map_or(false, |n| n == env!("CARGO_PKG_NAME"))
+        }
+    };
 
     // compile wrappers first
-    if is_main {
+    if is_main_or_default {
         let status = Command::new(env!("CARGO"))
             .args(["build", "--bin", "clang_wrap"])
             .status()
