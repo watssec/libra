@@ -42,6 +42,8 @@ enum ClangArg {
     NoWarnings,
     /// -pthread
     POSIXThread,
+    /// -print-<key>{=<value>}, --print-<key>{=<value>}
+    Print(String, Option<String>),
     /// -o <token>
     Output(String),
     /// <token>
@@ -134,6 +136,13 @@ impl ClangArg {
         if let Some(inner) = token.strip_prefix("-W") {
             let (k, v) = Self::expect_maybe_key_value(inner);
             return Self::Warning(k, v);
+        }
+        if let Some(inner) = token
+            .strip_prefix("-print-")
+            .or_else(|| token.strip_prefix("--print-"))
+        {
+            let (k, v) = Self::expect_maybe_key_value(inner);
+            return Self::Print(k, v);
         }
 
         panic!("unknown Clang option: {}", token);
