@@ -46,6 +46,8 @@ enum ClangArg {
     POSIXThread,
     /// -print-<key>{=<value>}, --print-<key>{=<value>}
     Print(String, Option<String>),
+    /// -pedantic
+    Pedantic,
     /// -o <token>
     Output(String),
     /// <token>
@@ -109,6 +111,9 @@ impl ClangArg {
             }
             "-pthread" => {
                 return Self::POSIXThread;
+            }
+            "-pedantic" => {
+                return Self::Pedantic;
             }
             "-o" => {
                 return Self::Output(Self::expect_next(stream));

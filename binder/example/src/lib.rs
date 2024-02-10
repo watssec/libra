@@ -15,6 +15,7 @@ pub static COMMAND_EXTENSION: &str = ".command.json";
 #[derive(StructOpt)]
 enum Example {
     ApacheHttpd,
+    LibXML2,
     PCRE2,
 }
 
@@ -40,6 +41,7 @@ pub fn entrypoint() -> Result<()> {
     // run the subcommand
     match example {
         Example::ApacheHttpd => execute::<apps::apache_httpd::Config>(),
+        Example::LibXML2 => execute::<apps::libxml2::Config>(),
         Example::PCRE2 => execute::<apps::pcre2::Config>(),
     }
 }
