@@ -27,8 +27,13 @@ impl WorkflowConfig for Config {
         let mut rebuild = false;
         rebuild = snippet::git_clone(&path_src, "https://github.com/apache/httpd.git", rebuild)?;
         rebuild = snippet::svn_clone(
-            &path_src.join("srclib/apr"),
+            &path_src.join("srclib").join("apr"),
             "https://svn.apache.org/repos/asf/apr/apr/trunk/",
+            rebuild,
+        )?;
+        rebuild = snippet::svn_clone(
+            &path_src.join("srclib").join("apr-util"),
+            "https://svn.apache.org/repos/asf/apr/apr-util/trunk/",
             rebuild,
         )?;
 
