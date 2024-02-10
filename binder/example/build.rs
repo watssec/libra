@@ -6,9 +6,7 @@ fn main() {
     // decide whether we are compiling the main
     let is_main_or_default = match env::var_os("CARGO_BIN_NAME") {
         None => env::var_os("CARGO_PRIMARY_PACKAGE").is_some(),
-        Some(e) => {
-            e.to_str().map_or(false, |n| n == env!("CARGO_PKG_NAME"))
-        }
+        Some(e) => e.to_str().map_or(false, |n| n == env!("CARGO_PKG_NAME")),
     };
 
     // compile wrappers first

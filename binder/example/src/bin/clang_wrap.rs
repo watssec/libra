@@ -18,8 +18,10 @@ enum ClangArg {
     Include(String),
     /// -isysroot <token>
     IncludeSysroot(String),
+    /// -l<token>, -l <token>
+    LibName(String),
     /// -L<token>, -L <token>
-    Library(String),
+    LibPath(String),
     /// -O<level>
     Optimization(String),
     /// -arch <token>
@@ -77,8 +79,11 @@ impl ClangArg {
             "-I" => {
                 return Self::Include(Self::expect_next(stream));
             }
+            "-l" => {
+                return Self::LibName(Self::expect_next(stream));
+            }
             "-L" => {
-                return Self::Library(Self::expect_next(stream));
+                return Self::LibPath(Self::expect_next(stream));
             }
             "-arch" => {
                 return Self::Arch(Self::expect_next(stream));
@@ -120,8 +125,11 @@ impl ClangArg {
         if let Some(inner) = token.strip_prefix("-I") {
             return Self::Include(inner.to_string());
         }
+        if let Some(inner) = token.strip_prefix("-l") {
+            return Self::LibName(inner.to_string());
+        }
         if let Some(inner) = token.strip_prefix("-L") {
-            return Self::Library(inner.to_string());
+            return Self::LibPath(inner.to_string());
         }
         if let Some(inner) = token.strip_prefix("-O") {
             return Self::Optimization(inner.to_string());
