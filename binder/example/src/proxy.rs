@@ -1,3 +1,6 @@
+use std::process::Command;
+
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 /// Extension for our own command database
@@ -10,8 +13,8 @@ pub enum ClangArg {
     ModeCompile,
     /// -std=<token>
     Standard(String),
-    /// -D<token>
-    Define(String),
+    /// -D<key>{=<value>}
+    Define(String, Option<String>),
     /// -I<token>, -I <token>
     Include(String),
     /// -isysroot <token>
@@ -123,7 +126,8 @@ impl ClangArg {
             return Self::Standard(inner.to_string());
         }
         if let Some(inner) = token.strip_prefix("-D") {
-            return Self::Define(inner.to_string());
+            let (k, v) = Self::expect_maybe_key_value(inner);
+            return Self::Define(k, v);
         }
         if let Some(inner) = token.strip_prefix("-I") {
             return Self::Include(inner.to_string());
@@ -175,5 +179,40 @@ impl ClangArg {
                 (key.to_string(), Some(val.to_string()))
             }
         }
+    }
+}
+
+impl ClangArg {
+    fn as_cmd_arg(&self, cmd: &mut Command) -> Result<()> {
+        match self {
+            Self::ModeCompile => bail!("unexpected -c"),
+            Self::Standard(val) => cmd.arg(format!("-std={}", val)),
+            Self::Define(key, None) => cmd.arg(format!("-D{}", key)),
+            Self::Define(key, Some(val)) => cmd.arg(format!("-D{}={}", key, val)),
+            Self::Include(val) => cmd.arg(format!("-I{}", val)),
+            Self::IncludeSysroot(val) => cmd.arg("-isysroot").arg(val),
+            Self::LibName(val) => cmd.arg(format!("-l{}", val)),
+            Self::LibPath(val) => cmd.arg(format!("-L{}", val)),
+            Self::Optimization(val) => cmd.arg(format!("-O{}", val)),
+            Self::Arch(val) => cmd.arg("-arch").arg(val),
+            Self::MachineArch(val) => cmd.arg(format!("-march={}", val)),
+            Self::Debug => cmd.arg("-g"),
+            Self::LinkShared => bail!("unexpected -shared"),
+            Self::LinkStatic => bail!("unexpected -static"),
+            Self::Backend(key, None) => cmd.arg("-mllvm").arg(key),
+            Self::Backend(key, Some(val)) => cmd.arg("-mllvm").arg(format!("{}={}", key, val)),
+            Self::Flag(key, None) => cmd.arg(format!("-f{}", key)),
+            Self::Flag(key, Some(val)) => cmd.arg(format!("-f{}={}", key, val)),
+            Self::Warning(key, None) => cmd.arg(format!("-W{}", key)),
+            Self::Warning(key, Some(val)) => cmd.arg(format!("-W{}={}", key, val)),
+            Self::NoWarnings => cmd.arg("-w"),
+            Self::POSIXThread => cmd.arg("-pthread"),
+            Self::Print(key, None) => bail!("unexpected -print-{}", key),
+            Self::Print(key, Some(val)) => bail!("unexpected -print-{}={}", key, val),
+            Self::Pedantic => cmd.arg("-pedantic"),
+            Self::Output(val) => bail!("unexpected -o {}", val),
+            Self::Input(val) => bail!("unexpected input {}", val),
+        };
+        Ok(())
     }
 }
