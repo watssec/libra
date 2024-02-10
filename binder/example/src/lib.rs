@@ -5,12 +5,12 @@ use libra_shared::config::initialize;
 
 use crate::common::execute;
 
+pub mod proxy;
+
+mod analyze;
 mod apps;
 mod common;
 mod snippet;
-
-/// Extension for our own command database
-pub static COMMAND_EXTENSION: &str = ".command.json";
 
 #[derive(StructOpt)]
 enum Example {

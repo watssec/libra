@@ -385,9 +385,11 @@ dependencies = [
  "libra-engine",
  "libra-shared",
  "log",
+ "petgraph",
  "serde",
  "serde_json",
  "structopt",
+ "walkdir",
 ]
 
 [[package]]
