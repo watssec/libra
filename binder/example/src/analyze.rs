@@ -31,6 +31,12 @@ impl Language {
     }
 }
 
+#[derive(Default)]
+struct Libraries {
+    sys: Vec<SysLib>,
+    usr: Vec<PathBuf>,
+}
+
 enum Action {
     Compile {
         input: PathBuf,
@@ -39,15 +45,13 @@ enum Action {
     },
     Link {
         inputs: Vec<PathBuf>,
-        libs_sys: Vec<SysLib>,
-        libs_usr: Vec<PathBuf>,
+        libs: Libraries,
         output: PathBuf,
     },
     CompileAndLink {
         input: PathBuf,
         lang: Language,
-        libs_sys: Vec<SysLib>,
-        libs_usr: Vec<PathBuf>,
+        libs: Libraries,
         output: PathBuf,
     },
 }
@@ -153,7 +157,7 @@ impl Action {
 
     fn filter_args_for_mode_link(
         invocation: ClangInvocation,
-    ) -> Result<(ClangInvocation, Option<(Vec<SysLib>, Vec<PathBuf>)>)> {
+    ) -> Result<(ClangInvocation, Option<Libraries>)> {
         let ClangInvocation { cwd, args } = invocation;
 
         // collect libraries
@@ -218,8 +222,10 @@ impl Action {
                     bail!("library {} not found", name);
                 }
             }
-
-            Some((libs_sys, libs_usr))
+            Some(Libraries {
+                sys: libs_sys,
+                usr: libs_usr,
+            })
         } else {
             None
         };
@@ -257,47 +263,43 @@ impl Action {
                 lang,
                 output,
             }
-        } else if inputs.len() == 1 {
-            let input = inputs.into_iter().next().unwrap();
-
-            // at least linking is involved
-            let (libs_sys, libs_usr) = link_libs_opt.unwrap_or_else(|| (vec![], vec![]));
-
-            match Language::probe(&input) {
-                None => {
-                    // linking mode
-                    Action::Link {
-                        inputs: vec![input],
-                        libs_sys,
-                        libs_usr,
-                        output,
-                    }
-                }
-                Some(lang) => {
-                    // compile and link mode
-                    Action::CompileAndLink {
-                        input,
-                        lang,
-                        libs_sys,
-                        libs_usr,
-                        output,
-                    }
-                }
-            }
         } else {
-            for item in &inputs {
-                if Language::probe(item).is_some() {
-                    bail!("found source code file in linking mode");
+            // at least linking is involved
+            let libs = link_libs_opt.unwrap_or_default();
+
+            // now decide whether this is linking only or compile and link
+            if inputs.len() == 1 {
+                let input = inputs.into_iter().next().unwrap();
+                match Language::probe(&input) {
+                    None => {
+                        // linking mode
+                        Action::Link {
+                            inputs: vec![input],
+                            libs,
+                            output,
+                        }
+                    }
+                    Some(lang) => {
+                        // compile and link mode
+                        Action::CompileAndLink {
+                            input,
+                            lang,
+                            libs,
+                            output,
+                        }
+                    }
                 }
-            }
-
-            let (libs_sys, libs_usr) = link_libs_opt.unwrap_or_else(|| (vec![], vec![]));
-
-            Action::Link {
-                inputs,
-                libs_sys,
-                libs_usr,
-                output,
+            } else {
+                for item in &inputs {
+                    if Language::probe(item).is_some() {
+                        bail!("found source code file in linking mode");
+                    }
+                }
+                Action::Link {
+                    inputs,
+                    libs,
+                    output,
+                }
             }
         };
 
