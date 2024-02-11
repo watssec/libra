@@ -19,10 +19,6 @@ pub enum ClangArg {
     Include(String),
     /// -isysroot <token>
     IncludeSysroot(String),
-    /// -l<token>, -l <token>
-    LibName(String),
-    /// -L<token>, -L <token>
-    LibPath(String),
     /// -O<level>
     Optimization(String),
     /// -arch <token>
@@ -31,11 +27,17 @@ pub enum ClangArg {
     MachineArch(String),
     /// -g, --debug
     Debug,
+    /// -l<token>, -l <token>
+    LibName(String),
+    /// -L<token>, -L <token>
+    LibPath(String),
     /// -shared, --shared
     LinkShared,
     /// -static, --static
     LinkStatic,
-    /// -mllvm -<key>{=<value>}
+    /// -Wl,<arg>,<arg>,...
+    Linker(Vec<(String, Option<String>)>),
+    /// -mllvm <key>{=<value>}
     Backend(String, Option<String>),
     /// -f<key>{=<value>}
     Flag(String, Option<String>),
@@ -43,12 +45,12 @@ pub enum ClangArg {
     Warning(String, Option<String>),
     /// -w, --no-warnings
     NoWarnings,
+    /// -pedantic
+    Pedantic,
     /// -pthread
     POSIXThread,
     /// -print-<key>{=<value>}, --print-<key>{=<value>}
     Print(String, Option<String>),
-    /// -pedantic
-    Pedantic,
     /// -o <token>
     Output(String),
     /// <token>
@@ -82,6 +84,9 @@ impl ClangArg {
             "-I" => {
                 return Self::Include(Self::expect_next(stream));
             }
+            "-isysroot" => {
+                return Self::IncludeSysroot(Self::expect_next(stream));
+            }
             "-l" => {
                 return Self::LibName(Self::expect_next(stream));
             }
@@ -100,9 +105,6 @@ impl ClangArg {
             "-static" | "--static" => {
                 return Self::LinkStatic;
             }
-            "-isysroot" => {
-                return Self::IncludeSysroot(Self::expect_next(stream));
-            }
             "-mllvm" => {
                 let (k, v) = Self::expect_maybe_key_value(&Self::expect_next(stream));
                 return Self::Backend(k, v);
@@ -110,11 +112,11 @@ impl ClangArg {
             "-w" | "--no-warnings" => {
                 return Self::NoWarnings;
             }
-            "-pthread" => {
-                return Self::POSIXThread;
-            }
             "-pedantic" => {
                 return Self::Pedantic;
+            }
+            "-pthread" => {
+                return Self::POSIXThread;
             }
             "-o" => {
                 return Self::Output(Self::expect_next(stream));
@@ -132,17 +134,25 @@ impl ClangArg {
         if let Some(inner) = token.strip_prefix("-I") {
             return Self::Include(inner.to_string());
         }
+        if let Some(inner) = token.strip_prefix("-O") {
+            return Self::Optimization(inner.to_string());
+        }
+        if let Some(inner) = token.strip_prefix("-march=") {
+            return Self::MachineArch(inner.to_string());
+        }
         if let Some(inner) = token.strip_prefix("-l") {
             return Self::LibName(inner.to_string());
         }
         if let Some(inner) = token.strip_prefix("-L") {
             return Self::LibPath(inner.to_string());
         }
-        if let Some(inner) = token.strip_prefix("-O") {
-            return Self::Optimization(inner.to_string());
-        }
-        if let Some(inner) = token.strip_prefix("-march=") {
-            return Self::MachineArch(inner.to_string());
+        if let Some(inner) = token.strip_prefix("-Wl,") {
+            let mut args = vec![];
+            for item in inner.split(',') {
+                let (k, v) = Self::expect_maybe_key_value(item);
+                args.push((k, v));
+            }
+            return Self::Linker(args);
         }
         if let Some(inner) = token.strip_prefix("-f") {
             let (k, v) = Self::expect_maybe_key_value(inner);
@@ -191,14 +201,28 @@ impl ClangArg {
             Self::Define(key, Some(val)) => cmd.arg(format!("-D{}={}", key, val)),
             Self::Include(val) => cmd.arg(format!("-I{}", val)),
             Self::IncludeSysroot(val) => cmd.arg("-isysroot").arg(val),
-            Self::LibName(val) => cmd.arg(format!("-l{}", val)),
-            Self::LibPath(val) => cmd.arg(format!("-L{}", val)),
             Self::Optimization(val) => cmd.arg(format!("-O{}", val)),
             Self::Arch(val) => cmd.arg("-arch").arg(val),
             Self::MachineArch(val) => cmd.arg(format!("-march={}", val)),
             Self::Debug => cmd.arg("-g"),
+            Self::LibName(val) => bail!("unexpected -l{}", val),
+            Self::LibPath(val) => bail!("unexpected -L{}", val),
             Self::LinkShared => bail!("unexpected -shared"),
             Self::LinkStatic => bail!("unexpected -static"),
+            Self::Linker(args) => {
+                bail!(
+                    "unexpected -Wl,{}",
+                    args.iter()
+                        .map(|(k, v)| {
+                            match v {
+                                None => k.to_string(),
+                                Some(v) => format!("{}={}", k, v),
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
             Self::Backend(key, None) => cmd.arg("-mllvm").arg(key),
             Self::Backend(key, Some(val)) => cmd.arg("-mllvm").arg(format!("{}={}", key, val)),
             Self::Flag(key, None) => cmd.arg(format!("-f{}", key)),
@@ -206,10 +230,10 @@ impl ClangArg {
             Self::Warning(key, None) => cmd.arg(format!("-W{}", key)),
             Self::Warning(key, Some(val)) => cmd.arg(format!("-W{}={}", key, val)),
             Self::NoWarnings => cmd.arg("-w"),
+            Self::Pedantic => cmd.arg("-pedantic"),
             Self::POSIXThread => cmd.arg("-pthread"),
             Self::Print(key, None) => bail!("unexpected -print-{}", key),
             Self::Print(key, Some(val)) => bail!("unexpected -print-{}={}", key, val),
-            Self::Pedantic => cmd.arg("-pedantic"),
             Self::Output(val) => bail!("unexpected -o {}", val),
             Self::Input(val) => bail!("unexpected input {}", val),
         };
