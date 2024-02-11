@@ -2,7 +2,7 @@ use std::process::Command;
 use std::{env, fs, process};
 
 use libra_engine::flow::shared::Context;
-use libra_example::proxy::{ClangArg, COMMAND_EXTENSION};
+use libra_example::proxy::{ClangArg, ClangInvocation, COMMAND_EXTENSION};
 
 fn main() {
     // get paths
@@ -39,7 +39,16 @@ fn main() {
         Some(out) => format!("{}{}", out, COMMAND_EXTENSION),
     };
 
+    // create the invocation package
+    let invocation = ClangInvocation {
+        cwd: env::current_dir()
+            .expect("unable to get current working directory")
+            .canonicalize()
+            .expect("unable to get canonicalize cwd path"),
+        args: parsed,
+    };
+
     // serialize
-    let content = serde_json::to_string_pretty(&parsed).expect("serialization error");
+    let content = serde_json::to_string_pretty(&invocation).expect("serialization error");
     fs::write(path, content).expect("IO error");
 }

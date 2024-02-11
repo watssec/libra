@@ -1,6 +1,5 @@
-use std::process::Command;
+use std::path::PathBuf;
 
-use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 /// Extension for our own command database
@@ -193,25 +192,25 @@ impl ClangArg {
 }
 
 impl ClangArg {
-    fn as_cmd_arg(&self, cmd: &mut Command) -> Result<()> {
+    fn as_args(&self) -> Vec<String> {
         match self {
-            Self::ModeCompile => bail!("unexpected -c"),
-            Self::Standard(val) => cmd.arg(format!("-std={}", val)),
-            Self::Define(key, None) => cmd.arg(format!("-D{}", key)),
-            Self::Define(key, Some(val)) => cmd.arg(format!("-D{}={}", key, val)),
-            Self::Include(val) => cmd.arg(format!("-I{}", val)),
-            Self::IncludeSysroot(val) => cmd.arg("-isysroot").arg(val),
-            Self::Optimization(val) => cmd.arg(format!("-O{}", val)),
-            Self::Arch(val) => cmd.arg("-arch").arg(val),
-            Self::MachineArch(val) => cmd.arg(format!("-march={}", val)),
-            Self::Debug => cmd.arg("-g"),
-            Self::LibName(val) => bail!("unexpected -l{}", val),
-            Self::LibPath(val) => bail!("unexpected -L{}", val),
-            Self::LinkShared => bail!("unexpected -shared"),
-            Self::LinkStatic => bail!("unexpected -static"),
+            Self::ModeCompile => vec!["-c".into()],
+            Self::Standard(val) => vec![format!("-std={}", val)],
+            Self::Define(key, None) => vec![format!("-D{}", key)],
+            Self::Define(key, Some(val)) => vec![format!("-D{}={}", key, val)],
+            Self::Include(val) => vec![format!("-I{}", val)],
+            Self::IncludeSysroot(val) => vec!["-isysroot".into(), val.into()],
+            Self::Optimization(val) => vec![format!("-O{}", val)],
+            Self::Arch(val) => vec!["-arch".into(), val.into()],
+            Self::MachineArch(val) => vec![format!("-march={}", val)],
+            Self::Debug => vec!["-g".into()],
+            Self::LibName(val) => vec![format!("-l{}", val)],
+            Self::LibPath(val) => vec![format!("-L{}", val)],
+            Self::LinkShared => vec!["-shared".into()],
+            Self::LinkStatic => vec!["-static".into()],
             Self::Linker(args) => {
-                bail!(
-                    "unexpected -Wl,{}",
+                vec![format!(
+                    "-Wl,{}",
                     args.iter()
                         .map(|(k, v)| {
                             match v {
@@ -221,22 +220,28 @@ impl ClangArg {
                         })
                         .collect::<Vec<_>>()
                         .join(",")
-                )
+                )]
             }
-            Self::Backend(key, None) => cmd.arg("-mllvm").arg(key),
-            Self::Backend(key, Some(val)) => cmd.arg("-mllvm").arg(format!("{}={}", key, val)),
-            Self::Flag(key, None) => cmd.arg(format!("-f{}", key)),
-            Self::Flag(key, Some(val)) => cmd.arg(format!("-f{}={}", key, val)),
-            Self::Warning(key, None) => cmd.arg(format!("-W{}", key)),
-            Self::Warning(key, Some(val)) => cmd.arg(format!("-W{}={}", key, val)),
-            Self::NoWarnings => cmd.arg("-w"),
-            Self::Pedantic => cmd.arg("-pedantic"),
-            Self::POSIXThread => cmd.arg("-pthread"),
-            Self::Print(key, None) => bail!("unexpected -print-{}", key),
-            Self::Print(key, Some(val)) => bail!("unexpected -print-{}={}", key, val),
-            Self::Output(val) => bail!("unexpected -o {}", val),
-            Self::Input(val) => bail!("unexpected input {}", val),
-        };
-        Ok(())
+            Self::Backend(key, None) => vec!["-mllvm".into(), key.into()],
+            Self::Backend(key, Some(val)) => vec!["-mllvm".into(), format!("{}={}", key, val)],
+            Self::Flag(key, None) => vec![format!("-f{}", key)],
+            Self::Flag(key, Some(val)) => vec![format!("-f{}={}", key, val)],
+            Self::Warning(key, None) => vec![format!("-W{}", key)],
+            Self::Warning(key, Some(val)) => vec![format!("-W{}={}", key, val)],
+            Self::NoWarnings => vec!["-w".into()],
+            Self::Pedantic => vec!["-pedantic".into()],
+            Self::POSIXThread => vec!["-pthread".into()],
+            Self::Print(key, None) => vec![format!("-print-{}", key)],
+            Self::Print(key, Some(val)) => vec![format!("-print-{}={}", key, val)],
+            Self::Output(val) => vec![format!("-o {}", val)],
+            Self::Input(val) => vec![format!("unexpected input {}", val)],
+        }
     }
+}
+
+/// Clang invocation
+#[derive(Serialize, Deserialize)]
+pub struct ClangInvocation {
+    pub cwd: PathBuf,
+    pub args: Vec<ClangArg>,
 }
