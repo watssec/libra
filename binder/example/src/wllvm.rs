@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{bail, Result};
@@ -81,16 +81,11 @@ impl Action {
                 }
 
                 // resolve path
-                let path = Path::new(name);
-                let path_resolved = if path.is_absolute() {
-                    path.to_path_buf()
-                } else {
-                    cwd.join(path)
-                };
+                let path_resolved = normalize_path(&cwd, name);
                 if !path_resolved.exists() {
                     bail!("output path does not exist");
                 }
-                target = Some(path_resolved.canonicalize()?);
+                target = Some(path_resolved);
             } else {
                 new_args.push(item);
             }
@@ -122,16 +117,11 @@ impl Action {
         for item in args {
             if let ClangArg::Input(name) = &item {
                 // resolve path
-                let path = Path::new(name);
-                let path_resolved = if path.is_absolute() {
-                    path.to_path_buf()
-                } else {
-                    cwd.join(path)
-                };
+                let path_resolved = normalize_path(&cwd, name);
                 if !path_resolved.exists() {
                     bail!("input path does not exist");
                 }
-                inputs.push(path_resolved.canonicalize()?);
+                inputs.push(path_resolved);
             } else {
                 new_args.push(item);
             }
@@ -517,4 +507,26 @@ pub fn build_database(path_src: &Path) -> Result<()> {
 
     // done
     Ok(())
+}
+
+/// Like `fs::canonicalize`, but without resolving and symbolic links
+fn normalize_path<P: AsRef<Path>, Q: AsRef<Path>>(cwd: P, path: Q) -> PathBuf {
+    let path = path.as_ref();
+
+    let mut absolute = if path.is_absolute() {
+        PathBuf::new()
+    } else {
+        cwd.as_ref().to_path_buf()
+    };
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                absolute.pop();
+            }
+            component => absolute.push(component.as_os_str()),
+        }
+    }
+
+    absolute
 }
