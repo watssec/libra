@@ -65,8 +65,9 @@ enum Action {
 impl Action {
     fn filter_args_for_output(invocation: ClangInvocation) -> Result<(ClangInvocation, PathBuf)> {
         let ClangInvocation { cwd, cxx, args } = invocation;
-
         let mut new_args = vec![];
+
+        // find the output
         let mut target = None;
         for item in args {
             if let ClangArg::Output(name) = &item {
@@ -90,10 +91,13 @@ impl Action {
             }
         }
 
+        // check that output exists
         let output = match target {
             None => bail!("no output in the invocation"),
             Some(out) => out,
         };
+
+        // repack
         let new_invocation = ClangInvocation {
             cwd,
             cxx,
@@ -106,8 +110,9 @@ impl Action {
         invocation: ClangInvocation,
     ) -> Result<(ClangInvocation, Vec<PathBuf>)> {
         let ClangInvocation { cwd, cxx, args } = invocation;
-
         let mut new_args = vec![];
+
+        // find the inputs
         let mut inputs = vec![];
         for item in args {
             if let ClangArg::Input(name) = &item {
@@ -127,9 +132,12 @@ impl Action {
             }
         }
 
+        // check that inputs are not empty
         if inputs.is_empty() {
             bail!("no inputs in the invocation");
         }
+
+        // repack
         let new_invocation = ClangInvocation {
             cwd,
             cxx,
@@ -142,9 +150,10 @@ impl Action {
         invocation: ClangInvocation,
     ) -> Result<(ClangInvocation, bool)> {
         let ClangInvocation { cwd, cxx, args } = invocation;
-
-        let mut is_compile_only = false;
         let mut new_args = vec![];
+
+        // look for flag
+        let mut is_compile_only = false;
         for item in args {
             if matches!(&item, ClangArg::ModeCompile) {
                 if is_compile_only {
@@ -156,6 +165,7 @@ impl Action {
             }
         }
 
+        // repack
         let new_invocation = ClangInvocation {
             cwd,
             cxx,
@@ -168,13 +178,14 @@ impl Action {
         invocation: ClangInvocation,
     ) -> Result<(ClangInvocation, Option<Libraries>)> {
         let ClangInvocation { cwd, cxx, args } = invocation;
+        let mut new_args = vec![];
 
         // collect libraries
         let mut has_linking_flags = false;
         let mut lib_names = vec![];
         let mut lib_paths = vec![];
         let mut libs_sys = vec![];
-        let mut new_args = vec![];
+
         for item in args {
             match &item {
                 ClangArg::LibName(val) => {
@@ -243,6 +254,7 @@ impl Action {
             None
         };
 
+        // repack
         let new_invocation = ClangInvocation {
             cwd,
             cxx,
@@ -289,7 +301,6 @@ impl Action {
                 };
                 match extension {
                     CommonExtensions::C | CommonExtensions::CPP | CommonExtensions::Asm => {
-                        // compile and link mode
                         Action::CompileAndLink {
                             input,
                             libs,
@@ -297,17 +308,15 @@ impl Action {
                             invocation,
                         }
                     }
-                    CommonExtensions::Object => {
-                        // linking mode
-                        Action::Link {
-                            inputs: vec![input],
-                            libs,
-                            output,
-                            invocation,
-                        }
-                    }
+                    CommonExtensions::Object => Action::Link {
+                        inputs: vec![input],
+                        libs,
+                        output,
+                        invocation,
+                    },
                 }
             } else {
+                // more than one input, mark it as linking
                 Action::Link {
                     inputs,
                     libs,
