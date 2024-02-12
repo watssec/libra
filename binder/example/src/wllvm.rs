@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
+use std::{fs, io};
 
 use anyhow::{bail, Result};
 use libra_engine::flow::shared::Context;
@@ -314,9 +314,15 @@ impl Action {
                     },
                 }
             } else {
+                // canonicalize all input paths for linking
+                let canonical_inputs = inputs
+                    .iter()
+                    .map(|e| e.canonicalize())
+                    .collect::<io::Result<_>>()?;
+
                 // more than one input, mark it as linking
                 Action::Link {
-                    inputs,
+                    inputs: canonical_inputs,
                     libs,
                     output,
                     invocation,
