@@ -357,6 +357,8 @@ impl Action {
 
     /// Invoke the build action for whole-program LLVM
     pub fn invoke_for_wllvm(&self) -> Result<()> {
+        let ctxt = Context::new().expect("LLVM context");
+
         // unpack
         let output = self.output();
         debug!("[wllvm] processing: {}", output.to_string_lossy());
@@ -366,26 +368,7 @@ impl Action {
             | Self::Link { invocation, .. }
             | Self::CompileAndLink { invocation, .. } => invocation,
         };
-
-        let new_ext = output.extension().map_or_else(
-            || BITCODE_EXTENSION.to_string(),
-            |e| {
-                format!(
-                    "{}.{}",
-                    e.to_str().expect("pure ASCII extension"),
-                    BITCODE_EXTENSION
-                )
-            },
-        );
-        let bitcode_output = output.with_extension(new_ext);
-
-        // prepare command
-        let ctxt = Context::new().expect("LLVM context");
-        let name = if *cxx { "clang++" } else { "clang" };
-        let bin_clang = ctxt.path_llvm(["bin", name]).expect("ascii path only");
-
-        let mut cmd = Command::new(bin_clang);
-        cmd.current_dir(cwd);
+        let bitcode_output = derive_bitcode_path(output);
 
         // branch by action type
         match self {
@@ -394,6 +377,12 @@ impl Action {
                 output: _,
                 invocation: _,
             } => {
+                // env
+                let name = if *cxx { "clang++" } else { "clang" };
+                let executable = ctxt.path_llvm(["bin", name]).expect("ascii path only");
+                let mut cmd = Command::new(executable);
+                cmd.current_dir(cwd);
+
                 // header
                 cmd.arg("-c").arg("-emit-llvm");
 
@@ -439,15 +428,38 @@ impl Action {
                 // input and output
                 cmd.arg("-o").arg(bitcode_output);
                 cmd.arg(input);
-            }
-            Self::Link { .. } | Self::CompileAndLink { .. } => todo!(),
-        }
 
-        // invoke the command
-        let status = cmd.status()?;
-        if !status.success() {
-            let args: Vec<_> = cmd.get_args().map(|e| e.to_string_lossy()).collect();
-            bail!("failed to execute command: {}", args.join(" "));
+                // invoke the command
+                run_for_success(cmd)?;
+            }
+            Self::Link {
+                inputs,
+                libs: _,
+                output: _,
+                invocation: _,
+            } => {
+                // TODO: handle libs
+
+                // env
+                let executable = ctxt
+                    .path_llvm(["bin", "llvm-link"])
+                    .expect("ascii path only");
+                let mut cmd = Command::new(executable);
+                cmd.current_dir(cwd);
+
+                // header
+                cmd.arg("--only-needed").arg("--disable-lazy-loading");
+
+                // input and output
+                cmd.arg("-o").arg(bitcode_output);
+                for input in inputs {
+                    cmd.arg(derive_bitcode_path(input));
+                }
+
+                // invoke the command
+                run_for_success(cmd)?;
+            }
+            Self::CompileAndLink { .. } => todo!(),
         }
         Ok(())
     }
@@ -525,7 +537,7 @@ pub fn build_database(path_src: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Like `fs::canonicalize`, but without resolving and symbolic links
+/// Utility: Like `fs::canonicalize`, but without resolving and symbolic links
 fn normalize_path<P: AsRef<Path>, Q: AsRef<Path>>(cwd: P, path: Q) -> PathBuf {
     let path = path.as_ref();
 
@@ -545,4 +557,30 @@ fn normalize_path<P: AsRef<Path>, Q: AsRef<Path>>(cwd: P, path: Q) -> PathBuf {
     }
 
     absolute
+}
+
+/// Utility: Derive the file name for bitcode
+fn derive_bitcode_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    let path = path.as_ref();
+    let new_ext = path.extension().map_or_else(
+        || BITCODE_EXTENSION.to_string(),
+        |e| {
+            format!(
+                "{}.{}",
+                e.to_str().expect("pure ASCII extension"),
+                BITCODE_EXTENSION
+            )
+        },
+    );
+    path.with_extension(new_ext)
+}
+
+/// Utility: Execute command
+fn run_for_success(mut cmd: Command) -> Result<()> {
+    let status = cmd.status()?;
+    if !status.success() {
+        let args: Vec<_> = cmd.get_args().map(|e| e.to_string_lossy()).collect();
+        bail!("failed to execute command: {}", args.join(" "));
+    }
+    Ok(())
 }
