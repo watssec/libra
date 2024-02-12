@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command;
-use std::{env, fs, process};
+use std::{env, fmt, fs, process};
 
 use serde::{Deserialize, Serialize};
 
@@ -245,7 +245,7 @@ impl ClangArg {
 }
 
 impl ClangArg {
-    fn as_args(&self) -> Vec<String> {
+    pub fn as_args(&self) -> Vec<String> {
         match self {
             Self::ModeCompile => vec!["-c".into()],
             Self::Standard(val) => vec![format!("-std={}", val)],
@@ -282,6 +282,12 @@ impl ClangArg {
             Self::Output(val) => vec![format!("-o {}", val)],
             Self::Input(val) => vec![format!("unexpected input {}", val)],
         }
+    }
+}
+
+impl fmt::Display for ClangArg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.as_args().join(" "))
     }
 }
 

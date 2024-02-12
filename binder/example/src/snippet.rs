@@ -19,7 +19,7 @@ pub fn git_clone(path_src: &Path, repo: &str, mut rebuild: bool) -> Result<bool>
         }
         rebuild = true;
     } else {
-        debug!("skipped: git clone {}", repo);
+        debug!("[build] skipped: git clone {}", repo);
     }
     Ok(rebuild)
 }
@@ -34,7 +34,7 @@ pub fn svn_clone(path_src: &Path, repo: &str, mut rebuild: bool) -> Result<bool>
         }
         rebuild = true;
     } else {
-        debug!("skipped: svn checkout {}", repo);
+        debug!("[build] skipped: svn checkout {}", repo);
     }
     Ok(rebuild)
 }
@@ -53,6 +53,7 @@ pub fn build_via_autoconf(
         Some(args) => {
             let path_configure = path_src.join("configure");
             if rebuild || !path_configure.exists() {
+                debug!("[build] running autogen.sh");
                 let mut cmd = Command::new("./autogen.sh");
                 cmd.args(args);
                 cmd.current_dir(path_src);
@@ -61,7 +62,7 @@ pub fn build_via_autoconf(
                 }
                 rebuild = true;
             } else {
-                debug!("skipped: autogen.sh")
+                debug!("[build] skipped: autogen.sh");
             }
         }
     }
@@ -69,6 +70,8 @@ pub fn build_via_autoconf(
     // configure
     let path_makefile = path_src.join("Makefile");
     if rebuild || !path_makefile.exists() {
+        debug!("[build] running configure");
+
         // clean-up the installation directory
         if path_bin.exists() {
             fs::remove_dir_all(path_bin)?;
@@ -90,11 +93,13 @@ pub fn build_via_autoconf(
         }
         rebuild = true;
     } else {
-        debug!("skipped: configure")
+        debug!("[build] skipped: configure");
     }
 
     // make
     if rebuild || !path_bin.exists() {
+        debug!("[build] running make");
+
         let mut cmd = Command::new("make");
         cmd.current_dir(path_src);
         if !cmd.status()?.success() {
@@ -108,9 +113,10 @@ pub fn build_via_autoconf(
         }
         rebuild = true;
     } else {
-        debug!("skipped: make install")
+        debug!("[build] skipped: make install");
     }
 
+    // done
     Ok(rebuild)
 }
 

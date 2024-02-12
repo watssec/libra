@@ -1,13 +1,18 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use anyhow::{bail, Result};
+use libra_engine::flow::shared::Context;
+use log::debug;
 use petgraph::algo::toposort;
 use petgraph::graph::DiGraph;
 use walkdir::WalkDir;
 
 use crate::proxy::{ClangArg, ClangInvocation, COMMAND_EXTENSION, LIBMARK_EXTENSION};
+
+static BITCODE_EXTENSION: &str = "bc";
 
 enum SysLib {
     C,
@@ -346,16 +351,97 @@ impl Action {
 
     /// Invoke the build action for whole-program LLVM
     pub fn invoke_for_wllvm(&self) -> Result<()> {
+        // unpack
+        let output = self.output();
+        debug!("[wllvm] processing: {}", output.to_string_lossy());
+
+        let ClangInvocation { cwd, cxx, args } = match self {
+            Self::Compile { invocation, .. }
+            | Self::Link { invocation, .. }
+            | Self::CompileAndLink { invocation, .. } => invocation,
+        };
+
+        let new_ext = output.extension().map_or_else(
+            || BITCODE_EXTENSION.to_string(),
+            |e| {
+                format!(
+                    "{}.{}",
+                    e.to_str().expect("pure ASCII extension"),
+                    BITCODE_EXTENSION
+                )
+            },
+        );
+        let bitcode_output = output.with_extension(new_ext);
+
+        // prepare command
+        let ctxt = Context::new().expect("LLVM context");
+        let name = if *cxx { "clang++" } else { "clang" };
+        let bin_clang = ctxt.path_llvm(["bin", name]).expect("ascii path only");
+
+        let mut cmd = Command::new(bin_clang);
+        cmd.current_dir(cwd);
+
+        // branch by action type
         match self {
             Self::Compile {
                 input,
-                output,
-                invocation,
+                output: _,
+                invocation: _,
             } => {
-                let ClangInvocation { cwd, cxx, args } = invocation;
-                todo!();
+                // header
+                cmd.arg("-c").arg("-emit-llvm");
+
+                // arguments
+                for option in args {
+                    match option {
+                        // pass through
+                        ClangArg::Standard(..)
+                        | ClangArg::Define(..)
+                        | ClangArg::Include(..)
+                        | ClangArg::IncludeSysroot(..)
+                        | ClangArg::Arch(..)
+                        | ClangArg::MachineArch(..)
+                        | ClangArg::Debug
+                        | ClangArg::FlagPIC(..)
+                        | ClangArg::FlagPIE(..)
+                        | ClangArg::FlagRTTI(..)
+                        | ClangArg::FlagExceptions(..)
+                        | ClangArg::Warning(..)
+                        | ClangArg::NoWarnings
+                        | ClangArg::Pedantic
+                        | ClangArg::POSIXThread => {
+                            cmd.args(option.as_args());
+                        }
+                        // ignored
+                        ClangArg::Optimization(..) | ClangArg::PrepMD(..) | ClangArg::Print(..) => {
+                        }
+                        // unexpected
+                        ClangArg::ModeCompile
+                        | ClangArg::LibName(..)
+                        | ClangArg::LibPath(..)
+                        | ClangArg::LinkShared
+                        | ClangArg::LinkStatic
+                        | ClangArg::LinkRpath(..)
+                        | ClangArg::LinkSoname(..)
+                        | ClangArg::Output(..)
+                        | ClangArg::Input(..) => {
+                            bail!("unexpected {} option: {}", name, option)
+                        }
+                    }
+                }
+
+                // input and output
+                cmd.arg("-o").arg(bitcode_output);
+                cmd.arg(input);
             }
             Self::Link { .. } | Self::CompileAndLink { .. } => todo!(),
+        }
+
+        // invoke the command
+        let status = cmd.status()?;
+        if !status.success() {
+            let args: Vec<_> = cmd.get_args().map(|e| e.to_string_lossy()).collect();
+            bail!("failed to execute command: {}", args.join(" "));
         }
         Ok(())
     }
