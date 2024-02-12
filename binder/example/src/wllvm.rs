@@ -84,7 +84,7 @@ impl Action {
                 if !path_resolved.exists() {
                     bail!("output path does not exist");
                 }
-                target = Some(path_resolved);
+                target = Some(path_resolved.canonicalize()?);
             } else {
                 new_args.push(item);
             }
@@ -120,7 +120,7 @@ impl Action {
                 if !path_resolved.exists() {
                     bail!("input path does not exist");
                 }
-                inputs.push(path_resolved);
+                inputs.push(path_resolved.canonicalize()?);
             } else {
                 new_args.push(item);
             }
@@ -264,7 +264,7 @@ impl Action {
             }
             let input = inputs.into_iter().next().unwrap();
             let lang = match Language::probe(&input) {
-                None => bail!("unrecognized source language"),
+                None => bail!("unrecognized source language: {}", input.to_string_lossy()),
                 Some(l) => l,
             };
 

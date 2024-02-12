@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::process::Command;
 
@@ -6,6 +7,7 @@ use anyhow::{anyhow, bail, Result};
 use log::debug;
 
 use crate::common::CLANG_WRAP;
+use crate::proxy::{COMMAND_EXTENSION, LIBMARK_EXTENSION};
 
 /// Git clone
 pub fn git_clone(path_src: &Path, repo: &str, mut rebuild: bool) -> Result<bool> {
@@ -109,4 +111,38 @@ pub fn build_via_autoconf(
     }
 
     Ok(rebuild)
+}
+
+/// Mark output library
+pub fn mark_output_lib<P: AsRef<Path>, Q: AsRef<Path>>(
+    name: &str,
+    path_install: P,
+    path_build: Q,
+) -> Result<()> {
+    let prefix = format!("lib{}.", name);
+
+    // get target path
+    let mut target = None;
+    for entry in fs::read_dir(path_build)? {
+        let entry = entry?;
+        if entry.file_name().into_string().map_or(false, |e| {
+            e.starts_with(&prefix) && e.ends_with(COMMAND_EXTENSION)
+        }) {
+            if target.is_some() {
+                bail!("more than one target to mark for {}", name);
+            }
+            target = Some(entry.path());
+        }
+    }
+    let src = match target {
+        None => bail!("no target to mark for {}", name),
+        Some(path) => path,
+    };
+
+    // create the symbolic link
+    let dst = path_install
+        .as_ref()
+        .join(format!("lib{}{}", name, LIBMARK_EXTENSION));
+    symlink(src, dst)?;
+    Ok(())
 }

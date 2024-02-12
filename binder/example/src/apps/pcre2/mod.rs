@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::WorkflowConfig;
 use crate::snippet;
+use crate::snippet::mark_output_lib;
 use crate::wllvm;
 
 /// Workflow configuration
@@ -27,7 +28,15 @@ impl WorkflowConfig for Config {
             "https://github.com/PCRE2Project/pcre2.git",
             rebuild,
         )?;
-        snippet::build_via_autoconf(&path_src, &path_bin, Some(&[]), &[], rebuild)?;
+        rebuild = snippet::build_via_autoconf(&path_src, &path_bin, Some(&[]), &[], rebuild)?;
+
+        // check
+        if rebuild {
+            let path_lib_build = path_src.join(".libs");
+            let path_lib_install = path_bin.join("lib");
+            mark_output_lib("pcre2-8", &path_lib_install, &path_lib_build)?;
+            mark_output_lib("pcre2-posix", &path_lib_install, &path_lib_build)?;
+        }
 
         // merge
         wllvm::build_database(&path_src)?;
