@@ -2,7 +2,9 @@ use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 
-fn build_wrapper(name: &str) {
+static WRARPS: [&str; 2] = ["clang_wrap", "clang_cpp_wrap"];
+
+fn build_wrap(name: &str) {
     let status = Command::new(env!("CARGO"))
         .args(["build", "--bin", name])
         .status()
@@ -13,16 +15,12 @@ fn build_wrapper(name: &str) {
 }
 
 fn main() {
-    // decide whether we are compiling the main
-    let is_main_or_default = match env::var_os("CARGO_BIN_NAME") {
-        None => env::var_os("CARGO_PRIMARY_PACKAGE").is_some(),
-        Some(e) => e.to_str().map_or(false, |n| n == env!("CARGO_PKG_NAME")),
-    };
-
     // compile wrappers first
-    if is_main_or_default {
-        build_wrapper("clang_wrap");
-        build_wrapper("clang_cpp_wrap");
+    let target = env!("CARGO_CRATE_NAME");
+    if target != "build_script_build" && !WRARPS.contains(&target) {
+        for name in WRARPS {
+            build_wrap(name);
+        }
     }
 
     // tweak the environment variables

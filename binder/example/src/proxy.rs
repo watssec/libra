@@ -47,8 +47,10 @@ pub enum ClangArg {
     Linker(Vec<(String, Option<String>)>),
     /// -mllvm <key>{=<value>}
     Backend(String, Option<String>),
-    /// -f<key>{=<value>}
-    Flag(String, Option<String>),
+    /// -fPIC
+    FlagPIC,
+    /// -fPIE
+    FlagPIE,
     /// -W<key>{=<value>}
     Warning(String, Option<String>),
     /// -w, --no-warnings
@@ -117,6 +119,12 @@ impl ClangArg {
                 let (k, v) = Self::expect_maybe_key_value(&Self::expect_next(stream));
                 return Self::Backend(k, v);
             }
+            "-fPIC" => {
+                return Self::FlagPIC;
+            }
+            "-fPIE" => {
+                return Self::FlagPIE;
+            }
             "-w" | "--no-warnings" => {
                 return Self::NoWarnings;
             }
@@ -169,10 +177,6 @@ impl ClangArg {
                 args.push((k, v));
             }
             return Self::Linker(args);
-        }
-        if let Some(inner) = token.strip_prefix("-f") {
-            let (k, v) = Self::expect_maybe_key_value(inner);
-            return Self::Flag(k, v);
         }
         if let Some(inner) = token.strip_prefix("-W") {
             let (k, v) = Self::expect_maybe_key_value(inner);
@@ -255,8 +259,8 @@ impl ClangArg {
             }
             Self::Backend(key, None) => vec!["-mllvm".into(), key.into()],
             Self::Backend(key, Some(val)) => vec!["-mllvm".into(), format!("{}={}", key, val)],
-            Self::Flag(key, None) => vec![format!("-f{}", key)],
-            Self::Flag(key, Some(val)) => vec![format!("-f{}={}", key, val)],
+            Self::FlagPIC => vec!["-fPIC".into()],
+            Self::FlagPIE => vec!["-fPIE".into()],
             Self::Warning(key, None) => vec![format!("-W{}", key)],
             Self::Warning(key, Some(val)) => vec![format!("-W{}={}", key, val)],
             Self::NoWarnings => vec!["-w".into()],
@@ -278,7 +282,7 @@ pub struct ClangInvocation {
     pub args: Vec<ClangArg>,
 }
 
-/// Wrap llvm tool
+/// Wrap a clang tool
 pub fn proxy_clang(cxx: bool) {
     // get paths
     let ctxt = Context::new().expect("LLVM context");

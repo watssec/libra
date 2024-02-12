@@ -350,6 +350,7 @@ impl Action {
                 invocation,
             } => {
                 let ClangInvocation { cwd, cxx, args } = invocation;
+                todo!();
             }
             Self::Link { .. } | Self::CompileAndLink { .. } => todo!(),
         }

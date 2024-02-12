@@ -24,15 +24,10 @@ fn baseline_cmake_options() -> Vec<String> {
             ["compiler-rt", "libcxx", "libcxxabi", "libunwind"].join(";")
         ),
         "-DLLVM_ENABLE_RTTI=ON".into(),
+        "-DLLVM_ENABLE_LLD=ON".into(),
         "-DLLVM_ENABLE_LIBCXX=ON".into(),
         "-DLIBC_ENABLE_USE_BY_CLANG=ON".into(),
         "-DCLANG_DEFAULT_CXX_STDLIB=libc++".into(),
-        #[cfg(target_os = "macos")]
-        "-DCMAKE_OSX_ARCHITECTURES=arm64".into(),
-        #[cfg(target_os = "macos")]
-        "-DLLDB_USE_SYSTEM_DEBUGSERVER=ON".into(),
-        #[cfg(target_os = "macos")]
-        "-DLLVM_LIBC_MPFR_INSTALL_PATH=/opt/homebrew/Cellar/mpfr".into(),
     ]
 }
 
