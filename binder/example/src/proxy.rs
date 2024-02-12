@@ -47,8 +47,6 @@ pub enum ClangArg {
     LinkRpath(String),
     /// -Wl,-soname,<token> | -Wl,-soname -Wl,<token>
     LinkSoname(String),
-    /// -mllvm <key>{=<value>}
-    Backend(String, Option<String>),
     /// -fPIC % -fno-PIC
     FlagPIC(bool),
     /// -fPIE % -fno-PIE
@@ -141,10 +139,6 @@ impl ClangArg {
                     None => panic!("expect argument after -soname"),
                     Some(inner) => return Self::LinkSoname(inner.to_string()),
                 }
-            }
-            "-mllvm" => {
-                let (k, v) = Self::expect_maybe_key_value(&Self::expect_next(stream));
-                return Self::Backend(k, v);
             }
             "-fPIC" => {
                 return Self::FlagPIC(true);
@@ -270,8 +264,6 @@ impl ClangArg {
             Self::LinkStatic => vec!["-static".into()],
             Self::LinkRpath(val) => vec![format!("-Wl,-rpath,{}", val)],
             Self::LinkSoname(val) => vec![format!("-Wl,-soname,{}", val)],
-            Self::Backend(key, None) => vec!["-mllvm".into(), key.into()],
-            Self::Backend(key, Some(val)) => vec!["-mllvm".into(), format!("{}={}", key, val)],
             Self::FlagPIC(true) => vec!["-fPIC".into()],
             Self::FlagPIC(false) => vec!["-fno-PIC".into()],
             Self::FlagPIE(true) => vec!["-fPIE".into()],
