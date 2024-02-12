@@ -47,10 +47,14 @@ pub enum ClangArg {
     Linker(Vec<(String, Option<String>)>),
     /// -mllvm <key>{=<value>}
     Backend(String, Option<String>),
-    /// -fPIC
-    FlagPIC,
-    /// -fPIE
-    FlagPIE,
+    /// -fPIC, -fno-PIC
+    FlagPIC(bool),
+    /// -fPIE, -fno-PIE
+    FlagPIE(bool),
+    /// -frtti, -fno-rtti
+    FlagRTTI(bool),
+    /// -fexceptions, -fno-exceptions
+    FlagExceptions(bool),
     /// -W<key>{=<value>}
     Warning(String, Option<String>),
     /// -w, --no-warnings
@@ -120,10 +124,28 @@ impl ClangArg {
                 return Self::Backend(k, v);
             }
             "-fPIC" => {
-                return Self::FlagPIC;
+                return Self::FlagPIC(true);
+            }
+            "-fno-PIC" => {
+                return Self::FlagPIC(false);
             }
             "-fPIE" => {
-                return Self::FlagPIE;
+                return Self::FlagPIE(true);
+            }
+            "-fno-PIE" => {
+                return Self::FlagPIE(false);
+            }
+            "-frtti" => {
+                return Self::FlagRTTI(true);
+            }
+            "-fno-rtti" => {
+                return Self::FlagRTTI(false);
+            }
+            "-fexceptions" => {
+                return Self::FlagExceptions(true);
+            }
+            "-fno-exceptions" => {
+                return Self::FlagExceptions(false);
             }
             "-w" | "--no-warnings" => {
                 return Self::NoWarnings;
@@ -259,8 +281,14 @@ impl ClangArg {
             }
             Self::Backend(key, None) => vec!["-mllvm".into(), key.into()],
             Self::Backend(key, Some(val)) => vec!["-mllvm".into(), format!("{}={}", key, val)],
-            Self::FlagPIC => vec!["-fPIC".into()],
-            Self::FlagPIE => vec!["-fPIE".into()],
+            Self::FlagPIC(true) => vec!["-fPIC".into()],
+            Self::FlagPIC(false) => vec!["-fno-PIC".into()],
+            Self::FlagPIE(true) => vec!["-fPIE".into()],
+            Self::FlagPIE(false) => vec!["-fno-PIE".into()],
+            Self::FlagRTTI(true) => vec!["-frtti".into()],
+            Self::FlagRTTI(false) => vec!["-fno-rtti".into()],
+            Self::FlagExceptions(true) => vec!["-fexceptions".into()],
+            Self::FlagExceptions(false) => vec!["-fno-exceptions".into()],
             Self::Warning(key, None) => vec![format!("-W{}", key)],
             Self::Warning(key, Some(val)) => vec![format!("-W{}={}", key, val)],
             Self::NoWarnings => vec!["-w".into()],
