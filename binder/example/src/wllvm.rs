@@ -332,12 +332,28 @@ impl Action {
 }
 
 impl Action {
+    /// Retrieve the output of this action
     pub fn output(&self) -> &Path {
         match self {
             Self::Compile { output, .. }
             | Self::Link { output, .. }
             | Self::CompileAndLink { output, .. } => output,
         }
+    }
+
+    /// Invoke the build action for whole-program LLVM
+    pub fn invoke_for_wllvm(&self) -> Result<()> {
+        match self {
+            Self::Compile {
+                input,
+                output,
+                invocation,
+            } => {
+                let ClangInvocation { cwd, cxx, args } = invocation;
+            }
+            Self::Link { .. } | Self::CompileAndLink { .. } => todo!(),
+        }
+        Ok(())
     }
 }
 
@@ -396,11 +412,19 @@ pub fn build_database(path_src: &Path) -> Result<()> {
         }
     }
 
-    // ensures the graph is a DAG
+    // ensures that the graph is a DAG
     let ordered = match toposort(&graph, None) {
         Ok(nodes) => nodes,
         Err(_) => bail!("expect a DAG in the build graph"),
     };
 
+    // build and merge according to topological order
+    for nid in ordered {
+        let key = graph.node_weight(nid).unwrap();
+        let action = actions.get(key).unwrap();
+        action.invoke_for_wllvm()?;
+    }
+
+    // done
     Ok(())
 }
