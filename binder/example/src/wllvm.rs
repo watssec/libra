@@ -25,6 +25,8 @@ enum CommonExtensions {
     CPP,
     Asm,
     Object,
+    LibStatic,
+    LibShared,
 }
 
 impl CommonExtensions {
@@ -35,6 +37,8 @@ impl CommonExtensions {
             "cc" => Self::CPP,
             "s" => Self::Asm,
             "o" => Self::Object,
+            "a" => Self::LibStatic,
+            "so" => Self::LibShared,
             _ => return None,
         };
         Some(lang)
@@ -272,12 +276,10 @@ impl Action {
             if link_libs_opt.is_some() {
                 bail!("unexpected linking flags in compile-only mode");
             }
-
             if inputs.len() != 1 {
                 bail!("more than one inputs in compile-only mode ");
             }
             let input = inputs.into_iter().next().unwrap();
-
             Action::Compile {
                 input,
                 output,
@@ -306,8 +308,13 @@ impl Action {
                             invocation,
                         }
                     }
-                    CommonExtensions::Object => Action::Link {
-                        inputs: vec![input],
+                    CommonExtensions::Object
+                    | CommonExtensions::LibShared
+                    | CommonExtensions::LibStatic => Action::Link {
+                        inputs: vec![
+                            // see below for reasons to canonicalize this input
+                            input.canonicalize()?,
+                        ],
                         libs,
                         output,
                         invocation,
@@ -315,6 +322,9 @@ impl Action {
                 }
             } else {
                 // canonicalize all input paths for linking
+                // NOTE: this is not required for compilation as we don't care how source code input
+                // are obtained (as long as they exist). But we canonicalize paths for libraries as
+                // library files can be symlinked (e.g., lib<name>.so -> lib<name>.so.<version>).
                 let canonical_inputs = inputs
                     .iter()
                     .map(|e| e.canonicalize())
