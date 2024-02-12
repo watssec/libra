@@ -7,7 +7,7 @@ use petgraph::algo::toposort;
 use petgraph::graph::DiGraph;
 use walkdir::WalkDir;
 
-use crate::proxy::{ClangArg, ClangInvocation, COMMAND_EXTENSION};
+use crate::proxy::{ClangArg, ClangInvocation, COMMAND_EXTENSION, LIBMARK_EXTENSION};
 
 enum SysLib {
     C,
@@ -212,16 +212,20 @@ impl Action {
         let libs = if has_linking_flags {
             let mut libs_usr = vec![];
             for name in lib_names {
+                let mark = format!("lib{}{}", name, LIBMARK_EXTENSION);
+
                 let mut found = false;
                 for path in &lib_paths {
-                    // TODO: resolve library
-                    let lib_file = path.join(&name);
-                    if lib_file.exists() {
-                        if found {
-                            bail!("more than one candidate for library {}", name);
+                    for entry in fs::read_dir(path)? {
+                        let entry = entry?;
+                        if entry.file_name().into_string().map_or(false, |e| e == mark) {
+                            if found {
+                                bail!("more than one candidate found for library {}", name);
+                            }
+                            found = true;
+                            // TODO: deref the mark
+                            libs_usr.push(entry.path());
                         }
-                        found = true;
-                        libs_usr.push(lib_file);
                     }
                 }
                 if !found {

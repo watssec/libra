@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 /// Extension for our own command database
 pub static COMMAND_EXTENSION: &str = ".command.json";
 
+/// Extension for our own library mark
+pub static LIBMARK_EXTENSION: &str = ".library.mark";
+
 /// Clang arguments
 #[derive(Serialize, Deserialize)]
 pub enum ClangArg {
