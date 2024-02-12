@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use petgraph::algo::toposort;
+use petgraph::graph::DiGraph;
 use walkdir::WalkDir;
 
 use crate::proxy::{ClangArg, ClangInvocation, COMMAND_EXTENSION};
@@ -42,17 +45,20 @@ enum Action {
         input: PathBuf,
         lang: Language,
         output: PathBuf,
+        invocation: ClangInvocation,
     },
     Link {
         inputs: Vec<PathBuf>,
         libs: Libraries,
         output: PathBuf,
+        invocation: ClangInvocation,
     },
     CompileAndLink {
         input: PathBuf,
         lang: Language,
         libs: Libraries,
         output: PathBuf,
+        invocation: ClangInvocation,
     },
 }
 
@@ -262,6 +268,7 @@ impl Action {
                 input,
                 lang,
                 output,
+                invocation,
             }
         } else {
             // at least linking is involved
@@ -277,6 +284,7 @@ impl Action {
                             inputs: vec![input],
                             libs,
                             output,
+                            invocation,
                         }
                     }
                     Some(lang) => {
@@ -286,6 +294,7 @@ impl Action {
                             lang,
                             libs,
                             output,
+                            invocation,
                         }
                     }
                 }
@@ -299,26 +308,86 @@ impl Action {
                     inputs,
                     libs,
                     output,
+                    invocation,
                 }
             }
         };
 
+        // done
         Ok(action)
     }
 }
 
+impl Action {
+    pub fn output(&self) -> &Path {
+        match self {
+            Self::Compile { output, .. }
+            | Self::Link { output, .. }
+            | Self::CompileAndLink { output, .. } => output,
+        }
+    }
+}
+
 /// Scan over the directory and collect build commands
-pub fn analyze(path_src: &Path) -> Result<()> {
+pub fn build_database(path_src: &Path) -> Result<()> {
     // collect commands
+    let mut actions = BTreeMap::new();
     for entry in WalkDir::new(path_src) {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |e| e == COMMAND_EXTENSION) {
+        if path
+            .file_name()
+            .and_then(|e| e.to_str())
+            .map_or(false, |e| e.ends_with(COMMAND_EXTENSION))
+        {
             let content = fs::read_to_string(path)?;
             let invocation: ClangInvocation = serde_json::from_str(&content)?;
-            Action::parse(invocation)?;
+            let action = Action::parse(invocation)?;
+            let exists = actions.insert(action.output().to_path_buf(), action);
+            match exists {
+                None => (),
+                Some(another) => {
+                    bail!(
+                        "output defined multiple times: {}",
+                        another.output().to_string_lossy()
+                    );
+                }
+            }
         }
     }
+
+    // build the compilation graph (DAG)
+    let mut graph = DiGraph::new();
+    let mut nodes = BTreeMap::new();
+
+    // add nodes
+    for key in actions.keys() {
+        let nid = graph.add_node(key.to_path_buf());
+        nodes.insert(key.to_path_buf(), nid);
+    }
+
+    // add edges
+    for (key, val) in &actions {
+        let dst = *nodes.get(key).unwrap();
+        match val {
+            Action::Compile { .. } | Action::CompileAndLink { .. } => (),
+            Action::Link { inputs, .. } => {
+                for item in inputs {
+                    let src = match nodes.get(item) {
+                        None => bail!("linker input does not exist: {}", item.to_string_lossy()),
+                        Some(idx) => *idx,
+                    };
+                    graph.add_edge(src, dst, ());
+                }
+            }
+        }
+    }
+
+    // ensures the graph is a DAG
+    let ordered = match toposort(&graph, None) {
+        Ok(nodes) => nodes,
+        Err(_) => bail!("expect a DAG in the build graph"),
+    };
 
     Ok(())
 }

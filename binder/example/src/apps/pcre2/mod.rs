@@ -3,9 +3,9 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::analyze::analyze;
 use crate::common::WorkflowConfig;
 use crate::snippet;
+use crate::wllvm;
 
 /// Workflow configuration
 #[derive(Serialize, Deserialize)]
@@ -30,7 +30,7 @@ impl WorkflowConfig for Config {
         snippet::build_via_autoconf(&path_src, &path_bin, Some(&[]), &[], rebuild)?;
 
         // merge
-        analyze(&path_src)?;
+        wllvm::build_database(&path_src)?;
 
         Ok(())
     }

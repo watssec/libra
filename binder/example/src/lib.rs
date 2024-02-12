@@ -7,10 +7,10 @@ use crate::common::execute;
 
 pub mod proxy;
 
-mod analyze;
 mod apps;
 mod common;
 mod snippet;
+mod wllvm;
 
 #[derive(StructOpt)]
 enum Example {
