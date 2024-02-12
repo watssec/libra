@@ -3,6 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use crate::analyze::analyze;
 use crate::common::WorkflowConfig;
 use crate::snippet;
 
@@ -19,6 +20,7 @@ impl WorkflowConfig for Config {
         let path_src = workdir.join("src");
         let path_bin = workdir.join("bin");
 
+        // build
         let mut rebuild = false;
         rebuild = snippet::git_clone(
             &path_src,
@@ -26,6 +28,9 @@ impl WorkflowConfig for Config {
             rebuild,
         )?;
         snippet::build_via_autoconf(&path_src, &path_bin, Some(&[]), &[], rebuild)?;
+
+        // merge
+        analyze(&path_src)?;
 
         Ok(())
     }

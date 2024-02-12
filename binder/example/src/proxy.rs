@@ -18,6 +18,8 @@ pub enum ClangArg {
     Include(String),
     /// -isysroot <token>
     IncludeSysroot(String),
+    /// -Wp,<arg>,<arg>,...
+    Preprocessor(Vec<(String, Option<String>)>),
     /// -O<level>
     Optimization(String),
     /// -arch <token>
@@ -133,6 +135,14 @@ impl ClangArg {
         if let Some(inner) = token.strip_prefix("-I") {
             return Self::Include(inner.to_string());
         }
+        if let Some(inner) = token.strip_prefix("-Wp,") {
+            let mut args = vec![];
+            for item in inner.split(',') {
+                let (k, v) = Self::expect_maybe_key_value(item);
+                args.push((k, v));
+            }
+            return Self::Preprocessor(args);
+        }
         if let Some(inner) = token.strip_prefix("-O") {
             return Self::Optimization(inner.to_string());
         }
@@ -200,6 +210,20 @@ impl ClangArg {
             Self::Define(key, Some(val)) => vec![format!("-D{}={}", key, val)],
             Self::Include(val) => vec![format!("-I{}", val)],
             Self::IncludeSysroot(val) => vec!["-isysroot".into(), val.into()],
+            Self::Preprocessor(args) => {
+                vec![format!(
+                    "-Wp,{}",
+                    args.iter()
+                        .map(|(k, v)| {
+                            match v {
+                                None => k.to_string(),
+                                Some(v) => format!("{}={}", k, v),
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )]
+            }
             Self::Optimization(val) => vec![format!("-O{}", val)],
             Self::Arch(val) => vec!["-arch".into(), val.into()],
             Self::MachineArch(val) => vec![format!("-march={}", val)],
