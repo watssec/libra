@@ -22,6 +22,14 @@ lazy_static! {
             .into_string()
             .expect("ASCII path only")
     };
+    pub static ref CLANG_CPP_WRAP: String = {
+        let mut target_dir = PathBuf::from(env!("LIBRA_TARGET_DIR"));
+        target_dir.push("clang_cpp_wrap");
+        target_dir
+            .into_os_string()
+            .into_string()
+            .expect("ASCII path only")
+    };
 }
 
 /// Common trait for workflow config

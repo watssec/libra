@@ -2,6 +2,16 @@ use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 
+fn build_wrapper(name: &str) {
+    let status = Command::new(env!("CARGO"))
+        .args(["build", "--bin", name])
+        .status()
+        .unwrap_or_else(|e| panic!("failed to spawn for {}: {}", name, e));
+    if !status.success() {
+        panic!("failed to build {}", name);
+    }
+}
+
 fn main() {
     // decide whether we are compiling the main
     let is_main_or_default = match env::var_os("CARGO_BIN_NAME") {
@@ -11,13 +21,8 @@ fn main() {
 
     // compile wrappers first
     if is_main_or_default {
-        let status = Command::new(env!("CARGO"))
-            .args(["build", "--bin", "clang_wrap"])
-            .status()
-            .expect("spawn to compile clang_wrap");
-        if !status.success() {
-            panic!("failed to compile clang_wrap");
-        }
+        build_wrapper("clang_wrap");
+        build_wrapper("clang_cpp_wrap");
     }
 
     // tweak the environment variables

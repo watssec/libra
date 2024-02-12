@@ -15,19 +15,21 @@ enum SysLib {
     POSIXThread,
 }
 
-enum Language {
+enum CommonExtensions {
     C,
     CPP,
     Asm,
+    Object,
 }
 
-impl Language {
+impl CommonExtensions {
     pub fn probe(path: &Path) -> Option<Self> {
         let lang = match path.extension().and_then(|e| e.to_str())? {
             "c" => Self::C,
             "cpp" => Self::CPP,
             "cc" => Self::CPP,
             "s" => Self::Asm,
+            "o" => Self::Object,
             _ => return None,
         };
         Some(lang)
@@ -43,7 +45,6 @@ struct Libraries {
 enum Action {
     Compile {
         input: PathBuf,
-        lang: Language,
         output: PathBuf,
         invocation: ClangInvocation,
     },
@@ -55,7 +56,6 @@ enum Action {
     },
     CompileAndLink {
         input: PathBuf,
-        lang: Language,
         libs: Libraries,
         output: PathBuf,
         invocation: ClangInvocation,
@@ -64,7 +64,7 @@ enum Action {
 
 impl Action {
     fn filter_args_for_output(invocation: ClangInvocation) -> Result<(ClangInvocation, PathBuf)> {
-        let ClangInvocation { cwd, args } = invocation;
+        let ClangInvocation { cwd, cxx, args } = invocation;
 
         let mut new_args = vec![];
         let mut target = None;
@@ -96,6 +96,7 @@ impl Action {
         };
         let new_invocation = ClangInvocation {
             cwd,
+            cxx,
             args: new_args,
         };
         Ok((new_invocation, output))
@@ -104,7 +105,7 @@ impl Action {
     fn filter_args_for_inputs(
         invocation: ClangInvocation,
     ) -> Result<(ClangInvocation, Vec<PathBuf>)> {
-        let ClangInvocation { cwd, args } = invocation;
+        let ClangInvocation { cwd, cxx, args } = invocation;
 
         let mut new_args = vec![];
         let mut inputs = vec![];
@@ -131,6 +132,7 @@ impl Action {
         }
         let new_invocation = ClangInvocation {
             cwd,
+            cxx,
             args: new_args,
         };
         Ok((new_invocation, inputs))
@@ -139,7 +141,7 @@ impl Action {
     fn filter_args_for_mode_compile(
         invocation: ClangInvocation,
     ) -> Result<(ClangInvocation, bool)> {
-        let ClangInvocation { cwd, args } = invocation;
+        let ClangInvocation { cwd, cxx, args } = invocation;
 
         let mut is_compile_only = false;
         let mut new_args = vec![];
@@ -156,6 +158,7 @@ impl Action {
 
         let new_invocation = ClangInvocation {
             cwd,
+            cxx,
             args: new_args,
         };
         Ok((new_invocation, is_compile_only))
@@ -164,7 +167,7 @@ impl Action {
     fn filter_args_for_mode_link(
         invocation: ClangInvocation,
     ) -> Result<(ClangInvocation, Option<Libraries>)> {
-        let ClangInvocation { cwd, args } = invocation;
+        let ClangInvocation { cwd, cxx, args } = invocation;
 
         // collect libraries
         let mut has_linking_flags = false;
@@ -242,6 +245,7 @@ impl Action {
 
         let new_invocation = ClangInvocation {
             cwd,
+            cxx,
             args: new_args,
         };
         Ok((new_invocation, libs))
@@ -263,14 +267,9 @@ impl Action {
                 bail!("more than one inputs in compile-only mode ");
             }
             let input = inputs.into_iter().next().unwrap();
-            let lang = match Language::probe(&input) {
-                None => bail!("unrecognized source language: {}", input.to_string_lossy()),
-                Some(l) => l,
-            };
 
             Action::Compile {
                 input,
-                lang,
                 output,
                 invocation,
             }
@@ -278,11 +277,27 @@ impl Action {
             // at least linking is involved
             let libs = link_libs_opt.unwrap_or_default();
 
-            // now decide whether this is linking only or compile and link
+            // now decide whether this is linking only or compile-and-link
             if inputs.len() == 1 {
                 let input = inputs.into_iter().next().unwrap();
-                match Language::probe(&input) {
-                    None => {
+                let extension = match CommonExtensions::probe(&input) {
+                    None => bail!(
+                        "unable to guess the action for single-file invocation: {}",
+                        input.to_string_lossy()
+                    ),
+                    Some(e) => e,
+                };
+                match extension {
+                    CommonExtensions::C | CommonExtensions::CPP | CommonExtensions::Asm => {
+                        // compile and link mode
+                        Action::CompileAndLink {
+                            input,
+                            libs,
+                            output,
+                            invocation,
+                        }
+                    }
+                    CommonExtensions::Object => {
                         // linking mode
                         Action::Link {
                             inputs: vec![input],
@@ -291,23 +306,8 @@ impl Action {
                             invocation,
                         }
                     }
-                    Some(lang) => {
-                        // compile and link mode
-                        Action::CompileAndLink {
-                            input,
-                            lang,
-                            libs,
-                            output,
-                            invocation,
-                        }
-                    }
                 }
             } else {
-                for item in &inputs {
-                    if Language::probe(item).is_some() {
-                        bail!("found source code file in linking mode");
-                    }
-                }
                 Action::Link {
                     inputs,
                     libs,

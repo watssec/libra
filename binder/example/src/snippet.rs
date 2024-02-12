@@ -6,7 +6,7 @@ use std::process::Command;
 use anyhow::{anyhow, bail, Result};
 use log::debug;
 
-use crate::common::CLANG_WRAP;
+use crate::common::{CLANG_CPP_WRAP, CLANG_WRAP};
 use crate::proxy::{COMMAND_EXTENSION, LIBMARK_EXTENSION};
 
 /// Git clone
@@ -83,6 +83,7 @@ pub fn build_via_autoconf(
         .arg("--disable-silent-rules")
         .args(args_configure)
         .env("CC", CLANG_WRAP.as_str())
+        .env("CXX", CLANG_CPP_WRAP.as_str())
         .current_dir(path_src);
         if !cmd.status()?.success() {
             bail!("unable to configure");
