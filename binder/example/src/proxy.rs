@@ -21,49 +21,51 @@ pub enum ClangArg {
     Standard(String),
     /// -D<key>{=<value>}
     Define(String, Option<String>),
-    /// -I<token>, -I <token>
+    /// -I<token> | -I <token>
     Include(String),
     /// -isysroot <token>
     IncludeSysroot(String),
-    /// -Wp,<arg>,<arg>,...
-    Preprocessor(Vec<(String, Option<String>)>),
+    /// -Wp,-MD,<arg> | -Wp,-MD -Wp,<arg>
+    PrepMD(String),
     /// -O<level>
     Optimization(String),
     /// -arch <token>
     Arch(String),
     /// -march=<token>
     MachineArch(String),
-    /// -g, --debug
+    /// -g | --debug
     Debug,
-    /// -l<token>, -l <token>
+    /// -l<token> | -l <token>
     LibName(String),
-    /// -L<token>, -L <token>
+    /// -L<token> | -L <token>
     LibPath(String),
-    /// -shared, --shared
+    /// -shared | --shared
     LinkShared,
-    /// -static, --static
+    /// -static | --static
     LinkStatic,
-    /// -Wl,<arg>,<arg>,...
-    Linker(Vec<(String, Option<String>)>),
+    /// -Wl,-rpath,<token> | -Wl,-rpath -Wl,<token>
+    LinkRpath(String),
+    /// -Wl,-soname,<token> | -Wl,-soname -Wl,<token>
+    LinkSoname(String),
     /// -mllvm <key>{=<value>}
     Backend(String, Option<String>),
-    /// -fPIC, -fno-PIC
+    /// -fPIC % -fno-PIC
     FlagPIC(bool),
-    /// -fPIE, -fno-PIE
+    /// -fPIE % -fno-PIE
     FlagPIE(bool),
-    /// -frtti, -fno-rtti
+    /// -frtti % -fno-rtti
     FlagRTTI(bool),
-    /// -fexceptions, -fno-exceptions
+    /// -fexceptions % -fno-exceptions
     FlagExceptions(bool),
     /// -W<key>{=<value>}
     Warning(String, Option<String>),
-    /// -w, --no-warnings
+    /// -w | --no-warnings
     NoWarnings,
     /// -pedantic
     Pedantic,
     /// -pthread
     POSIXThread,
-    /// -print-<key>{=<value>}, --print-<key>{=<value>}
+    /// -print-<key>{=<value>} | --print-<key>{=<value>}
     Print(String, Option<String>),
     /// -o <token>
     Output(String),
@@ -101,6 +103,13 @@ impl ClangArg {
             "-isysroot" => {
                 return Self::IncludeSysroot(Self::expect_next(stream));
             }
+            "-Wp,-MD" => {
+                let next = Self::expect_next(stream);
+                match next.strip_prefix("-Wp,") {
+                    None => panic!("expect argument after -MD"),
+                    Some(inner) => return Self::PrepMD(inner.to_string()),
+                }
+            }
             "-l" => {
                 return Self::LibName(Self::expect_next(stream));
             }
@@ -118,6 +127,20 @@ impl ClangArg {
             }
             "-static" | "--static" => {
                 return Self::LinkStatic;
+            }
+            "-Wl,-rpath" => {
+                let next = Self::expect_next(stream);
+                match next.strip_prefix("-Wl,") {
+                    None => panic!("expect argument after -rpath"),
+                    Some(inner) => return Self::LinkRpath(inner.to_string()),
+                }
+            }
+            "-Wl,-soname" => {
+                let next = Self::expect_next(stream);
+                match next.strip_prefix("-Wl,") {
+                    None => panic!("expect argument after -soname"),
+                    Some(inner) => return Self::LinkSoname(inner.to_string()),
+                }
             }
             "-mllvm" => {
                 let (k, v) = Self::expect_maybe_key_value(&Self::expect_next(stream));
@@ -172,13 +195,8 @@ impl ClangArg {
         if let Some(inner) = token.strip_prefix("-I") {
             return Self::Include(inner.to_string());
         }
-        if let Some(inner) = token.strip_prefix("-Wp,") {
-            let mut args = vec![];
-            for item in inner.split(',') {
-                let (k, v) = Self::expect_maybe_key_value(item);
-                args.push((k, v));
-            }
-            return Self::Preprocessor(args);
+        if let Some(inner) = token.strip_prefix("-Wp,-MD,") {
+            return Self::PrepMD(inner.to_string());
         }
         if let Some(inner) = token.strip_prefix("-O") {
             return Self::Optimization(inner.to_string());
@@ -192,13 +210,11 @@ impl ClangArg {
         if let Some(inner) = token.strip_prefix("-L") {
             return Self::LibPath(inner.to_string());
         }
-        if let Some(inner) = token.strip_prefix("-Wl,") {
-            let mut args = vec![];
-            for item in inner.split(',') {
-                let (k, v) = Self::expect_maybe_key_value(item);
-                args.push((k, v));
-            }
-            return Self::Linker(args);
+        if let Some(inner) = token.strip_prefix("-Wl,-rpath,") {
+            return Self::LinkRpath(inner.to_string());
+        }
+        if let Some(inner) = token.strip_prefix("-Wl,-soname,") {
+            return Self::LinkSoname(inner.to_string());
         }
         if let Some(inner) = token.strip_prefix("-W") {
             let (k, v) = Self::expect_maybe_key_value(inner);
@@ -243,20 +259,7 @@ impl ClangArg {
             Self::Define(key, Some(val)) => vec![format!("-D{}={}", key, val)],
             Self::Include(val) => vec![format!("-I{}", val)],
             Self::IncludeSysroot(val) => vec!["-isysroot".into(), val.into()],
-            Self::Preprocessor(args) => {
-                vec![format!(
-                    "-Wp,{}",
-                    args.iter()
-                        .map(|(k, v)| {
-                            match v {
-                                None => k.to_string(),
-                                Some(v) => format!("{}={}", k, v),
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(",")
-                )]
-            }
+            Self::PrepMD(val) => vec![format!("-Wp,-MD,{}", val)],
             Self::Optimization(val) => vec![format!("-O{}", val)],
             Self::Arch(val) => vec!["-arch".into(), val.into()],
             Self::MachineArch(val) => vec![format!("-march={}", val)],
@@ -265,20 +268,8 @@ impl ClangArg {
             Self::LibPath(val) => vec![format!("-L{}", val)],
             Self::LinkShared => vec!["-shared".into()],
             Self::LinkStatic => vec!["-static".into()],
-            Self::Linker(args) => {
-                vec![format!(
-                    "-Wl,{}",
-                    args.iter()
-                        .map(|(k, v)| {
-                            match v {
-                                None => k.to_string(),
-                                Some(v) => format!("{}={}", k, v),
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(",")
-                )]
-            }
+            Self::LinkRpath(val) => vec![format!("-Wl,-rpath,{}", val)],
+            Self::LinkSoname(val) => vec![format!("-Wl,-soname,{}", val)],
             Self::Backend(key, None) => vec!["-mllvm".into(), key.into()],
             Self::Backend(key, Some(val)) => vec!["-mllvm".into(), format!("{}={}", key, val)],
             Self::FlagPIC(true) => vec!["-fPIC".into()],

@@ -213,7 +213,10 @@ impl Action {
                         lib_paths.push(path_resolved);
                     }
                 }
-                ClangArg::LinkStatic | ClangArg::LinkShared | ClangArg::Linker(..) => {
+                ClangArg::LinkStatic
+                | ClangArg::LinkShared
+                | ClangArg::LinkRpath(..)
+                | ClangArg::LinkSoname(..) => {
                     has_linking_flags = true;
                 }
                 _ => {
