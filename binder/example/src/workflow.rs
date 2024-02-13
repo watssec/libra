@@ -8,6 +8,8 @@ use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
 
+use libra_engine::flow::fixedpoint::FlowFixedpoint;
+use libra_engine::flow::shared::Context;
 use libra_shared::config::PATH_STUDIO;
 
 use crate::common::{derive_bitcode_path, AppConfig};
@@ -78,10 +80,14 @@ impl Stage {
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "T: AppConfig")]
 pub struct Workflow<T: AppConfig> {
+    // config
+    config: T,
+    // build
     libs: BTreeMap<String, Artifact>,
     bins: BTreeMap<String, Artifact>,
     entry: Entrypoint,
-    config: T,
+    // analysis
+    fixedpoint: Option<usize>,
 }
 
 impl<T: AppConfig> Workflow<T> {
@@ -105,9 +111,9 @@ impl<T: AppConfig> Workflow<T> {
     }
 
     /// Analyze the artifact based on entry point
-    fn analyze(&self, path_src: &Path, path_bin: &Path) -> Result<()> {
+    fn analyze(&self, path_src: &Path, path_bin: &Path, path_wks: &Path) -> Result<()> {
         // derive the bitcode file
-        let original = match &self.entry.kind {
+        let artifact = match &self.entry.kind {
             ArtifactKind::Lib => match self.libs.get(&self.entry.name) {
                 None => bail!("unable to find entry target in libs: {}", self.entry.name),
                 Some(artifact) => path_bin
@@ -123,21 +129,41 @@ impl<T: AppConfig> Workflow<T> {
                     .canonicalize()?,
             },
         };
-        if !original.exists() {
+        if !artifact.exists() {
             bail!(
                 "original artifact does not exist: {}",
-                original.to_string_lossy()
+                artifact.to_string_lossy()
             );
         }
 
-        let derived = derive_bitcode_path(original);
-        if !derived.exists() {
+        let path_base_bitcode = derive_bitcode_path(artifact);
+        if !path_base_bitcode.exists() {
             bail!(
-                "derived artifact does not exist: {}",
-                derived.to_string_lossy()
+                "artifact bitcode does not exist: {}",
+                path_base_bitcode.to_string_lossy()
             );
         }
 
+        // prepare for analysis
+        let ctxt = Context::new()?;
+        fs::create_dir_all(path_wks)?;
+
+        // fixedpoint optimization (if applicable)
+        let trace = FlowFixedpoint::new(
+            &ctxt,
+            path_base_bitcode,
+            path_wks.to_path_buf(),
+            self.fixedpoint,
+        )
+        .execute()?;
+
+        if trace.is_empty() {
+            bail!("fixedpoint optimization leaves no modules in trace");
+        }
+        info!("Number of fixedpoint optimization rounds: {}", trace.len());
+        trace.into_iter().next_back().unwrap();
+
+        // done
         Ok(())
     }
 
@@ -145,6 +171,7 @@ impl<T: AppConfig> Workflow<T> {
     pub fn run(&self, workdir: &Path) -> Result<()> {
         let path_src = workdir.join("src");
         let path_bin = workdir.join("bin");
+        let path_wks = workdir.join("wks");
 
         // obtain the bitcode
         if !Stage::Build.get_mark(workdir) {
@@ -162,7 +189,7 @@ impl<T: AppConfig> Workflow<T> {
 
         // run the analysis
         if !Stage::Analyze.get_mark(workdir) {
-            self.analyze(&path_src, &path_bin)?;
+            self.analyze(&path_src, &path_bin, &path_wks)?;
         }
 
         Ok(())

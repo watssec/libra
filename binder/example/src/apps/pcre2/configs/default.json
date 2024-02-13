@@ -1,4 +1,5 @@
 {
+  "config": {},
   "libs": {
     "pcre2-8": {
       "item_in_bin": "lib",
@@ -23,6 +24,5 @@
     "kind": "bin",
     "name": "pcre2test",
     "function": "main"
-  },
-  "config": {}
+  }
 }
