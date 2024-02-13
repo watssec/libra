@@ -219,7 +219,8 @@ impl Action {
                 ClangArg::LinkStatic
                 | ClangArg::LinkShared
                 | ClangArg::LinkRpath(..)
-                | ClangArg::LinkSoname(..) => {
+                | ClangArg::LinkSoname(..)
+                | ClangArg::LinkVersionScript(..) => {
                     has_linking_flags = true;
                 }
                 _ => {
@@ -455,6 +456,7 @@ impl Action {
                 | ClangArg::LinkStatic
                 | ClangArg::LinkRpath(..)
                 | ClangArg::LinkSoname(..)
+                | ClangArg::LinkVersionScript(..)
                 | ClangArg::Output(..)
                 | ClangArg::Input(..) => {
                     bail!("unexpected {} option: {}", name, option)

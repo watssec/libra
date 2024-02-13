@@ -47,6 +47,8 @@ pub enum ClangArg {
     LinkRpath(String),
     /// -Wl,-soname,<token> | -Wl,-soname -Wl,<token>
     LinkSoname(String),
+    /// -Wl,--version-script,<token> | -Wl,--version-script -Wl,<token>
+    LinkVersionScript(String),
     /// -fPIC % -fno-PIC
     FlagPIC(bool),
     /// -fPIE % -fno-PIE
@@ -210,6 +212,9 @@ impl ClangArg {
         if let Some(inner) = token.strip_prefix("-Wl,-soname,") {
             return Self::LinkSoname(inner.to_string());
         }
+        if let Some(inner) = token.strip_prefix("-Wl,--version-script,") {
+            return Self::LinkVersionScript(inner.to_string());
+        }
         if let Some(inner) = token.strip_prefix("-W") {
             let (k, v) = Self::expect_maybe_key_value(inner);
             return Self::Warning(k, v);
@@ -264,6 +269,7 @@ impl ClangArg {
             Self::LinkStatic => vec!["-static".into()],
             Self::LinkRpath(val) => vec![format!("-Wl,-rpath,{}", val)],
             Self::LinkSoname(val) => vec![format!("-Wl,-soname,{}", val)],
+            Self::LinkVersionScript(val) => vec![format!("-Wl,--version-script,{}", val)],
             Self::FlagPIC(true) => vec!["-fPIC".into()],
             Self::FlagPIC(false) => vec!["-fno-PIC".into()],
             Self::FlagPIE(true) => vec!["-fPIE".into()],
