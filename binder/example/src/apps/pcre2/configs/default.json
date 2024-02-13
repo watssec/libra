@@ -10,10 +10,18 @@
     }
   },
   "bins": {
+    "pcre2test": {
+      "item_in_bin": "bin",
+      "item_in_src": ".libs"
+    },
     "pcre2grep": {
       "item_in_bin": "bin",
       "item_in_src": ".libs"
     }
   },
+  "entry": [
+    "pcre2test",
+    "main"
+  ],
   "config": {}
 }

@@ -28,11 +28,12 @@ struct Artifact {
 pub struct Workflow<T: AppConfig> {
     libs: BTreeMap<String, Artifact>,
     bins: BTreeMap<String, Artifact>,
+    entry: (String, String),
     config: T,
 }
 
 impl<T: AppConfig> Workflow<T> {
-    /// Check process
+    /// Check build artifact
     fn check(&self, path_src: &Path, path_bin: &Path) -> Result<()> {
         for (name, details) in &self.libs {
             snippet::mark_artifact_lib(
@@ -102,7 +103,7 @@ pub fn execute<T: AppConfig>() -> Result<()> {
     let app = T::app();
     let workflows = probe_workflows::<T>()?;
 
-    // execute the configs one by one
+    // execute the workflows one by one
     for (name, workdir, workflow) in workflows {
         info!("Processing '{}' under config '{}'", app, name);
 
