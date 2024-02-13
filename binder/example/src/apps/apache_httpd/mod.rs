@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::AppConfig;
 use crate::snippet;
-use crate::workflow::retrieve_config;
+use crate::workflow::retrieve_workflow;
 
 /// Workflow configuration
 #[derive(Serialize, Deserialize)]
@@ -20,7 +20,7 @@ impl AppConfig for Config {
 
     fn build(&self, path_src: &Path, path_bin: &Path) -> Result<bool> {
         // grab dependencies
-        let (dep_pcre2, _) = retrieve_config::<crate::apps::pcre2::Config>("default")?;
+        let (dep_pcre2, _) = retrieve_workflow::<crate::apps::pcre2::Config>("default")?;
 
         let mut rebuild = false;
         rebuild = snippet::git_clone(path_src, "https://github.com/apache/httpd.git", rebuild)?;

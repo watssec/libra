@@ -176,7 +176,11 @@ pub fn mark_artifact_lib<P: AsRef<Path>, Q: AsRef<Path>>(
 }
 
 /// Check that a binary artifact exists
-pub fn check_artifact_bin<P: AsRef<Path>>(name: &str, path_build: P) -> Result<()> {
+pub fn check_artifact_bin<P: AsRef<Path>, Q: AsRef<Path>>(
+    name: &str,
+    path_install: P,
+    path_build: Q,
+) -> Result<()> {
     let command_file = format!("{}{}", name, COMMAND_EXTENSION);
 
     // find the target
@@ -196,7 +200,12 @@ pub fn check_artifact_bin<P: AsRef<Path>>(name: &str, path_build: P) -> Result<(
         }
     }
     if !found {
-        bail!("binary artifact does not exist {}", name);
+        bail!("binary artifact does not exist in src {}", name);
+    }
+
+    // check in install
+    if !path_install.as_ref().join(name).exists() {
+        bail!("binary artifact does not exist in bin {}", name);
     }
 
     // done

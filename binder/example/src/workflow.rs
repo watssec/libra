@@ -17,49 +17,37 @@ lazy_static! {
 
 /// Details for a library artifact
 #[derive(Serialize, Deserialize)]
-struct ArtifactLib {
-    item_in_src: Vec<String>,
-    item_in_bin: Vec<String>,
-}
-
-/// Details for a binary artifact
-#[derive(Serialize, Deserialize)]
-struct ArtifactBin {
-    item_in_src: Vec<String>,
+struct Artifact {
+    item_in_src: String,
+    item_in_bin: String,
 }
 
 /// Workflow for an app
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "T: AppConfig")]
 pub struct Workflow<T: AppConfig> {
-    libs: BTreeMap<String, ArtifactLib>,
-    bins: BTreeMap<String, ArtifactBin>,
+    libs: BTreeMap<String, Artifact>,
+    bins: BTreeMap<String, Artifact>,
     config: T,
 }
 
 impl<T: AppConfig> Workflow<T> {
     /// Check process
     fn check(&self, path_src: &Path, path_bin: &Path) -> Result<()> {
-        // libraries
         for (name, details) in &self.libs {
-            let mut path_install = path_bin.to_path_buf();
-            path_install.extend(details.item_in_bin.iter());
-
-            let mut path_build = path_src.to_path_buf();
-            path_build.extend(details.item_in_src.iter());
-
-            snippet::mark_artifact_lib(name, &path_install, &path_build)?;
+            snippet::mark_artifact_lib(
+                name,
+                path_bin.join(&details.item_in_bin),
+                path_src.join(&details.item_in_src),
+            )?;
         }
-
-        // binaries
         for (name, details) in &self.bins {
-            let mut path_build = path_src.to_path_buf();
-            path_build.extend(details.item_in_src.iter());
-
-            snippet::check_artifact_bin(name, &path_build)?;
+            snippet::check_artifact_bin(
+                name,
+                path_bin.join(&details.item_in_bin),
+                path_src.join(&details.item_in_src),
+            )?;
         }
-
-        // done
         Ok(())
     }
 
@@ -78,10 +66,10 @@ impl<T: AppConfig> Workflow<T> {
     }
 }
 
-/// Probe for configs available
-fn probe_configs<T: AppConfig>() -> Result<Vec<(String, PathBuf, Workflow<T>)>> {
+/// Probe for workflows available
+fn probe_workflows<T: AppConfig>() -> Result<Vec<(String, PathBuf, Workflow<T>)>> {
     let app = T::app();
-    let mut configs = vec![];
+    let mut workflows = vec![];
 
     let base = Path::new(env!("CARGO_MANIFEST_DIR"));
     let config_dir = base.join("src").join("apps").join(app).join("configs");
@@ -90,7 +78,7 @@ fn probe_configs<T: AppConfig>() -> Result<Vec<(String, PathBuf, Workflow<T>)>> 
         let path = item.path();
         if path.extension().map_or(false, |e| e == "json") {
             let content = fs::read_to_string(&path)?;
-            let config: Workflow<T> = serde_json::from_str(&content)?;
+            let workflow: Workflow<T> = serde_json::from_str(&content)?;
 
             let filename = item
                 .file_name()
@@ -102,20 +90,20 @@ fn probe_configs<T: AppConfig>() -> Result<Vec<(String, PathBuf, Workflow<T>)>> 
                 .to_string();
             let workdir = PATH_STUDIO.join("example").join(app).join(&name);
 
-            configs.push((name, workdir, config));
+            workflows.push((name, workdir, workflow));
         }
     }
 
-    Ok(configs)
+    Ok(workflows)
 }
 
 /// Run the workflows based on defined config files
 pub fn execute<T: AppConfig>() -> Result<()> {
     let app = T::app();
-    let configs = probe_configs::<T>()?;
+    let workflows = probe_workflows::<T>()?;
 
     // execute the configs one by one
-    for (name, workdir, config) in configs {
+    for (name, workdir, workflow) in workflows {
         info!("Processing '{}' under config '{}'", app, name);
 
         // prepare the work directory
@@ -127,18 +115,18 @@ pub fn execute<T: AppConfig>() -> Result<()> {
         }
 
         // execute it
-        config.run(&workdir)?;
+        workflow.run(&workdir)?;
     }
     Ok(())
 }
 
-/// Retrieve the config
-pub fn retrieve_config<T: AppConfig>(target: &str) -> Result<(PathBuf, Workflow<T>)> {
-    let configs = probe_configs::<T>()?;
+/// Retrieve a particular workflow
+pub fn retrieve_workflow<T: AppConfig>(target: &str) -> Result<(PathBuf, Workflow<T>)> {
+    let configs = probe_workflows::<T>()?;
     for (name, workdir, config) in configs {
         if target == name.as_str() {
             return Ok((workdir, config));
         }
     }
-    bail!("no such config '{}' for app '{}'", target, T::app());
+    bail!("no such workflow '{}' for app '{}'", target, T::app());
 }
