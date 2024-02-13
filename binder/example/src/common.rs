@@ -30,5 +30,5 @@ pub trait AppConfig: Serialize + DeserializeOwned {
     fn app() -> &'static str;
 
     /// Build process
-    fn build(&self, path_src: &Path, path_bin: &Path) -> Result<bool>;
+    fn build(&self, path_src: &Path, path_bin: &Path) -> Result<()>;
 }

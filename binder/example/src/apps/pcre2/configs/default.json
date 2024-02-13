@@ -19,9 +19,10 @@
       "item_in_src": ".libs"
     }
   },
-  "entry": [
-    "pcre2test",
-    "main"
-  ],
+  "entry": {
+    "kind": "bin",
+    "name": "pcre2test",
+    "function": "main"
+  },
   "config": {}
 }

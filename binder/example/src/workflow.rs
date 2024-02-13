@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
@@ -9,6 +10,7 @@ use log::info;
 use serde::{Deserialize, Serialize};
 
 use crate::common::AppConfig;
+use crate::proxy::LIBMARK_EXTENSION;
 use crate::{snippet, wllvm};
 
 lazy_static! {
@@ -22,13 +24,61 @@ struct Artifact {
     item_in_bin: String,
 }
 
+/// Type of artifact
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ArtifactKind {
+    Lib,
+    Bin,
+}
+
+/// Entrypoint for analysis
+#[derive(Serialize, Deserialize)]
+struct Entrypoint {
+    kind: ArtifactKind,
+    name: String,
+    function: String,
+}
+
+/// Stages of the workflow
+enum Stage {
+    Build,
+    Check,
+    Merge,
+    Analyze,
+}
+
+impl Stage {
+    fn mark(&self) -> &str {
+        match self {
+            Self::Build => "mark.build",
+            Self::Check => "mark.check",
+            Self::Merge => "mark.merge",
+            Self::Analyze => "mark.analyze",
+        }
+    }
+
+    /// set the stage mark
+    pub fn set_mark(self, workdir: &Path) -> Result<()> {
+        OpenOptions::new()
+            .create_new(true)
+            .open(workdir.join(self.mark()))?;
+        Ok(())
+    }
+
+    /// get the stage mark
+    pub fn get_mark(self, workdir: &Path) -> bool {
+        workdir.join(self.mark()).exists()
+    }
+}
+
 /// Workflow for an app
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "T: AppConfig")]
 pub struct Workflow<T: AppConfig> {
     libs: BTreeMap<String, Artifact>,
     bins: BTreeMap<String, Artifact>,
-    entry: (String, String),
+    entry: Entrypoint,
     config: T,
 }
 
@@ -57,10 +107,44 @@ impl<T: AppConfig> Workflow<T> {
         let path_src = workdir.join("src");
         let path_bin = workdir.join("bin");
 
-        let rebuild = T::build(&self.config, &path_src, &path_bin)?;
-        if rebuild {
+        // obtain the bitcode
+        if !Stage::Build.get_mark(workdir) {
+            T::build(&self.config, &path_src, &path_bin)?;
+            Stage::Build.set_mark(workdir)?;
+        }
+        if !Stage::Check.get_mark(workdir) {
             self.check(&path_src, &path_bin)?;
+            Stage::Check.set_mark(workdir)?;
+        }
+        if !Stage::Merge.get_mark(workdir) {
             wllvm::merge(&path_src, &path_bin)?;
+            Stage::Merge.set_mark(workdir)?;
+        }
+
+        // run the analysis
+        if !Stage::Analyze.get_mark(workdir) {
+            let artifact = match &self.entry.kind {
+                ArtifactKind::Lib => match self.libs.get(&self.entry.name) {
+                    None => bail!("unable to find entry target in libs: {}", self.entry.name),
+                    Some(artifact) => path_bin
+                        .join(&artifact.item_in_bin)
+                        .join(format!("lib{}{}", self.entry.name, LIBMARK_EXTENSION))
+                        .canonicalize()?,
+                },
+                ArtifactKind::Bin => match self.bins.get(&self.entry.name) {
+                    None => bail!("unable to find entry target in bins: {}", self.entry.name),
+                    Some(artifact) => path_src
+                        .join(&artifact.item_in_src)
+                        .join(&self.entry.name)
+                        .canonicalize()?,
+                },
+            };
+            if !artifact.exists() {
+                bail!(
+                    "origial artifact does not exist: {}",
+                    artifact.to_string_lossy()
+                );
+            }
         }
 
         Ok(())

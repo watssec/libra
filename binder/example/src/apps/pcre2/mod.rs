@@ -15,17 +15,8 @@ impl AppConfig for Config {
         "pcre2"
     }
 
-    fn build(&self, path_src: &Path, path_bin: &Path) -> Result<bool> {
-        let mut rebuild = false;
-
-        // prep
-        rebuild = snippet::git_clone(
-            path_src,
-            "https://github.com/PCRE2Project/pcre2.git",
-            rebuild,
-        )?;
-
-        // build
-        snippet::build_via_autoconf(path_src, path_bin, Some(&[]), &[], rebuild)
+    fn build(&self, path_src: &Path, path_bin: &Path) -> Result<()> {
+        snippet::git_clone(path_src, "https://github.com/PCRE2Project/pcre2.git")?;
+        snippet::build_via_autoconf(path_src, path_bin, Some(&[]), &[])
     }
 }
