@@ -5,11 +5,12 @@ use std::{env, fs};
 
 use anyhow::{anyhow, bail, Result};
 use lazy_static::lazy_static;
-use libra_shared::config::PATH_STUDIO;
 use log::info;
 use serde::{Deserialize, Serialize};
 
-use crate::common::AppConfig;
+use libra_shared::config::PATH_STUDIO;
+
+use crate::common::{derive_bitcode_path, AppConfig};
 use crate::proxy::LIBMARK_EXTENSION;
 use crate::{snippet, wllvm};
 
@@ -62,6 +63,7 @@ impl Stage {
     pub fn set_mark(self, workdir: &Path) -> Result<()> {
         OpenOptions::new()
             .create_new(true)
+            .write(true)
             .open(workdir.join(self.mark()))?;
         Ok(())
     }
@@ -102,6 +104,43 @@ impl<T: AppConfig> Workflow<T> {
         Ok(())
     }
 
+    /// Analyze the artifact based on entry point
+    fn analyze(&self, path_src: &Path, path_bin: &Path) -> Result<()> {
+        // derive the bitcode file
+        let original = match &self.entry.kind {
+            ArtifactKind::Lib => match self.libs.get(&self.entry.name) {
+                None => bail!("unable to find entry target in libs: {}", self.entry.name),
+                Some(artifact) => path_bin
+                    .join(&artifact.item_in_bin)
+                    .join(format!("lib{}{}", self.entry.name, LIBMARK_EXTENSION))
+                    .canonicalize()?,
+            },
+            ArtifactKind::Bin => match self.bins.get(&self.entry.name) {
+                None => bail!("unable to find entry target in bins: {}", self.entry.name),
+                Some(artifact) => path_src
+                    .join(&artifact.item_in_src)
+                    .join(&self.entry.name)
+                    .canonicalize()?,
+            },
+        };
+        if !original.exists() {
+            bail!(
+                "original artifact does not exist: {}",
+                original.to_string_lossy()
+            );
+        }
+
+        let derived = derive_bitcode_path(original);
+        if !derived.exists() {
+            bail!(
+                "derived artifact does not exist: {}",
+                derived.to_string_lossy()
+            );
+        }
+
+        Ok(())
+    }
+
     /// Execute the profile
     pub fn run(&self, workdir: &Path) -> Result<()> {
         let path_src = workdir.join("src");
@@ -123,28 +162,7 @@ impl<T: AppConfig> Workflow<T> {
 
         // run the analysis
         if !Stage::Analyze.get_mark(workdir) {
-            let artifact = match &self.entry.kind {
-                ArtifactKind::Lib => match self.libs.get(&self.entry.name) {
-                    None => bail!("unable to find entry target in libs: {}", self.entry.name),
-                    Some(artifact) => path_bin
-                        .join(&artifact.item_in_bin)
-                        .join(format!("lib{}{}", self.entry.name, LIBMARK_EXTENSION))
-                        .canonicalize()?,
-                },
-                ArtifactKind::Bin => match self.bins.get(&self.entry.name) {
-                    None => bail!("unable to find entry target in bins: {}", self.entry.name),
-                    Some(artifact) => path_src
-                        .join(&artifact.item_in_src)
-                        .join(&self.entry.name)
-                        .canonicalize()?,
-                },
-            };
-            if !artifact.exists() {
-                bail!(
-                    "origial artifact does not exist: {}",
-                    artifact.to_string_lossy()
-                );
-            }
+            self.analyze(&path_src, &path_bin)?;
         }
 
         Ok(())

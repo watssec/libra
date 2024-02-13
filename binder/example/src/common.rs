@@ -24,6 +24,9 @@ lazy_static! {
     };
 }
 
+/// Extension for LLVM IR (bitcode) file
+pub static BITCODE_EXTENSION: &str = "bc";
+
 /// Common trait for workflow config
 pub trait AppConfig: Serialize + DeserializeOwned {
     /// Obtain the application name
@@ -31,4 +34,20 @@ pub trait AppConfig: Serialize + DeserializeOwned {
 
     /// Build process
     fn build(&self, path_src: &Path, path_bin: &Path) -> Result<()>;
+}
+
+/// Utility: Derive the filename for bitcode based on an existing file
+pub fn derive_bitcode_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    let path = path.as_ref();
+    let new_ext = path.extension().map_or_else(
+        || BITCODE_EXTENSION.to_string(),
+        |e| {
+            format!(
+                "{}.{}",
+                e.to_str().expect("pure ASCII extension"),
+                BITCODE_EXTENSION
+            )
+        },
+    );
+    path.with_extension(new_ext)
 }

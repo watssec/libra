@@ -11,9 +11,8 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::DiGraph;
 use walkdir::WalkDir;
 
+use crate::common::derive_bitcode_path;
 use crate::proxy::{ClangArg, ClangInvocation, COMMAND_EXTENSION, LIBMARK_EXTENSION};
-
-static BITCODE_EXTENSION: &str = "bc";
 
 static COMPILE_GRAPH_DOT: &str = ".compile_graph.dot";
 
@@ -616,22 +615,6 @@ fn normalize_path<P: AsRef<Path>, Q: AsRef<Path>>(cwd: P, path: Q) -> PathBuf {
     }
 
     absolute
-}
-
-/// Utility: Derive the file name for bitcode
-fn derive_bitcode_path<P: AsRef<Path>>(path: P) -> PathBuf {
-    let path = path.as_ref();
-    let new_ext = path.extension().map_or_else(
-        || BITCODE_EXTENSION.to_string(),
-        |e| {
-            format!(
-                "{}.{}",
-                e.to_str().expect("pure ASCII extension"),
-                BITCODE_EXTENSION
-            )
-        },
-    );
-    path.with_extension(new_ext)
 }
 
 /// Utility: Execute command
