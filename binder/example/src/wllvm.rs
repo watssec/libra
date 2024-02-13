@@ -7,12 +7,15 @@ use anyhow::{bail, Result};
 use libra_engine::flow::shared::Context;
 use log::debug;
 use petgraph::algo::toposort;
+use petgraph::dot::{Config, Dot};
 use petgraph::graph::DiGraph;
 use walkdir::WalkDir;
 
 use crate::proxy::{ClangArg, ClangInvocation, COMMAND_EXTENSION, LIBMARK_EXTENSION};
 
 static BITCODE_EXTENSION: &str = "bc";
+
+static COMPILE_GRAPH_DOT: &str = ".compile_graph.dot";
 
 enum SysLib {
     C,
@@ -501,7 +504,7 @@ impl Action {
 }
 
 /// Scan over the directory, collect build commands, and simulate the build to get bitcode files
-pub fn merge(path_src: &Path) -> Result<()> {
+pub fn merge(path_src: &Path, path_bin: &Path) -> Result<()> {
     // collect commands
     let mut actions = BTreeMap::new();
     for entry in WalkDir::new(path_src) {
@@ -583,6 +586,10 @@ pub fn merge(path_src: &Path) -> Result<()> {
         let action = actions.get(key).unwrap();
         action.invoke_for_wllvm()?;
     }
+
+    // plot the graph into a dot file
+    let dot = format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
+    fs::write(path_bin.join(COMPILE_GRAPH_DOT), dot)?;
 
     // done
     Ok(())
