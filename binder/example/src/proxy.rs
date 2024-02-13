@@ -25,8 +25,12 @@ pub enum ClangArg {
     Include(String),
     /// -isysroot <token>
     IncludeSysroot(String),
-    /// -Wp,-MD,<arg> | -Wp,-MD -Wp,<arg>
-    PrepMD(String),
+    /// -Wp,-MD
+    PrepMD,
+    /// -Wp,-MP
+    PrepMP,
+    /// -Wp,-MF
+    PrepMF(String),
     /// -O<level>
     Optimization(String),
     /// -arch <token>
@@ -43,11 +47,11 @@ pub enum ClangArg {
     LinkShared,
     /// -static | --static
     LinkStatic,
-    /// -Wl,-rpath,<token> | -Wl,-rpath -Wl,<token>
+    /// -Wl,-rpath,<token>
     LinkRpath(String),
-    /// -Wl,-soname,<token> | -Wl,-soname -Wl,<token>
+    /// -Wl,-soname,<token>
     LinkSoname(String),
-    /// -Wl,--version-script,<token> | -Wl,--version-script -Wl,<token>
+    /// -Wl,--version-script,<token>
     LinkVersionScript(String),
     /// -fPIC % -fno-PIC
     FlagPIC(bool),
@@ -103,13 +107,6 @@ impl ClangArg {
             "-isysroot" => {
                 return vec![Self::IncludeSysroot(Self::expect_next(stream))];
             }
-            "-Wp,-MD" => {
-                let next = Self::expect_next(stream);
-                match next.strip_prefix("-Wp,") {
-                    None => panic!("expect argument after -MD"),
-                    Some(inner) => return vec![Self::PrepMD(inner.to_string())],
-                }
-            }
             "-l" => {
                 return vec![Self::LibName(Self::expect_next(stream))];
             }
@@ -127,20 +124,6 @@ impl ClangArg {
             }
             "-static" | "--static" => {
                 return vec![Self::LinkStatic];
-            }
-            "-Wl,-rpath" => {
-                let next = Self::expect_next(stream);
-                match next.strip_prefix("-Wl,") {
-                    None => panic!("expect argument after -rpath"),
-                    Some(inner) => return vec![Self::LinkRpath(inner.to_string())],
-                }
-            }
-            "-Wl,-soname" => {
-                let next = Self::expect_next(stream);
-                match next.strip_prefix("-Wl,") {
-                    None => panic!("expect argument after -soname"),
-                    Some(inner) => return vec![Self::LinkSoname(inner.to_string())],
-                }
             }
             "-fPIC" => {
                 return vec![Self::FlagPIC(true)];
@@ -181,6 +164,37 @@ impl ClangArg {
             _ => (),
         }
 
+        // preprocessor
+        if let Some(inner) = token.strip_prefix("-Wp,") {
+            if inner.contains('"') || inner.contains('\'') {
+                panic!("unexpected quotation marks in {}", token);
+            }
+            let mut sub_iter = inner.split(",");
+
+            // sub-parser
+            let mut args = vec![];
+            while let Some(sub_token) = sub_iter.next() {
+                args.extend(Self::parse_preprocessor(sub_token, &mut sub_iter));
+            }
+            return args;
+        }
+
+        // linker
+        if let Some(inner) = token.strip_prefix("-Wl,") {
+            if inner.contains('"') || inner.contains('\'') {
+                panic!("unexpected quotation marks in {}", token);
+            }
+            let mut sub_iter = inner.split(",");
+
+            // sub-parser
+            let mut args = vec![];
+            while let Some(sub_token) = sub_iter.next() {
+                args.extend(Self::parse_linker(sub_token, &mut sub_iter));
+            }
+            return args;
+        }
+
+        // normal
         if let Some(inner) = token.strip_prefix("-std=") {
             return vec![Self::Standard(inner.to_string())];
         }
@@ -190,9 +204,6 @@ impl ClangArg {
         }
         if let Some(inner) = token.strip_prefix("-I") {
             return vec![Self::Include(inner.to_string())];
-        }
-        if let Some(inner) = token.strip_prefix("-Wp,-MD,") {
-            return vec![Self::PrepMD(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-O") {
             return vec![Self::Optimization(inner.to_string())];
@@ -205,15 +216,6 @@ impl ClangArg {
         }
         if let Some(inner) = token.strip_prefix("-L") {
             return vec![Self::LibPath(inner.to_string())];
-        }
-        if let Some(inner) = token.strip_prefix("-Wl,-rpath,") {
-            return vec![Self::LinkRpath(inner.to_string())];
-        }
-        if let Some(inner) = token.strip_prefix("-Wl,-soname,") {
-            return vec![Self::LinkSoname(inner.to_string())];
-        }
-        if let Some(inner) = token.strip_prefix("-Wl,--version-script,") {
-            return vec![Self::LinkVersionScript(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-W") {
             let (k, v) = Self::expect_maybe_key_value(inner);
@@ -228,6 +230,46 @@ impl ClangArg {
         }
 
         panic!("unknown Clang option: {}", token);
+    }
+
+    fn parse_preprocessor<'a, I>(token: &'a str, stream: &mut I) -> Vec<Self>
+    where
+        I: Iterator<Item = &'a str>,
+    {
+        match token {
+            "-MD" => {
+                return vec![Self::PrepMD];
+            }
+            "-MP" => {
+                return vec![Self::PrepMP];
+            }
+            "-MF" => {
+                return vec![Self::PrepMF(Self::expect_next(stream))];
+            }
+            _ => (),
+        }
+
+        panic!("unknown Clang option for preprocessor: {}", token);
+    }
+
+    fn parse_linker<'a, I>(token: &'a str, stream: &mut I) -> Vec<Self>
+    where
+        I: Iterator<Item = &'a str>,
+    {
+        match token {
+            "-rpath" => {
+                return vec![Self::LinkRpath(Self::expect_next(stream))];
+            }
+            "-soname" => {
+                return vec![Self::LinkSoname(Self::expect_next(stream))];
+            }
+            "--version-script" => {
+                return vec![Self::LinkVersionScript(Self::expect_next(stream))];
+            }
+            _ => (),
+        }
+
+        panic!("unknown Clang option for linker: {}", token);
     }
 
     fn expect_next<'a, I>(stream: &mut I) -> String
@@ -258,7 +300,9 @@ impl ClangArg {
             Self::Define(key, Some(val)) => vec![format!("-D{}={}", key, val)],
             Self::Include(val) => vec![format!("-I{}", val)],
             Self::IncludeSysroot(val) => vec!["-isysroot".into(), val.into()],
-            Self::PrepMD(val) => vec![format!("-Wp,-MD,{}", val)],
+            Self::PrepMD => vec!["-Wp,-MD".into()],
+            Self::PrepMP => vec!["-Wp,-MP".into()],
+            Self::PrepMF(val) => vec![format!("-Wp,-MF,{}", val)],
             Self::Optimization(val) => vec![format!("-O{}", val)],
             Self::Arch(val) => vec!["-arch".into(), val.into()],
             Self::MachineArch(val) => vec![format!("-march={}", val)],

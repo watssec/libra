@@ -447,7 +447,11 @@ impl Action {
                     cmd.args(option.as_args());
                 }
                 // ignored
-                ClangArg::Optimization(..) | ClangArg::PrepMD(..) | ClangArg::Print(..) => {}
+                ClangArg::Optimization(..)
+                | ClangArg::PrepMD
+                | ClangArg::PrepMP
+                | ClangArg::PrepMF(..)
+                | ClangArg::Print(..) => {}
                 // unexpected
                 ClangArg::ModeCompile
                 | ClangArg::LibName(..)
