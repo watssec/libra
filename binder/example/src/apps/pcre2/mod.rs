@@ -39,7 +39,7 @@ impl WorkflowConfig for Config {
         }
 
         // merge
-        wllvm::build_database(&path_src)?;
+        wllvm::merge(&path_src)?;
 
         Ok(())
     }

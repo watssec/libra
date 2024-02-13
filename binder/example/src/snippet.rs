@@ -132,14 +132,33 @@ pub fn mark_output_lib<P: AsRef<Path>, Q: AsRef<Path>>(
     let mut target = None;
     for entry in fs::read_dir(path_build)? {
         let entry = entry?;
-        if entry.file_name().into_string().map_or(false, |e| {
-            e.starts_with(&prefix) && e.ends_with(COMMAND_EXTENSION)
-        }) {
-            if target.is_some() {
-                bail!("more than one target to mark for {}", name);
+        let name = match entry.file_name().into_string() {
+            Ok(n) => n,
+            Err(_) => {
+                // not even ascii path
+                continue;
             }
-            target = Some(entry.path());
+        };
+        if !name.starts_with(&prefix) {
+            continue;
         }
+
+        let original = match name.strip_suffix(COMMAND_EXTENSION) {
+            None => {
+                // does not bear a build instruction
+                continue;
+            }
+            Some(base) => base,
+        };
+
+        // found the target
+        if target.is_some() {
+            bail!("more than one target to mark for {}", name);
+        }
+
+        let mut path = entry.path();
+        path.pop();
+        target = Some(path.join(original));
     }
     let src = match target {
         None => bail!("no target to mark for {}", name),

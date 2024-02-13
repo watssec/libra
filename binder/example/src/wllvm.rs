@@ -20,6 +20,7 @@ enum SysLib {
     POSIXThread,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 enum CommonExtensions {
     C,
     CPP,
@@ -239,8 +240,10 @@ impl Action {
                                 bail!("more than one candidate found for library {}", name);
                             }
                             found = true;
-                            // TODO: deref the mark
-                            libs_usr.push(entry.path());
+                            libs_usr.push(
+                                // canonicalize dereferences the mark which is a symbolic link
+                                entry.path().canonicalize()?,
+                            );
                         }
                     }
                 }
@@ -434,12 +437,10 @@ impl Action {
             }
             Self::Link {
                 inputs,
-                libs: _,
+                libs,
                 output: _,
                 invocation: _,
             } => {
-                // TODO: handle libs
-
                 // env
                 let executable = ctxt
                     .path_llvm(["bin", "llvm-link"])
@@ -455,6 +456,9 @@ impl Action {
                 for input in inputs {
                     cmd.arg(derive_bitcode_path(input));
                 }
+                for lib in &libs.usr {
+                    cmd.arg(derive_bitcode_path(lib));
+                }
 
                 // invoke the command
                 run_for_success(cmd)?;
@@ -465,8 +469,8 @@ impl Action {
     }
 }
 
-/// Scan over the directory and collect build commands
-pub fn build_database(path_src: &Path) -> Result<()> {
+/// Scan over the directory, collect build commands, and simulate the build to get bitcode files
+pub fn merge(path_src: &Path) -> Result<()> {
     // collect commands
     let mut actions = BTreeMap::new();
     for entry in WalkDir::new(path_src) {
