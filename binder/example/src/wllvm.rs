@@ -541,12 +541,28 @@ pub fn merge(path_src: &Path) -> Result<()> {
     // add edges
     for (key, val) in &actions {
         let dst = *nodes.get(key).unwrap();
+
+        // input dependencies
         match val {
             Action::Compile { .. } | Action::CompileAndLink { .. } => (),
             Action::Link { inputs, .. } => {
                 for item in inputs {
                     let src = match nodes.get(item) {
                         None => bail!("linker input does not exist: {}", item.to_string_lossy()),
+                        Some(idx) => *idx,
+                    };
+                    graph.add_edge(src, dst, ());
+                }
+            }
+        }
+
+        // library dependencies
+        match val {
+            Action::Compile { .. } => (),
+            Action::Link { libs, .. } | Action::CompileAndLink { libs, .. } => {
+                for item in &libs.usr {
+                    let src = match nodes.get(item) {
+                        None => continue,
                         Some(idx) => *idx,
                     };
                     graph.add_edge(src, dst, ());
