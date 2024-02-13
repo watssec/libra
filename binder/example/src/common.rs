@@ -5,9 +5,11 @@ use anyhow::{anyhow, bail, Result};
 use lazy_static::lazy_static;
 use log::info;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use libra_shared::config::PATH_STUDIO;
+
+use crate::{snippet, wllvm};
 
 lazy_static! {
     static ref FORCE: bool = matches!(env::var("FORCE"), Ok(val) if val == "1");
@@ -32,13 +34,70 @@ lazy_static! {
     };
 }
 
+/// Details for a library artifact
+#[derive(Serialize, Deserialize)]
+pub struct ArtifactLib {
+    item_in_src: Vec<String>,
+    item_in_bin: Vec<String>,
+}
+
+/// Details for a binary artifact
+#[derive(Serialize, Deserialize)]
+pub struct ArtifactBin {
+    item_in_src: Vec<String>,
+}
+
 /// Common trait for workflow config
 pub trait WorkflowConfig: Serialize + DeserializeOwned {
     /// Obtain the application name
     fn app() -> &'static str;
 
+    /// List library artifacts
+    fn artifact_libs(&self) -> impl Iterator<Item = (&str, &ArtifactLib)>;
+
+    /// List binary artifacts
+    fn artifact_bins(&self) -> impl Iterator<Item = (&str, &ArtifactBin)>;
+
+    /// Build process
+    fn build(&self, path_src: &Path, path_bin: &Path) -> Result<bool>;
+
+    /// Check process
+    fn check(&self, path_src: &Path, path_bin: &Path) -> Result<()> {
+        // libraries
+        for (name, details) in self.artifact_libs() {
+            let mut path_install = path_bin.to_path_buf();
+            path_install.extend(details.item_in_bin.iter());
+            let mut path_build = path_src.to_path_buf();
+            path_build.extend(details.item_in_src.iter());
+
+            snippet::mark_artifact_lib(name, &path_install, &path_build)?;
+        }
+
+        // binaries
+        for (name, details) in self.artifact_bins() {
+            let mut path_build = path_src.to_path_buf();
+            path_build.extend(details.item_in_src.iter());
+
+            snippet::check_artifact_bin(name, &path_build)?;
+        }
+
+        // done
+        Ok(())
+    }
+
     /// Execute the profile
-    fn run(self, workdir: &Path) -> Result<()>;
+    fn run(self, workdir: &Path) -> Result<()> {
+        let path_src = workdir.join("src");
+        let path_bin = workdir.join("bin");
+
+        let rebuild = self.build(&path_src, &path_bin)?;
+        if rebuild {
+            self.check(&path_src, &path_bin)?;
+            wllvm::merge(&path_src, &path_bin)?;
+        }
+
+        Ok(())
+    }
 }
 
 /// Run the workflows based on defined config files

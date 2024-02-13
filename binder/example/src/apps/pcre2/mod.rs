@@ -1,46 +1,43 @@
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::common::WorkflowConfig;
+use crate::common::{ArtifactBin, ArtifactLib, WorkflowConfig};
 use crate::snippet;
-use crate::snippet::mark_output_lib;
-use crate::wllvm;
 
 /// Workflow configuration
 #[derive(Serialize, Deserialize)]
-pub struct Config {}
+pub struct Config {
+    libs: BTreeMap<String, ArtifactLib>,
+    bins: BTreeMap<String, ArtifactBin>,
+}
 
 impl WorkflowConfig for Config {
     fn app() -> &'static str {
         "pcre2"
     }
 
-    fn run(self, workdir: &Path) -> Result<()> {
-        let path_src = workdir.join("src");
-        let path_bin = workdir.join("bin");
+    fn artifact_libs(&self) -> impl Iterator<Item = (&str, &ArtifactLib)> {
+        self.libs.iter().map(|(k, v)| (k.as_str(), v))
+    }
 
-        // build
+    fn artifact_bins(&self) -> impl Iterator<Item = (&str, &ArtifactBin)> {
+        self.bins.iter().map(|(k, v)| (k.as_str(), v))
+    }
+
+    fn build(&self, path_src: &Path, path_bin: &Path) -> Result<bool> {
         let mut rebuild = false;
+
+        // prep
         rebuild = snippet::git_clone(
             &path_src,
             "https://github.com/PCRE2Project/pcre2.git",
             rebuild,
         )?;
-        rebuild = snippet::build_via_autoconf(&path_src, &path_bin, Some(&[]), &[], rebuild)?;
 
-        // check
-        if rebuild {
-            let path_lib_build = path_src.join(".libs");
-            let path_lib_install = path_bin.join("lib");
-            mark_output_lib("pcre2-8", &path_lib_install, &path_lib_build)?;
-            mark_output_lib("pcre2-posix", &path_lib_install, &path_lib_build)?;
-        }
-
-        // merge
-        wllvm::merge(&path_src, &path_bin)?;
-
-        Ok(())
+        // build
+        snippet::build_via_autoconf(&path_src, &path_bin, Some(&[]), &[], rebuild)
     }
 }

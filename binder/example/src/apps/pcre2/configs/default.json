@@ -1,1 +1,17 @@
-{}
+{
+  "libs": {
+    "pcre2-8": {
+      "item_in_bin": "lib",
+      "item_in_src": ".libs"
+    },
+    "pcre2-posix": {
+      "item_in_bin": "lib",
+      "item_in_src": ".libs"
+    }
+  },
+  "bins": {
+    "pcre2grep": {
+      "item_in_src": ".libs"
+    }
+  }
+}

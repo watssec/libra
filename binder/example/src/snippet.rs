@@ -120,8 +120,8 @@ pub fn build_via_autoconf(
     Ok(rebuild)
 }
 
-/// Mark output library
-pub fn mark_output_lib<P: AsRef<Path>, Q: AsRef<Path>>(
+/// Mark a library artifact
+pub fn mark_artifact_lib<P: AsRef<Path>, Q: AsRef<Path>>(
     name: &str,
     path_install: P,
     path_build: Q,
@@ -151,9 +151,9 @@ pub fn mark_output_lib<P: AsRef<Path>, Q: AsRef<Path>>(
             Some(base) => base,
         };
 
-        // found the target
+        // target found
         if target.is_some() {
-            bail!("more than one target to mark for {}", name);
+            bail!("more than one library target for {}", name);
         }
 
         let mut path = entry.path();
@@ -161,7 +161,7 @@ pub fn mark_output_lib<P: AsRef<Path>, Q: AsRef<Path>>(
         target = Some(path.join(original));
     }
     let src = match target {
-        None => bail!("no target to mark for {}", name),
+        None => bail!("no target to mark for library {}", name),
         Some(path) => path,
     };
 
@@ -170,5 +170,35 @@ pub fn mark_output_lib<P: AsRef<Path>, Q: AsRef<Path>>(
         .as_ref()
         .join(format!("lib{}{}", name, LIBMARK_EXTENSION));
     symlink(src, dst)?;
+
+    // done
+    Ok(())
+}
+
+/// Check that a binary artifact exists
+pub fn check_artifact_bin<P: AsRef<Path>>(name: &str, path_build: P) -> Result<()> {
+    let command_file = format!("{}{}", name, COMMAND_EXTENSION);
+
+    // find the target
+    let mut found = false;
+    for entry in fs::read_dir(path_build)? {
+        let entry = entry?;
+        if entry
+            .file_name()
+            .into_string()
+            .map_or(false, |n| n == command_file)
+        {
+            // target found
+            if found {
+                bail!("more than one binary target for {}", name);
+            }
+            found = true;
+        }
+    }
+    if !found {
+        bail!("binary artifact does not exist {}", name);
+    }
+
+    // done
     Ok(())
 }
