@@ -360,8 +360,6 @@ impl Action {
 
     /// Invoke the build action for whole-program LLVM
     pub fn invoke_for_wllvm(&self) -> Result<()> {
-        let ctxt = Context::new().expect("LLVM context");
-
         // unpack
         let output = self.output();
         debug!("[wllvm] processing: {}", output.to_string_lossy());
@@ -380,60 +378,7 @@ impl Action {
                 output: _,
                 invocation: _,
             } => {
-                // env
-                let name = if *cxx { "clang++" } else { "clang" };
-                let executable = ctxt.path_llvm(["bin", name]).expect("ascii path only");
-                let mut cmd = Command::new(executable);
-                cmd.current_dir(cwd);
-
-                // header
-                cmd.arg("-c").arg("-emit-llvm");
-
-                // arguments
-                for option in args {
-                    match option {
-                        // pass through
-                        ClangArg::Standard(..)
-                        | ClangArg::Define(..)
-                        | ClangArg::Include(..)
-                        | ClangArg::IncludeSysroot(..)
-                        | ClangArg::Arch(..)
-                        | ClangArg::MachineArch(..)
-                        | ClangArg::Debug
-                        | ClangArg::FlagPIC(..)
-                        | ClangArg::FlagPIE(..)
-                        | ClangArg::FlagRTTI(..)
-                        | ClangArg::FlagExceptions(..)
-                        | ClangArg::Warning(..)
-                        | ClangArg::NoWarnings
-                        | ClangArg::Pedantic
-                        | ClangArg::POSIXThread => {
-                            cmd.args(option.as_args());
-                        }
-                        // ignored
-                        ClangArg::Optimization(..) | ClangArg::PrepMD(..) | ClangArg::Print(..) => {
-                        }
-                        // unexpected
-                        ClangArg::ModeCompile
-                        | ClangArg::LibName(..)
-                        | ClangArg::LibPath(..)
-                        | ClangArg::LinkShared
-                        | ClangArg::LinkStatic
-                        | ClangArg::LinkRpath(..)
-                        | ClangArg::LinkSoname(..)
-                        | ClangArg::Output(..)
-                        | ClangArg::Input(..) => {
-                            bail!("unexpected {} option: {}", name, option)
-                        }
-                    }
-                }
-
-                // input and output
-                cmd.arg("-o").arg(bitcode_output);
-                cmd.arg(input);
-
-                // invoke the command
-                run_for_success(cmd)?;
+                Self::invoke_compiler(cwd, *cxx, args, input, &bitcode_output)?;
             }
             Self::Link {
                 inputs,
@@ -441,31 +386,117 @@ impl Action {
                 output: _,
                 invocation: _,
             } => {
-                // env
-                let executable = ctxt
-                    .path_llvm(["bin", "llvm-link"])
-                    .expect("ascii path only");
-                let mut cmd = Command::new(executable);
-                cmd.current_dir(cwd);
-
-                // header
-                cmd.arg("--only-needed").arg("--disable-lazy-loading");
-
-                // input and output
-                cmd.arg("-o").arg(bitcode_output);
-                for input in inputs {
-                    cmd.arg(derive_bitcode_path(input));
-                }
-                for lib in &libs.usr {
-                    cmd.arg(derive_bitcode_path(lib));
-                }
-
-                // invoke the command
-                run_for_success(cmd)?;
+                Self::invoke_linker(cwd, inputs, libs, &bitcode_output)?;
             }
-            Self::CompileAndLink { .. } => todo!(),
+            Self::CompileAndLink {
+                input,
+                libs,
+                output: _,
+                invocation: _,
+            } => {
+                let bitcode_temp = derive_bitcode_path(&bitcode_output);
+                Self::invoke_compiler(cwd, *cxx, args, input, &bitcode_temp)?;
+                Self::invoke_linker(cwd, &[&bitcode_output], libs, &bitcode_output)?;
+            }
         }
         Ok(())
+    }
+
+    /// Invoke compiler
+    fn invoke_compiler(
+        cwd: &Path,
+        cxx: bool,
+        args: &[ClangArg],
+        input: &Path,
+        output: &Path,
+    ) -> Result<()> {
+        let ctxt = Context::new().expect("LLVM context");
+
+        // env
+        let name = if cxx { "clang++" } else { "clang" };
+        let executable = ctxt.path_llvm(["bin", name]).expect("ascii path only");
+        let mut cmd = Command::new(executable);
+        cmd.current_dir(cwd);
+
+        // header
+        cmd.arg("-c").arg("-emit-llvm");
+
+        // arguments
+        for option in args {
+            match option {
+                // pass through
+                ClangArg::Standard(..)
+                | ClangArg::Define(..)
+                | ClangArg::Include(..)
+                | ClangArg::IncludeSysroot(..)
+                | ClangArg::Arch(..)
+                | ClangArg::MachineArch(..)
+                | ClangArg::Debug
+                | ClangArg::FlagPIC(..)
+                | ClangArg::FlagPIE(..)
+                | ClangArg::FlagRTTI(..)
+                | ClangArg::FlagExceptions(..)
+                | ClangArg::Warning(..)
+                | ClangArg::NoWarnings
+                | ClangArg::Pedantic
+                | ClangArg::POSIXThread => {
+                    cmd.args(option.as_args());
+                }
+                // ignored
+                ClangArg::Optimization(..) | ClangArg::PrepMD(..) | ClangArg::Print(..) => {}
+                // unexpected
+                ClangArg::ModeCompile
+                | ClangArg::LibName(..)
+                | ClangArg::LibPath(..)
+                | ClangArg::LinkShared
+                | ClangArg::LinkStatic
+                | ClangArg::LinkRpath(..)
+                | ClangArg::LinkSoname(..)
+                | ClangArg::Output(..)
+                | ClangArg::Input(..) => {
+                    bail!("unexpected {} option: {}", name, option)
+                }
+            }
+        }
+
+        // input and output
+        cmd.arg("-o").arg(output);
+        cmd.arg(input);
+
+        // invoke the command
+        run_for_success(cmd)
+    }
+
+    /// Invoke linker
+    fn invoke_linker<P: AsRef<Path>>(
+        cwd: &Path,
+        inputs: &[P],
+        libs: &Libraries,
+        output: &Path,
+    ) -> Result<()> {
+        let ctxt = Context::new().expect("LLVM context");
+
+        // env
+        let executable = ctxt
+            .path_llvm(["bin", "llvm-link"])
+            .expect("ascii path only");
+        let mut cmd = Command::new(executable);
+        cmd.current_dir(cwd);
+
+        // header
+        cmd.arg("--only-needed").arg("--disable-lazy-loading");
+
+        // input and output
+        cmd.arg("-o").arg(output);
+        for input in inputs {
+            cmd.arg(derive_bitcode_path(input));
+        }
+        for lib in &libs.usr {
+            cmd.arg(derive_bitcode_path(lib));
+        }
+
+        // invoke the command
+        run_for_success(cmd)
     }
 }
 
