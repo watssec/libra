@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
+use walkdir::WalkDir;
 
 use crate::common::{CLANG_CPP_WRAP, CLANG_WRAP};
 use crate::proxy::{COMMAND_EXTENSION, LIBMARK_EXTENSION};
@@ -68,6 +69,23 @@ pub fn build_via_autoconf(
     .current_dir(path_src);
     if !cmd.status()?.success() {
         bail!("unable to configure");
+    }
+
+    // clear out command line arguments before actual build
+    let mut command_files = vec![];
+    for entry in WalkDir::new(path_src) {
+        let entry = entry?;
+        let path = entry.path();
+        if path
+            .file_name()
+            .and_then(|e| e.to_str())
+            .map_or(false, |e| e.ends_with(COMMAND_EXTENSION))
+        {
+            command_files.push(path.to_path_buf());
+        }
+    }
+    for path in command_files {
+        fs::remove_file(path)?;
     }
 
     // make
