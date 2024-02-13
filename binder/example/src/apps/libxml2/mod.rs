@@ -3,36 +3,31 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::common::WorkflowConfig;
+use crate::common::AppConfig;
 use crate::snippet;
 
 /// Workflow configuration
 #[derive(Serialize, Deserialize)]
 pub struct Config {}
 
-impl WorkflowConfig for Config {
+impl AppConfig for Config {
     fn app() -> &'static str {
         "libxml2"
     }
 
-    fn run(self, workdir: &Path) -> Result<()> {
-        let path_src = workdir.join("src");
-        let path_bin = workdir.join("bin");
-
+    fn build(&self, path_src: &Path, path_bin: &Path) -> Result<bool> {
         let mut rebuild = false;
         rebuild = snippet::git_clone(
-            &path_src,
+            path_src,
             "https://gitlab.gnome.org/GNOME/libxml2.git",
             rebuild,
         )?;
         snippet::build_via_autoconf(
-            &path_src,
-            &path_bin,
+            path_src,
+            path_bin,
             Some(&[]),
             &["--without-python"],
             rebuild,
-        )?;
-
-        Ok(())
+        )
     }
 }

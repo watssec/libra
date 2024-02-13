@@ -13,5 +13,6 @@
     "pcre2grep": {
       "item_in_src": ".libs"
     }
-  }
+  },
+  "config": {}
 }

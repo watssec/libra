@@ -51,6 +51,7 @@ impl CommonExtensions {
 
 #[derive(Default)]
 struct Libraries {
+    #[allow(dead_code)]
     sys: Vec<SysLib>,
     usr: Vec<PathBuf>,
 }

@@ -3,7 +3,7 @@ use structopt::StructOpt;
 
 use libra_shared::config::initialize;
 
-use crate::common::execute;
+use crate::workflow::execute;
 
 pub mod proxy;
 
@@ -11,6 +11,7 @@ mod apps;
 mod common;
 mod snippet;
 mod wllvm;
+mod workflow;
 
 #[derive(StructOpt)]
 enum Example {
