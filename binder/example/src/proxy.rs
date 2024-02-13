@@ -80,151 +80,151 @@ impl ClangArg {
     {
         let mut args = vec![];
         while let Some(token) = iter.next() {
-            args.push(Self::parse(token, &mut iter));
+            args.extend(Self::parse(token, &mut iter));
         }
         args
     }
 
-    fn parse<'a, I>(token: &'a str, stream: &mut I) -> Self
+    fn parse<'a, I>(token: &'a str, stream: &mut I) -> Vec<Self>
     where
         I: Iterator<Item = &'a str>,
     {
         if !token.starts_with('-') {
-            return Self::Input(token.to_string());
+            return vec![Self::Input(token.to_string())];
         }
 
         match token {
             "-c" => {
-                return Self::ModeCompile;
+                return vec![Self::ModeCompile];
             }
             "-I" => {
-                return Self::Include(Self::expect_next(stream));
+                return vec![Self::Include(Self::expect_next(stream))];
             }
             "-isysroot" => {
-                return Self::IncludeSysroot(Self::expect_next(stream));
+                return vec![Self::IncludeSysroot(Self::expect_next(stream))];
             }
             "-Wp,-MD" => {
                 let next = Self::expect_next(stream);
                 match next.strip_prefix("-Wp,") {
                     None => panic!("expect argument after -MD"),
-                    Some(inner) => return Self::PrepMD(inner.to_string()),
+                    Some(inner) => return vec![Self::PrepMD(inner.to_string())],
                 }
             }
             "-l" => {
-                return Self::LibName(Self::expect_next(stream));
+                return vec![Self::LibName(Self::expect_next(stream))];
             }
             "-L" => {
-                return Self::LibPath(Self::expect_next(stream));
+                return vec![Self::LibPath(Self::expect_next(stream))];
             }
             "-arch" => {
-                return Self::Arch(Self::expect_next(stream));
+                return vec![Self::Arch(Self::expect_next(stream))];
             }
             "-g" | "--debug" => {
-                return Self::Debug;
+                return vec![Self::Debug];
             }
             "-shared" | "--shared" => {
-                return Self::LinkShared;
+                return vec![Self::LinkShared];
             }
             "-static" | "--static" => {
-                return Self::LinkStatic;
+                return vec![Self::LinkStatic];
             }
             "-Wl,-rpath" => {
                 let next = Self::expect_next(stream);
                 match next.strip_prefix("-Wl,") {
                     None => panic!("expect argument after -rpath"),
-                    Some(inner) => return Self::LinkRpath(inner.to_string()),
+                    Some(inner) => return vec![Self::LinkRpath(inner.to_string())],
                 }
             }
             "-Wl,-soname" => {
                 let next = Self::expect_next(stream);
                 match next.strip_prefix("-Wl,") {
                     None => panic!("expect argument after -soname"),
-                    Some(inner) => return Self::LinkSoname(inner.to_string()),
+                    Some(inner) => return vec![Self::LinkSoname(inner.to_string())],
                 }
             }
             "-fPIC" => {
-                return Self::FlagPIC(true);
+                return vec![Self::FlagPIC(true)];
             }
             "-fno-PIC" => {
-                return Self::FlagPIC(false);
+                return vec![Self::FlagPIC(false)];
             }
             "-fPIE" => {
-                return Self::FlagPIE(true);
+                return vec![Self::FlagPIE(true)];
             }
             "-fno-PIE" => {
-                return Self::FlagPIE(false);
+                return vec![Self::FlagPIE(false)];
             }
             "-frtti" => {
-                return Self::FlagRTTI(true);
+                return vec![Self::FlagRTTI(true)];
             }
             "-fno-rtti" => {
-                return Self::FlagRTTI(false);
+                return vec![Self::FlagRTTI(false)];
             }
             "-fexceptions" => {
-                return Self::FlagExceptions(true);
+                return vec![Self::FlagExceptions(true)];
             }
             "-fno-exceptions" => {
-                return Self::FlagExceptions(false);
+                return vec![Self::FlagExceptions(false)];
             }
             "-w" | "--no-warnings" => {
-                return Self::NoWarnings;
+                return vec![Self::NoWarnings];
             }
             "-pedantic" => {
-                return Self::Pedantic;
+                return vec![Self::Pedantic];
             }
             "-pthread" => {
-                return Self::POSIXThread;
+                return vec![Self::POSIXThread];
             }
             "-o" => {
-                return Self::Output(Self::expect_next(stream));
+                return vec![Self::Output(Self::expect_next(stream))];
             }
             _ => (),
         }
 
         if let Some(inner) = token.strip_prefix("-std=") {
-            return Self::Standard(inner.to_string());
+            return vec![Self::Standard(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-D") {
             let (k, v) = Self::expect_maybe_key_value(inner);
-            return Self::Define(k, v);
+            return vec![Self::Define(k, v)];
         }
         if let Some(inner) = token.strip_prefix("-I") {
-            return Self::Include(inner.to_string());
+            return vec![Self::Include(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-Wp,-MD,") {
-            return Self::PrepMD(inner.to_string());
+            return vec![Self::PrepMD(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-O") {
-            return Self::Optimization(inner.to_string());
+            return vec![Self::Optimization(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-march=") {
-            return Self::MachineArch(inner.to_string());
+            return vec![Self::MachineArch(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-l") {
-            return Self::LibName(inner.to_string());
+            return vec![Self::LibName(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-L") {
-            return Self::LibPath(inner.to_string());
+            return vec![Self::LibPath(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-Wl,-rpath,") {
-            return Self::LinkRpath(inner.to_string());
+            return vec![Self::LinkRpath(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-Wl,-soname,") {
-            return Self::LinkSoname(inner.to_string());
+            return vec![Self::LinkSoname(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-Wl,--version-script,") {
-            return Self::LinkVersionScript(inner.to_string());
+            return vec![Self::LinkVersionScript(inner.to_string())];
         }
         if let Some(inner) = token.strip_prefix("-W") {
             let (k, v) = Self::expect_maybe_key_value(inner);
-            return Self::Warning(k, v);
+            return vec![Self::Warning(k, v)];
         }
         if let Some(inner) = token
             .strip_prefix("-print-")
             .or_else(|| token.strip_prefix("--print-"))
         {
             let (k, v) = Self::expect_maybe_key_value(inner);
-            return Self::Print(k, v);
+            return vec![Self::Print(k, v)];
         }
 
         panic!("unknown Clang option: {}", token);
