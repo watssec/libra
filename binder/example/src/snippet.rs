@@ -62,7 +62,6 @@ pub fn build_via_autoconf(
         "--prefix={}",
         path_bin.to_str().ok_or_else(|| anyhow!("non-ascii path"))?
     ))
-    .arg("--disable-silent-rules")
     .args(args_configure)
     .env("CC", CLANG_WRAP.as_str())
     .env("CXX", CLANG_CPP_WRAP.as_str())

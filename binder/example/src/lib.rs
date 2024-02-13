@@ -18,6 +18,7 @@ enum Example {
     ApacheHttpd,
     LibXML2,
     PCRE2,
+    ZLib,
 }
 
 #[derive(StructOpt)]
@@ -44,5 +45,6 @@ pub fn entrypoint() -> Result<()> {
         Example::ApacheHttpd => execute::<apps::apache_httpd::Config>(),
         Example::LibXML2 => execute::<apps::libxml2::Config>(),
         Example::PCRE2 => execute::<apps::pcre2::Config>(),
+        Example::ZLib => execute::<apps::zlib::Config>(),
     }
 }

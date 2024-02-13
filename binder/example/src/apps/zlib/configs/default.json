@@ -1,0 +1,15 @@
+{
+  "config": {},
+  "libs": {
+    "z": {
+      "item_in_bin": "lib",
+      "item_in_src": "."
+    }
+  },
+  "bins": {},
+  "entry": {
+    "kind": "lib",
+    "name": "z",
+    "function": ""
+  }
+}
