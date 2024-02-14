@@ -523,6 +523,8 @@ pub fn merge(path_src: &Path, path_bin: &Path) -> Result<()> {
         {
             let content = fs::read_to_string(path)?;
             let invocation: ClangInvocation = serde_json::from_str(&content)?;
+            debug!("[wllvm] parsing invocation {}", invocation);
+
             let action = Action::parse(invocation)?;
             let exists = actions.insert(action.output().to_path_buf(), action);
             match exists {

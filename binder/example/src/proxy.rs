@@ -349,6 +349,17 @@ pub struct ClangInvocation {
     pub args: Vec<ClangArg>,
 }
 
+impl fmt::Display for ClangInvocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let name = if self.cxx { "clang++" } else { "clang" };
+        let mut all_args = vec![];
+        for arg in &self.args {
+            all_args.extend(arg.as_args());
+        }
+        write!(f, "{} {}", name, all_args.join(" "))
+    }
+}
+
 /// Wrap a clang tool
 pub fn proxy_clang(cxx: bool) {
     // get paths
