@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, Result};
+use libra_shared::config::PROJECT;
 
 use libra_shared::dep::{DepState, Dependency, Resolver};
 use libra_shared::git::GitRepo;
@@ -10,26 +11,8 @@ use libra_shared::git::GitRepo;
 // path constants
 static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
 
-/// Get baseline cmake command
-fn baseline_cmake_options() -> Vec<String> {
-    vec![
-        "-DCMAKE_BUILD_TYPE=Debug".into(),
-        "-DBUILD_SHARED_LIBS=ON".into(),
-        format!(
-            "-DLLVM_ENABLE_PROJECTS={}",
-            ["clang", "clang-tools-extra", "libc", "lld", "lldb", "polly",].join(";")
-        ),
-        format!(
-            "-DLLVM_ENABLE_RUNTIMES={}",
-            ["compiler-rt", "libcxx", "libcxxabi", "libunwind"].join(";")
-        ),
-        "-DLLVM_ENABLE_RTTI=ON".into(),
-        "-DLLVM_ENABLE_LLD=ON".into(),
-        "-DLLVM_ENABLE_LIBCXX=ON".into(),
-        "-DLIBC_ENABLE_USE_BY_CLANG=ON".into(),
-        "-DCLANG_DEFAULT_CXX_STDLIB=libc++".into(),
-    ]
-}
+// default cmake cache to use
+static CMAKE_CACHE: &str = include_str!("llvm.cmake");
 
 /// Artifact path resolver for LLVM
 pub struct ResolverLLVM {
@@ -78,9 +61,15 @@ impl Dependency<ResolverLLVM> for DepLLVM {
     }
 
     fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {
+        // dump the cmake cache
+        let path_cmake_cache = path_src.join(format!("{}.cmake", PROJECT));
+        fs::write(&path_cmake_cache, CMAKE_CACHE)?;
+
+        // cmake list options against the cache
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
-            .args(baseline_cmake_options())
+            .arg("-C")
+            .arg(path_cmake_cache)
             .arg(path_src.join("llvm"))
             .current_dir(path_config);
         let status = cmd.status()?;
@@ -91,12 +80,17 @@ impl Dependency<ResolverLLVM> for DepLLVM {
     }
 
     fn build(path_src: &Path, resolver: &ResolverLLVM) -> Result<()> {
+        // dump the cmake cache
+        let path_cmake_cache = path_src.join(format!("{}.cmake", PROJECT));
+        fs::write(&path_cmake_cache, CMAKE_CACHE)?;
+
         // config
         fs::create_dir(&resolver.path_build)?;
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
-            .args(baseline_cmake_options())
+            .arg("-C")
+            .arg(path_cmake_cache)
             .arg(path_src.join("llvm"))
             .current_dir(&resolver.path_build);
         let status = cmd.status()?;
@@ -106,7 +100,10 @@ impl Dependency<ResolverLLVM> for DepLLVM {
 
         // build
         let mut cmd = Command::new("cmake");
-        cmd.arg("--build").arg(&resolver.path_build);
+        cmd.arg("--build")
+            .arg(&resolver.path_build)
+            .arg("--target")
+            .arg("stage3");
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Build failed"));
@@ -119,7 +116,9 @@ impl Dependency<ResolverLLVM> for DepLLVM {
         cmd.arg("--install")
             .arg(&resolver.path_build)
             .arg("--prefix")
-            .arg(&resolver.path_install);
+            .arg(&resolver.path_install)
+            .arg("--target")
+            .arg("stage3-install");
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Install failed"));
