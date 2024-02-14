@@ -69,13 +69,16 @@ impl Dependency<ResolverLLVM> for DepLLVM {
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
             .arg("-C")
-            .arg(path_cmake_cache)
+            .arg(&path_cmake_cache)
             .arg(path_src.join("llvm"))
             .current_dir(path_config);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
         }
+
+        // clean up the cmake cache
+        fs::remove_file(path_cmake_cache)?;
         Ok(())
     }
 
@@ -90,7 +93,7 @@ impl Dependency<ResolverLLVM> for DepLLVM {
         cmd.arg("-G")
             .arg("Ninja")
             .arg("-C")
-            .arg(path_cmake_cache)
+            .arg(&path_cmake_cache)
             .arg(path_src.join("llvm"))
             .current_dir(&resolver.path_build);
         let status = cmd.status()?;
@@ -124,7 +127,8 @@ impl Dependency<ResolverLLVM> for DepLLVM {
             return Err(anyhow!("Install failed"));
         }
 
-        // done
+        // clean up the cmake cache
+        fs::remove_file(path_cmake_cache)?;
         Ok(())
     }
 }
