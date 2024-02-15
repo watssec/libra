@@ -13,7 +13,7 @@ RUN apt-get install -y \
     git subversion curl python3 \
     flex bison bc cpio \
     pkg-config m4 libtool libtool-bin \
-    libncurses-dev libssl-dev libelf-dev
+    libstdc++-12-dev libncurses-dev libssl-dev libelf-dev
 
 # install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh
