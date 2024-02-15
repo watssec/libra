@@ -18,7 +18,7 @@ set(CLANG_BOOTSTRAP_TARGETS
     stage3-install CACHE STRING "")
 
 # Stage 1: build core with system cc
-#          the new clang will have -flto=<?> support
+#          the new clang will have -flto support
 set(STAGE1_PROJECTS "clang;lld")
 set(STAGE1_RUNTIMES "")
 
@@ -35,7 +35,7 @@ set(BOOTSTRAP_CLANG_BOOTSTRAP_TARGETS
     check-clang CACHE STRING "")
 
 # Stage 2: build core with stage1-clang -flto=thin
-#          the new clang will have -flto=<?> support
+#          the new clang will have -flto support
 set(STAGE2_PROJECTS "clang;lld")
 set(STAGE2_RUNTIMES "")
 
@@ -45,8 +45,8 @@ set(BOOTSTRAP_LLVM_ENABLE_RUNTIMES ${STAGE2_RUNTIMES} CACHE STRING "")
 set(BOOTSTRAP_LLVM_ENABLE_LLD ON CACHE BOOL "")
 set(BOOTSTRAP_LLVM_ENABLE_LTO "Thin" CACHE STRING "")
 
-# Stage 3: build llvm with stage2-clang -flto=full
-#          the new clang will have -flto=<?> and -stdlib=libc++ support
+# Stage 3: build llvm with stage2-clang -flto=thin
+#          the new clang will have -flto and -stdlib=libc++ support
 set(STAGE3_PROJECTS "clang;clang-tools-extra;lld;lldb;polly;libc")
 set(STAGE3_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind")
 
@@ -54,5 +54,5 @@ set(BOOTSTRAP_BOOTSTRAP_LLVM_TARGETS_TO_BUILD Native CACHE STRING "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_PROJECTS ${STAGE3_PROJECTS} CACHE STRING "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_RUNTIMES ${STAGE3_RUNTIMES} CACHE STRING "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_LLD ON CACHE BOOL "")
-set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_LTO "Full" CACHE STRING "")
+set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_LTO "Thin" CACHE STRING "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_RTTI ON CACHE BOOL "")
