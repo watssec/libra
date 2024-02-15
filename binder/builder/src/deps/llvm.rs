@@ -105,6 +105,8 @@ impl Dependency<ResolverLLVM> for DepLLVM {
         let mut cmd = Command::new("cmake");
         cmd.arg("--build")
             .arg(&resolver.path_build)
+            .arg("--parallel")
+            .arg("1")
             .arg("--target")
             .arg("stage3");
         let status = cmd.status()?;
