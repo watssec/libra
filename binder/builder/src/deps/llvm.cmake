@@ -17,10 +17,10 @@ set(CLANG_BOOTSTRAP_TARGETS
     stage3-test-suite
     stage3-install CACHE STRING "")
 
-# Stage 1: build clang with system cc
-#          the new clang has -fuse-ld=* option
-set(STAGE1_PROJECTS "clang")
-set(STAGE1_RUNTIMES "")
+# Stage 1: build core with system cc
+#          the new clang will have -flto=<?> -stdlib=libc++ support
+set(STAGE1_PROJECTS "clang;lld")
+set(STAGE1_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind")
 
 set(LLVM_TARGETS_TO_BUILD Native CACHE STRING "")
 set(LLVM_ENABLE_PROJECTS ${STAGE1_PROJECTS} CACHE STRING "")
@@ -34,17 +34,24 @@ set(BOOTSTRAP_CLANG_BOOTSTRAP_TARGETS
     check-llvm
     check-clang CACHE STRING "")
 
-# Stage 2: build clang and lld with stage1-clang
-#          the new clang has -fuse-ld=lld support
+# Stage 2: build core with stage1-clang -flto=thin -stdlib=libc++
+#          the new clang will have -flto=<?> -stdlib=libc++ support
 set(STAGE2_PROJECTS "clang;lld")
-set(STAGE2_RUNTIMES "")
+set(STAGE2_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind")
 
 set(BOOTSTRAP_LLVM_TARGETS_TO_BUILD Native CACHE STRING "")
 set(BOOTSTRAP_LLVM_ENABLE_PROJECTS ${STAGE2_PROJECTS} CACHE STRING "")
 set(BOOTSTRAP_LLVM_ENABLE_RUNTIMES ${STAGE2_RUNTIMES} CACHE STRING "")
+set(BOOTSTRAP_LLVM_ENABLE_LLD ON CACHE BOOL "")
+set(BOOTSTRAP_LLVM_ENABLE_LTO "Thin" CACHE STRING "")
+set(BOOTSTRAP_LLVM_ENABLE_LIBCXX ON CACHE BOOL "")
+set(BOOTSTRAP_CLANG_DEFAULT_CXX_STDLIB "libc++" CACHE STRING "")
+set(BOOTSTRAP_CLANG_DEFAULT_RTLIB "compiler-rt" CACHE STRING "")
+set(BOOTSTRAP_CLANG_DEFAULT_UNWINDLIB "libunwind" CACHE STRING "")
+set(BOOTSTRAP_BOOTSTRAP_LIBC_ENABLE_USE_BY_CLANG ON CACHE BOOL "")
 
-# Stage 3: build the entire llvm with stage2-clang -flto=full
-#          the new clang has -fuse-ld=lld and -stdlib=libc++ support
+# Stage 3: build llvm with stage2-clang -flto=full -stdlib=libc++
+#          the new clang will have -flto=<?> -stdlib=libc++ support
 set(STAGE3_PROJECTS "clang;clang-tools-extra;lld;lldb;polly;libc")
 set(STAGE3_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind")
 
@@ -53,4 +60,8 @@ set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_PROJECTS ${STAGE3_PROJECTS} CACHE STRING "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_RUNTIMES ${STAGE3_RUNTIMES} CACHE STRING "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_LLD ON CACHE BOOL "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_LTO "Full" CACHE STRING "")
+set(BOOTSTRAP_BOOTSTRAP_CLANG_DEFAULT_CXX_STDLIB "libc++" CACHE STRING "")
+set(BOOTSTRAP_BOOTSTRAP_CLANG_DEFAULT_RTLIB "compiler-rt" CACHE STRING "")
+set(BOOTSTRAP_BOOTSTRAP_CLANG_DEFAULT_UNWINDLIB "libunwind" CACHE STRING "")
+set(BOOTSTRAP_BOOTSTRAP_BOOTSTRAP_LIBC_ENABLE_USE_BY_CLANG ON CACHE BOOL "")
 set(BOOTSTRAP_BOOTSTRAP_LLVM_ENABLE_RTTI ON CACHE BOOL "")
