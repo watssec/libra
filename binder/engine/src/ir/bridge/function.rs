@@ -1,9 +1,13 @@
+use std::collections::BTreeSet;
+
 use crate::error::{EngineError, EngineResult, Unsupported};
 use crate::ir::adapter;
 use crate::ir::bridge::cfg::ControlFlowGraph;
 use crate::ir::bridge::intrinsics::filter_intrinsics;
 use crate::ir::bridge::shared::{Identifier, SymbolRegistry};
 use crate::ir::bridge::typing::{Type, TypeRegistry};
+
+use super::value::RegisterSlot;
 
 /// An adapted representation of an LLVM function parameter
 #[derive(Eq, PartialEq)]
@@ -274,5 +278,19 @@ impl Function {
             }
         }
         Ok(val)
+    }
+
+    pub fn collect_variables(&self) -> BTreeSet<RegisterSlot> { 
+	let mut result: BTreeSet<RegisterSlot> = BTreeSet::new();
+	
+	// Ignore parameters for now
+	// for param in self.params {
+	//     let Some(name) = param.name else { return result };
+	//     result.insert(name)
+	// }
+	
+	let Some(body) = &self.body else { return result };
+	result.append(&mut body.collect_variables());
+	result  
     }
 }
