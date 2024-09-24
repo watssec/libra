@@ -7,10 +7,10 @@ license = "GPL-3.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.79"
-lazy_static = "1.4.0"
-log = "0.4.20"
-serde = { version = "1.0.196", features = ["derive"] }
-serde_json = { version = "1.0.113", features = ["unbounded_depth"] }
-simplelog = "0.12.1"
-tempfile = "3.10.0"
+anyhow = { workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+simplelog = { workspace = true }
+tempfile = { workspace = true }

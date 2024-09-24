@@ -8,14 +8,14 @@ edition = "2021"
 default-run = "libra-example"
 
 [dependencies]
-anyhow = "1.0.79"
-lazy_static = "1.4.0"
-log = "0.4.20"
-petgraph = "0.6.4"
-serde = { version = "1.0.196", features = ["derive"] }
-serde_json = { version = "1.0.113", features = ["unbounded_depth"] }
-structopt = "0.3.26"
-walkdir = "2.4.0"
-libra-builder = { path = "../builder" }
-libra-engine = { path = "../engine" }
-libra-shared = { path = "../shared" }
+anyhow = { workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+petgraph = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+structopt = { workspace = true }
+walkdir = { workspace = true }
+libra-builder = { workspace = true }
+libra-engine = { workspace = true }
+libra-shared = { workspace = true }

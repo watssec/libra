@@ -7,7 +7,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.79"
-log = "0.4.20"
-structopt = "0.3.26"
-libra-shared = { path = "../shared" }
+anyhow = { workspace = true }
+log = { workspace = true }
+structopt = { workspace = true }
+libra-shared = { workspace = true }
