@@ -4,7 +4,7 @@ mod pass;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use structopt::StructOpt;
+use clap::{Parser, Subcommand};
 
 use libra_shared::config::initialize;
 
@@ -12,32 +12,31 @@ pub use crate::deps::llvm::ResolverLLVM;
 use crate::deps::DepArgs;
 use crate::pass::PassArgs;
 
-#[derive(StructOpt)]
-#[structopt(
+#[derive(Parser)]
+#[clap(
     name = "libra-builder",
     about = "A custom builder for LLVM and LIBRA",
     rename_all = "kebab-case"
 )]
 struct Args {
     /// Subcommand
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     command: Command,
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 enum Command {
     /// The dependencies
-    #[structopt(name = "deps")]
+    #[command(subcommand)]
     Deps(DepArgs),
     /// The LLVM pass
-    #[structopt(name = "pass")]
     Pass(PassArgs),
 }
 
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
     // setup
-    let args = Args::from_args();
+    let args = Args::parse();
     let Args { command } = args;
     initialize();
 

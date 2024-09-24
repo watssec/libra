@@ -1,5 +1,5 @@
 use anyhow::Result;
-use structopt::StructOpt;
+use clap::Subcommand;
 
 use libra_shared::dep::{DepState, Dependency, Resolver};
 
@@ -7,7 +7,7 @@ use crate::deps::llvm::{DepLLVM, ResolverLLVM};
 
 pub mod llvm;
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 pub enum DepAction {
     /// Config the dependency
     Config,
@@ -15,7 +15,7 @@ pub enum DepAction {
     /// Build the dependency
     Build {
         /// Force the build to proceed
-        #[structopt(short, long)]
+        #[clap(short, long)]
         force: bool,
     },
 }
@@ -31,9 +31,10 @@ impl DepAction {
     }
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum DepArgs {
+    #[command(subcommand)]
     LLVM(DepAction),
 }
 

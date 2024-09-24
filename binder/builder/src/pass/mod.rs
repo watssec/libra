@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
-use structopt::StructOpt;
+use clap::Args;
 
 use libra_shared::config::{PATH_ROOT, PATH_STUDIO};
 use libra_shared::dep::Resolver;
@@ -15,10 +15,10 @@ use crate::deps::llvm::ResolverLLVM;
 // path constants
 static SEGMENTS: [&str; 1] = ["oracle"];
 
-#[derive(StructOpt)]
+#[derive(Args)]
 pub struct PassArgs {
     /// Force the build to proceed
-    #[structopt(short, long)]
+    #[clap(short, long)]
     force: bool,
 }
 
