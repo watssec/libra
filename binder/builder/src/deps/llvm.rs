@@ -3,99 +3,92 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, Result};
-use libra_shared::config::PROJECT;
+use libra_shared::config::{PATH_ROOT, PROJECT};
 
-use libra_shared::dep::{DepState, Dependency, Resolver};
+use libra_shared::dep::Dependency;
 use libra_shared::git::GitRepo;
-
-// path constants
-static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
 
 // default cmake cache to use
 static CMAKE_CACHE: &str = include_str!("llvm.cmake");
 
-/// Artifact path resolver for LLVM
-pub struct ResolverLLVM {
-    /// Base path for the artifact directory
-    path_artifact: PathBuf,
-    /// <artifact>/build
+/// Information to be consumed while building it
+struct PrepResult {
+    path_src_llvm: PathBuf,
+    path_cmake_cache: PathBuf,
     path_build: PathBuf,
-    /// <artifact>/install
     path_install: PathBuf,
-}
-
-impl Resolver for ResolverLLVM {
-    fn construct(path: PathBuf) -> Self {
-        Self {
-            path_build: path.join("build"),
-            path_install: path.join("install"),
-            path_artifact: path,
-        }
-    }
-
-    fn destruct(self) -> PathBuf {
-        self.path_artifact
-    }
-
-    fn seek() -> Result<(GitRepo, Self)> {
-        DepState::<ResolverLLVM, DepLLVM>::new()?.into_source_and_artifact()
-    }
-}
-
-impl ResolverLLVM {
-    pub fn path_build(&self) -> &Path {
-        &self.path_build
-    }
-
-    pub fn path_install(&self) -> &Path {
-        &self.path_install
-    }
 }
 
 /// Represent the LLVM deps
 pub struct DepLLVM {}
 
-impl Dependency<ResolverLLVM> for DepLLVM {
-    fn repo_path_from_root() -> &'static [&'static str] {
-        &PATH_REPO
-    }
+impl DepLLVM {
+    /// Prepare the stage for build
+    fn prep(path_wks: &Path) -> Result<PrepResult> {
+        let path_src = path_wks.join("src");
 
-    fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {
+        // checkout
+        let mut repo = GitRepo::new(PATH_ROOT.join("deps").join("llvm-project"), None)?;
+        repo.checkout(&path_src)?;
+
         // dump the cmake cache
         let path_cmake_cache = path_src.join(format!("{}.cmake", PROJECT));
         fs::write(&path_cmake_cache, CMAKE_CACHE)?;
+
+        // prepare for the build and install directory
+        let path_build = path_wks.join("build");
+        fs::create_dir(&path_build)?;
+
+        let path_install = path_wks.join("build");
+        fs::create_dir(&path_install)?;
+
+        // done
+        Ok(PrepResult {
+            path_src_llvm: path_src.join("llvm"),
+            path_cmake_cache,
+            path_build,
+            path_install,
+        })
+    }
+}
+
+impl Dependency for DepLLVM {
+    fn name() -> &'static str {
+        "llvm"
+    }
+
+    fn tweak(path_wks: &Path) -> Result<()> {
+        // prepare the source code
+        let pack = DepLLVM::prep(path_wks)?;
 
         // cmake list options against the cache
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
             .arg("-C")
-            .arg(&path_cmake_cache)
-            .arg(path_src.join("llvm"))
-            .current_dir(path_config);
+            .arg(&pack.path_cmake_cache)
+            .arg(&pack.path_src_llvm)
+            .current_dir(&pack.path_build);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
         }
 
-        // clean up the cmake cache
-        fs::remove_file(path_cmake_cache)?;
+        // done
         Ok(())
     }
 
-    fn build(path_src: &Path, resolver: &ResolverLLVM) -> Result<()> {
-        // dump the cmake cache
-        let path_cmake_cache = path_src.join(format!("{}.cmake", PROJECT));
-        fs::write(&path_cmake_cache, CMAKE_CACHE)?;
+    fn build(path_wks: &Path) -> Result<()> {
+        // prepare the source code
+        let pack = DepLLVM::prep(path_wks)?;
 
         // config
-        fs::create_dir(&resolver.path_build)?;
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
             .arg("-C")
-            .arg(&path_cmake_cache)
-            .arg(path_src.join("llvm"))
-            .current_dir(&resolver.path_build);
+            .arg(&pack.path_cmake_cache)
+            .arg(&pack.path_src_llvm)
+            .current_dir(&pack.path_build);
         let status = cmd.status()?;
         if !status.success() {
             return Err(anyhow!("Configure failed"));
@@ -104,7 +97,7 @@ impl Dependency<ResolverLLVM> for DepLLVM {
         // build
         let mut cmd = Command::new("cmake");
         cmd.arg("--build")
-            .arg(&resolver.path_build)
+            .arg(&pack.path_build)
             .arg("--target")
             .arg("stage3");
         let status = cmd.status()?;
@@ -113,13 +106,13 @@ impl Dependency<ResolverLLVM> for DepLLVM {
         }
 
         // install
-        fs::create_dir(&resolver.path_install)?;
+        fs::create_dir(&pack.path_install)?;
 
         let mut cmd = Command::new("cmake");
         cmd.arg("--install")
-            .arg(&resolver.path_build)
+            .arg(&pack.path_build)
             .arg("--prefix")
-            .arg(&resolver.path_install)
+            .arg(&pack.path_install)
             .arg("--target")
             .arg("stage3-install");
         let status = cmd.status()?;
@@ -127,8 +120,7 @@ impl Dependency<ResolverLLVM> for DepLLVM {
             return Err(anyhow!("Install failed"));
         }
 
-        // clean up the cmake cache
-        fs::remove_file(path_cmake_cache)?;
+        // done
         Ok(())
     }
 }

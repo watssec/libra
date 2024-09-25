@@ -1,16 +1,16 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use libra_shared::dep::{DepState, Dependency, Resolver};
+use libra_shared::dep::{DepState, Dependency};
 
-use crate::deps::llvm::{DepLLVM, ResolverLLVM};
+use crate::deps::llvm::DepLLVM;
 
 pub mod llvm;
 
 #[derive(Subcommand)]
 pub enum DepAction {
-    /// Config the dependency
-    Config,
+    /// Print information about how to build the dependency
+    Tweak,
 
     /// Build the dependency
     Build {
@@ -21,10 +21,10 @@ pub enum DepAction {
 }
 
 impl DepAction {
-    fn run_internal<R: Resolver, T: Dependency<R>>(self) -> Result<()> {
-        let state: DepState<R, T> = DepState::new()?;
+    fn run_internal<T: Dependency>(self) -> Result<()> {
+        let state: DepState<T> = DepState::new()?;
         match self {
-            Self::Config => state.list_build_options()?,
+            Self::Tweak => state.tweak()?,
             Self::Build { force } => state.build(force)?,
         }
         Ok(())
@@ -41,7 +41,7 @@ pub enum DepArgs {
 impl DepArgs {
     pub fn run(self) -> Result<()> {
         match self {
-            Self::LLVM(action) => action.run_internal::<ResolverLLVM, DepLLVM>(),
+            Self::LLVM(action) => action.run_internal::<DepLLVM>(),
         }
     }
 }

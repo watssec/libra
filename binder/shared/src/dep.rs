@@ -17,7 +17,7 @@ pub trait Dependency {
     fn name() -> &'static str;
 
     /// Print information (e.g., configurable options) on how to build it
-    fn help(path_wks: &Path) -> Result<()>;
+    fn tweak(path_wks: &Path) -> Result<()>;
 
     /// Build this dependency from scratch
     fn build(path_wks: &Path) -> Result<()>;
@@ -123,10 +123,10 @@ impl<T: Dependency> DepState<T> {
     }
 
     /// Print information (e.g., configurable options) on how to build it
-    pub fn help(self) -> Result<()> {
+    pub fn tweak(self) -> Result<()> {
         // always happens in tmpfs
         let tmp = tempdir()?;
-        T::help(tmp.path())?;
+        T::tweak(tmp.path())?;
         tmp.close()?;
         Ok(())
     }
