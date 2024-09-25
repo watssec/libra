@@ -20,7 +20,7 @@ pub struct ResolverLLVM {
     path_artifact: PathBuf,
     /// <artifact>/build
     path_build: PathBuf,
-    /// <artifact>/build
+    /// <artifact>/install
     path_install: PathBuf,
 }
 

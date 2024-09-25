@@ -35,10 +35,11 @@ enum Command {
 
 /// Main entrypoint
 pub fn entrypoint() -> Result<()> {
+    initialize();
+
     // setup
     let args = Args::parse();
     let Args { command } = args;
-    initialize();
 
     // run the command
     match command {
