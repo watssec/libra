@@ -2,10 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{anyhow, Result};
-use libra_shared::config::{PATH_ROOT, PROJECT};
+use anyhow::{bail, Result};
 
-use libra_shared::dep::Dependency;
+use libra_shared::config::{PATH_ROOT, PROJECT};
+use libra_shared::dep::{DepState, Dependency};
 use libra_shared::git::GitRepo;
 
 // default cmake cache to use
@@ -19,7 +19,7 @@ struct PrepResult {
     path_install: PathBuf,
 }
 
-/// Represent the LLVM deps
+/// Represent the LLVM dependency
 pub struct DepLLVM {}
 
 impl DepLLVM {
@@ -39,7 +39,7 @@ impl DepLLVM {
         let path_build = path_wks.join("build");
         fs::create_dir(&path_build)?;
 
-        let path_install = path_wks.join("build");
+        let path_install = path_wks.join("install");
         fs::create_dir(&path_install)?;
 
         // done
@@ -70,7 +70,7 @@ impl Dependency for DepLLVM {
             .current_dir(&pack.path_build);
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Configure failed"));
+            bail!("Configure failed with status {}", status);
         }
 
         // done
@@ -91,7 +91,7 @@ impl Dependency for DepLLVM {
             .current_dir(&pack.path_build);
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Configure failed"));
+            bail!("Configure failed with status {}", status);
         }
 
         // build
@@ -102,12 +102,10 @@ impl Dependency for DepLLVM {
             .arg("stage3");
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Build failed"));
+            bail!("Build failed with status {}", status);
         }
 
         // install
-        fs::create_dir(&pack.path_install)?;
-
         let mut cmd = Command::new("cmake");
         cmd.arg("--install")
             .arg(&pack.path_build)
@@ -117,10 +115,25 @@ impl Dependency for DepLLVM {
             .arg("stage3-install");
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Install failed"));
+            bail!("Install failed with status {}", status);
         }
 
         // done
         Ok(())
+    }
+}
+
+/// Artifact to be used in LLVM pass building
+#[non_exhaustive]
+pub struct ArtifactForPass {
+    pub path_install: PathBuf,
+}
+
+impl ArtifactForPass {
+    pub fn seek() -> Result<Self> {
+        let path_wks = DepState::<DepLLVM>::new()?.artifact()?;
+        Ok(Self {
+            path_install: path_wks.join("install"),
+        })
     }
 }

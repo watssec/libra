@@ -1,52 +1,29 @@
-use std::collections::hash_map::DefaultHasher;
-use std::fs;
-use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Result};
-use clap::Args;
 
-use libra_shared::config::{PATH_ROOT, PATH_STUDIO};
-use libra_shared::dep::Resolver;
+use libra_shared::config::PATH_ROOT;
+use libra_shared::dep::{DepState, Dependency};
 
-use crate::deps::llvm::ResolverLLVM;
+use crate::deps::llvm::ArtifactForPass;
 
-// path constants
-static SEGMENTS: [&str; 1] = ["oracle"];
+/// Represent the Oracle dependency
+pub struct DepOracle {}
 
-#[derive(Args)]
-pub struct PassArgs {
-    /// Force the build to proceed
-    #[clap(short, long)]
-    force: bool,
-}
+impl Dependency for DepOracle {
+    fn name() -> &'static str {
+        "oracle"
+    }
 
-impl PassArgs {
-    pub fn build(self) -> Result<()> {
-        let Self { force } = self;
+    fn tweak(_path_wks: &Path) -> Result<()> {
+        bail!("not supported");
+    }
 
-        // derive deps and paths
-        let (config_hash, resolver_llvm) = derive_deps()?;
-
-        let mut path_src = PATH_ROOT.clone();
-        path_src.extend(SEGMENTS);
-
-        let mut path_build = PATH_STUDIO.to_path_buf();
-        path_build.extend(SEGMENTS);
-        path_build.push(config_hash);
-
-        // clean out previous build if needed
-        if path_build.exists() {
-            if !force {
-                bail!(
-                    "Build directory {} already exists",
-                    path_build.to_str().unwrap()
-                );
-            }
-            fs::remove_dir_all(&path_build)?;
-        }
-        fs::create_dir_all(&path_build)?;
+    fn build(path_wks: &Path) -> Result<()> {
+        // prepare paths and deps
+        let path_src = PATH_ROOT.join("oracle");
+        let artifact_llvm = ArtifactForPass::seek()?;
 
         // configure
         let mut cmd = Command::new("cmake");
@@ -54,25 +31,25 @@ impl PassArgs {
             .arg("Ninja")
             .arg(format!(
                 "-DCFG_LLVM_INSTALL_DIR={}",
-                resolver_llvm
-                    .path_install()
+                artifact_llvm
+                    .path_install
                     .to_str()
                     .ok_or_else(|| anyhow!("non-ascii path"))?
             ))
             .arg("-DCMAKE_BUILD_TYPE=Debug")
-            .arg(path_src);
-        cmd.current_dir(&path_build);
+            .arg(path_src)
+            .current_dir(path_wks);
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Configure failed"));
+            bail!("Configure failed with status {}", status);
         }
 
         // build
         let mut cmd = Command::new("cmake");
-        cmd.arg("--build").arg(&path_build);
+        cmd.arg("--build").arg(path_wks);
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Build failed"));
+            bail!("Build failed with status {}", status);
         }
 
         // done
@@ -80,25 +57,17 @@ impl PassArgs {
     }
 }
 
-/// Derive the config hash for the pass
-fn derive_deps() -> Result<(String, ResolverLLVM)> {
-    // get dep: llvm
-    let (git_llvm, resolver_llvm) = ResolverLLVM::seek()?;
-
-    // config hash
-    let mut hasher = DefaultHasher::new();
-    git_llvm.commit().hash(&mut hasher);
-    let config_hash = hasher.finish();
-
-    // done
-    Ok((format!("{:#18x}", config_hash), resolver_llvm))
+/// Artifact to be consumed by the analysis engine
+#[non_exhaustive]
+pub struct Artifact {
+    pub path_lib: PathBuf,
 }
 
-/// Retrieve the artifact path
-pub fn artifact() -> Result<PathBuf> {
-    let (config_hash, _) = derive_deps()?;
-    let mut path_build = PATH_STUDIO.to_path_buf();
-    path_build.extend(SEGMENTS);
-    path_build.extend([config_hash.as_str(), "Libra", "libLibra.so"]);
-    Ok(path_build)
+impl Artifact {
+    pub fn seek() -> Result<Self> {
+        let path_wks = DepState::<DepOracle>::new()?.artifact()?;
+        Ok(Self {
+            path_lib: path_wks.join("Libra").join("libLibra.so"),
+        })
+    }
 }

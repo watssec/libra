@@ -148,4 +148,12 @@ impl<T: Dependency> DepState<T> {
         scratch.make()?;
         Ok(())
     }
+
+    /// Unpack this state into the artifact directory
+    pub fn artifact(self) -> Result<PathBuf> {
+        match self {
+            Self::Scratch(_) => bail!("Artifact for {} does not exist", T::name()),
+            Self::Package(pkg) => Ok(pkg.path_wks),
+        }
+    }
 }

@@ -1,16 +1,13 @@
 mod deps;
 mod pass;
 
-use std::path::PathBuf;
-
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+use crate::deps::llvm::DepLLVM;
+use crate::pass::DepOracle;
 use libra_shared::config::initialize;
-
-pub use crate::deps::llvm::ResolverLLVM;
-use crate::deps::DepArgs;
-use crate::pass::PassArgs;
+use libra_shared::dep::{DepState, Dependency};
 
 #[derive(Parser)]
 #[clap(
@@ -21,16 +18,49 @@ use crate::pass::PassArgs;
 struct Args {
     /// Subcommand
     #[command(subcommand)]
-    command: Command,
+    command: DepCommand,
 }
 
 #[derive(Subcommand)]
-enum Command {
-    /// The dependencies
+pub enum DepAction {
+    /// Print information about how to build the dependency
+    Tweak,
+
+    /// Build the dependency
+    Build {
+        /// Force the build to proceed
+        #[clap(short, long)]
+        force: bool,
+    },
+}
+
+impl DepAction {
+    fn run_internal<T: Dependency>(self) -> Result<()> {
+        let state: DepState<T> = DepState::new()?;
+        match self {
+            Self::Tweak => state.tweak()?,
+            Self::Build { force } => state.build(force)?,
+        }
+        Ok(())
+    }
+}
+
+#[derive(Subcommand)]
+#[allow(clippy::upper_case_acronyms)]
+pub enum DepCommand {
     #[command(subcommand)]
-    Deps(DepArgs),
-    /// The LLVM pass
-    Pass(PassArgs),
+    LLVM(DepAction),
+    #[command(subcommand)]
+    Oracle(DepAction),
+}
+
+impl DepCommand {
+    pub fn run(self) -> Result<()> {
+        match self {
+            Self::LLVM(action) => action.run_internal::<DepLLVM>(),
+            Self::Oracle(action) => action.run_internal::<DepOracle>(),
+        }
+    }
 }
 
 /// Main entrypoint
@@ -42,14 +72,6 @@ pub fn entrypoint() -> Result<()> {
     let Args { command } = args;
 
     // run the command
-    match command {
-        Command::Deps(sub) => sub.run()?,
-        Command::Pass(sub) => sub.build()?,
-    }
+    command.run()?;
     Ok(())
-}
-
-/// Utility function for exposing pass to others
-pub fn artifact_for_pass() -> Result<PathBuf> {
-    pass::artifact()
 }
