@@ -6,20 +6,18 @@ use std::{env, fs};
 use anyhow::{anyhow, bail, Result};
 use log::debug;
 
-use libra_builder::ResolverLLVM;
+use libra_builder::deps::llvm::ArtifactLLVM;
 use libra_engine::error::{EngineError, EngineResult};
 use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{
     ClangCommand, ClangSupportedLanguage, CompileDB, CompileEntry, TokenStream,
 };
-use libra_shared::dep::{DepState, Dependency, Resolver};
+use libra_shared::config::PATH_ROOT;
+use libra_shared::dep::{DepState, Dependency};
 use libra_shared::git::GitRepo;
 
 use crate::common::{TestCase, TestSuite};
-
-static PATH_REPO: [&str; 2] = ["deps", "llvm-test-suite"];
-static PATH_WORKSPACE: [&str; 2] = ["testsuite", "external"];
 
 /// Maximum number of fixedpoint optimization
 static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
@@ -45,72 +43,80 @@ fn baseline_cmake_options(path_src: &Path) -> Result<Vec<String>> {
     ])
 }
 
-/// Artifact path resolver for LLVM
-pub struct ResolverLLVMExternal {
-    /// Base path for the artifact directory
-    path_artifact: PathBuf,
-    /// <artifact>/compile_commands.json
-    path_compile_db: PathBuf,
-}
-
-impl Resolver for ResolverLLVMExternal {
-    fn construct(path: PathBuf) -> Self {
-        Self {
-            path_compile_db: path.join("compile_commands.json"),
-            path_artifact: path,
-        }
-    }
-
-    fn destruct(self) -> PathBuf {
-        self.path_artifact
-    }
-
-    fn seek() -> Result<(GitRepo, Self)> {
-        DepState::<ResolverLLVMExternal, DepLLVMExternal>::new()?.into_source_and_artifact()
-    }
+/// Information to be consumed while building it
+struct PrepResult {
+    path_src: PathBuf,
+    path_build: PathBuf,
 }
 
 /// Represent the llvm-test-suite
 pub struct DepLLVMExternal {}
 
-impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
-    fn repo_path_from_root() -> &'static [&'static str] {
-        &PATH_REPO
+impl DepLLVMExternal {
+    /// Prepare the stage for build
+    fn prep(path_wks: &Path) -> Result<PrepResult> {
+        let path_src = path_wks.join("src");
+
+        // checkout
+        let mut repo = GitRepo::new(PATH_ROOT.join("deps").join("llvm-test-suite"), None)?;
+        repo.checkout(&path_src)?;
+
+        // prepare for the build and install directory
+        let path_build = path_wks.join("build");
+        fs::create_dir(&path_build)?;
+
+        // done
+        Ok(PrepResult {
+            path_src,
+            path_build,
+        })
+    }
+}
+
+impl Dependency for DepLLVMExternal {
+    fn name() -> &'static str {
+        "llvm-testsuite-external"
     }
 
-    fn list_build_options(path_src: &Path, path_config: &Path) -> Result<()> {
+    fn tweak(path_wks: &Path) -> Result<()> {
+        // prepare the source code
+        let pack = Self::prep(path_wks)?;
+
         let mut cmd = Command::new("cmake");
         cmd.arg("-LAH")
-            .args(baseline_cmake_options(path_src)?)
-            .arg(path_src)
-            .current_dir(path_config);
+            .args(baseline_cmake_options(&pack.path_src)?)
+            .arg(&pack.path_src)
+            .current_dir(&pack.path_build);
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Configure failed"));
+            bail!("Configure failed with status {}", status);
         }
         Ok(())
     }
 
-    fn build(path_src: &Path, resolver: &ResolverLLVMExternal) -> Result<()> {
+    fn build(path_wks: &Path) -> Result<()> {
+        // prepare the source code
+        let pack = Self::prep(path_wks)?;
+
         // config
         let mut cmd = Command::new("cmake");
         cmd.arg("-G")
             .arg("Ninja")
-            .args(baseline_cmake_options(path_src)?)
+            .args(baseline_cmake_options(&pack.path_src)?)
             .arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
-            .arg(path_src)
-            .current_dir(&resolver.path_artifact);
+            .arg(&pack.path_src)
+            .current_dir(&pack.path_build);
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Configure failed"));
+            bail!("Configure failed with status {}", status);
         }
 
         // build
         let mut cmd = Command::new("cmake");
-        cmd.arg("--build").arg(&resolver.path_artifact);
+        cmd.arg("--build").arg(&pack.path_build);
         let status = cmd.status()?;
         if !status.success() {
-            return Err(anyhow!("Build failed"));
+            bail!("Build failed with status {}", status);
         }
 
         // done
@@ -118,17 +124,14 @@ impl Dependency<ResolverLLVMExternal> for DepLLVMExternal {
     }
 }
 
-impl TestSuite<TestCaseExternal, ResolverLLVMExternal> for DepLLVMExternal {
-    fn wks_path_from_studio() -> &'static [&'static str] {
-        PATH_WORKSPACE.as_ref()
+impl TestSuite<TestCaseExternal> for DepLLVMExternal {
+    fn tag() -> &'static str {
+        Self::name()
     }
 
-    fn discover_test_cases(
-        _repo: &GitRepo,
-        resolver: &ResolverLLVMExternal,
-    ) -> Result<Vec<TestCaseExternal>> {
-        let commands = Self::parse_compile_database(resolver)?;
-        Self::lit_test_discovery(resolver, commands)
+    fn discover_test_cases() -> Result<Vec<TestCaseExternal>> {
+        let path_wks = DepState::<Self>::new()?.artifact()?;
+        Self::lit_test_discovery(&path_wks)
     }
 }
 
@@ -213,10 +216,8 @@ impl DepLLVMExternal {
         Ok(Some((mark, cmd)))
     }
 
-    fn parse_compile_database(
-        resolver: &ResolverLLVMExternal,
-    ) -> Result<BTreeMap<String, ClangCommand>> {
-        let comp_db = CompileDB::new(&resolver.path_compile_db)?;
+    fn parse_compile_database(path_compile_db: &Path) -> Result<BTreeMap<String, ClangCommand>> {
+        let comp_db = CompileDB::new(path_compile_db)?;
 
         // collect commands into a map
         let mut commands = BTreeMap::new();
@@ -233,18 +234,19 @@ impl DepLLVMExternal {
         Ok(commands)
     }
 
-    fn lit_test_discovery(
-        resolver: &ResolverLLVMExternal,
-        mut commands: BTreeMap<String, ClangCommand>,
-    ) -> Result<Vec<TestCaseExternal>> {
+    fn lit_test_discovery(path_wks: &Path) -> Result<Vec<TestCaseExternal>> {
+        // parse the compilation database
+        let path_compile_db = path_wks.join("build").join("compile_commands.json");
+        let mut commands = Self::parse_compile_database(&path_compile_db)?;
+
         // locate the lit tool
-        let (_, pkg_llvm) = ResolverLLVM::seek()?;
-        let bin_lit = pkg_llvm.path_build().join("bin").join("llvm-lit");
+        let artifact_llvm = ArtifactLLVM::seek()?;
+        let bin_lit = artifact_llvm.path_build.join("bin").join("llvm-lit");
 
         // run discovery
         let output = Command::new(bin_lit)
             .arg("--show-tests")
-            .arg(&resolver.path_artifact)
+            .arg(path_wks)
             .output()?;
 
         // sanity check the execution
@@ -284,7 +286,7 @@ impl DepLLVMExternal {
             };
 
             // check existence
-            let path_test = resolver.path_artifact.join(name);
+            let path_test = path_wks.join(name);
             if !path_test.exists() {
                 bail!("test marker does not exist: {}", name);
             }

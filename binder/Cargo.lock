@@ -449,6 +449,7 @@ name = "libra-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap 4.5.18",
  "fs_extra",
  "lazy_static",
  "libra-builder",
@@ -458,7 +459,6 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
- "structopt",
  "tempfile",
  "walkdir",
 ]

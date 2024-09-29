@@ -13,21 +13,22 @@ use crate::error::{EngineError, EngineResult};
 use crate::ir::{adapter, bridge};
 
 /// Context for all workflow
+#[non_exhaustive]
 pub struct Context {
     /// Path to the llvm installation base
     pkg_llvm: PathBuf,
     /// Path to the clang compiler
-    bin_clang: PathBuf,
+    pub bin_clang: PathBuf,
     /// Path to the llvm-link tool
-    bin_llvm_link: PathBuf,
+    pub bin_llvm_link: PathBuf,
     /// Path to the llvm-as tool
-    bin_llvm_as: PathBuf,
+    pub bin_llvm_as: PathBuf,
     /// Path to the llvm-dis tool
-    bin_llvm_dis: PathBuf,
+    pub bin_llvm_dis: PathBuf,
     /// Path to the opt tool
-    bin_opt: PathBuf,
+    pub bin_opt: PathBuf,
     /// Path to the libra pass oracle
-    lib_pass_oracle: PathBuf,
+    pub lib_pass_oracle: PathBuf,
 }
 
 impl Context {

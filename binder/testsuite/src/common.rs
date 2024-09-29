@@ -14,8 +14,6 @@ use serde::{Deserialize, Serialize};
 use libra_engine::error::{EngineError, EngineResult};
 use libra_engine::flow::shared::Context;
 use libra_shared::config::PATH_STUDIO;
-use libra_shared::dep::Resolver;
-use libra_shared::git::GitRepo;
 
 // Environment configurations
 lazy_static! {
@@ -40,18 +38,17 @@ pub trait TestCase: Send {
 }
 
 /// A trait that marks a test suite
-pub trait TestSuite<C: TestCase, R: Resolver> {
+pub trait TestSuite<C: TestCase> {
     /// Location of the workspace from the studio
-    fn wks_path_from_studio() -> &'static [&'static str];
+    fn tag() -> &'static str;
 
     /// Test case discovery
-    fn discover_test_cases(repo: &GitRepo, resolver: &R) -> Result<Vec<C>>;
+    fn discover_test_cases() -> Result<Vec<C>>;
 
     /// Run the test suite
-    fn run(repo: GitRepo, resolver: R, force: bool, filter: Vec<String>) -> Result<()> {
+    fn run(force: bool, filter: Vec<String>) -> Result<()> {
         // prepare the environment
-        let mut workdir = PATH_STUDIO.to_path_buf();
-        workdir.extend(Self::wks_path_from_studio());
+        let workdir = PATH_STUDIO.join("testing").join(Self::tag());
         if workdir.exists() {
             if !force {
                 info!("Prior testing result exists");
@@ -62,7 +59,7 @@ pub trait TestSuite<C: TestCase, R: Resolver> {
         fs::create_dir_all(&workdir)?;
 
         // information collection
-        let test_cases = Self::discover_test_cases(&repo, &resolver)?;
+        let test_cases = Self::discover_test_cases()?;
         info!("Number of test cases discovered: {}", test_cases.len());
 
         // run the tests

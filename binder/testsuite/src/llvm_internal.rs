@@ -6,87 +6,54 @@ use std::process::Command;
 use anyhow::{anyhow, bail, Result};
 use log::{debug, warn};
 
-use libra_builder::ResolverLLVM;
+use libra_builder::deps::llvm::ArtifactLLVM;
 use libra_engine::error::EngineResult;
 use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use libra_engine::flow::shared::Context;
-use libra_shared::dep::{DepState, Dependency, Resolver};
-use libra_shared::git::GitRepo;
+use libra_shared::dep::Dependency;
 
 use crate::common::{TestCase, TestSuite};
-
-static PATH_REPO: [&str; 2] = ["deps", "llvm-project"];
-static PATH_WORKSPACE: [&str; 2] = ["testsuite", "internal"];
 
 /// Maximum number of fixedpoint optimization
 static MAX_ROUNDS_OF_FIXEDPOINT_OPTIMIZATION: usize = 16;
 
-/// Artifact path resolver for LLVM
-pub struct ResolverLLVMInternal {
-    resolver: ResolverLLVM,
-    bin_lit: PathBuf,
-    dir_test: PathBuf,
-}
-
-impl Resolver for ResolverLLVMInternal {
-    fn construct(path: PathBuf) -> Self {
-        let resolver = ResolverLLVM::construct(path);
-        Self {
-            bin_lit: resolver.path_build().join("bin").join("llvm-lit"),
-            dir_test: resolver.path_build().join("test"),
-            resolver,
-        }
-    }
-
-    fn destruct(self) -> PathBuf {
-        let Self { resolver, .. } = self;
-        resolver.destruct()
-    }
-
-    fn seek() -> Result<(GitRepo, Self)> {
-        DepState::<ResolverLLVMInternal, DepLLVMInternal>::new()?.into_source_and_artifact()
-    }
-}
-
 /// Represent the llvm-project
 pub struct DepLLVMInternal {}
 
-impl Dependency<ResolverLLVMInternal> for DepLLVMInternal {
-    fn repo_path_from_root() -> &'static [&'static str] {
-        &PATH_REPO
+impl Dependency for DepLLVMInternal {
+    fn name() -> &'static str {
+        "llvm-testsuite-internal"
     }
 
-    fn list_build_options(_path_src: &Path, _path_config: &Path) -> Result<()> {
-        bail!("attempting to setup LLVM internal test suite");
+    fn tweak(_path_wks: &Path) -> Result<()> {
+        bail!("attempting to tweat LLVM internal test suite");
     }
 
-    fn build(_path_src: &Path, _resolver: &ResolverLLVMInternal) -> Result<()> {
+    fn build(_path_wks: &Path) -> Result<()> {
         bail!("attempting to build LLVM internal test suite");
     }
 }
 
-impl TestSuite<TestCaseInternal, ResolverLLVMInternal> for DepLLVMInternal {
-    fn wks_path_from_studio() -> &'static [&'static str] {
-        PATH_WORKSPACE.as_ref()
+impl TestSuite<TestCaseInternal> for DepLLVMInternal {
+    fn tag() -> &'static str {
+        Self::name()
     }
 
-    fn discover_test_cases(
-        repo: &GitRepo,
-        resolver: &ResolverLLVMInternal,
-    ) -> Result<Vec<TestCaseInternal>> {
-        Self::lit_test_discovery(repo, resolver)
+    fn discover_test_cases() -> Result<Vec<TestCaseInternal>> {
+        Self::lit_test_discovery()
     }
 }
 
 impl DepLLVMInternal {
-    fn lit_test_discovery(
-        repo: &GitRepo,
-        resolver: &ResolverLLVMInternal,
-    ) -> Result<Vec<TestCaseInternal>> {
+    fn lit_test_discovery() -> Result<Vec<TestCaseInternal>> {
+        // locate the paths and the lit tool
+        let artifact_llvm = ArtifactLLVM::seek()?;
+        let bin_lit = artifact_llvm.path_build.join("bin").join("llvm-lit");
+
         // run discovery
-        let output = Command::new(&resolver.bin_lit)
+        let output = Command::new(bin_lit)
             .arg("--show-tests")
-            .arg(&resolver.dir_test)
+            .arg(artifact_llvm.path_build.join("test"))
             .output()?;
 
         // sanity check the execution
@@ -121,7 +88,7 @@ impl DepLLVMInternal {
             }
 
             let name = tokens.next().ok_or_else(|| anyhow!("expect test name"))?;
-            let path_test = repo.path().join("llvm").join("test").join(name);
+            let path_test = artifact_llvm.path_src.join("llvm").join("test").join(name);
             if !path_test.exists() {
                 bail!("test marker does not exist: {}", name);
             }
