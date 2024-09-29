@@ -6,8 +6,8 @@ use std::process::Command;
 use anyhow::{anyhow, bail, Result};
 use serde::Deserialize;
 
-use libra_builder::{artifact_for_pass, ResolverLLVM};
-use libra_shared::dep::Resolver;
+use libra_builder::deps::llvm::ArtifactLLVM;
+use libra_builder::pass::ArtifactOracle;
 
 use crate::error::{EngineError, EngineResult};
 use crate::ir::{adapter, bridge};
@@ -26,24 +26,24 @@ pub struct Context {
     bin_llvm_dis: PathBuf,
     /// Path to the opt tool
     bin_opt: PathBuf,
-    /// Path to the libra pass
-    lib_pass: PathBuf,
+    /// Path to the libra pass oracle
+    lib_pass_oracle: PathBuf,
 }
 
 impl Context {
     pub fn new() -> Result<Self> {
-        let (_, resolver_llvm) = ResolverLLVM::seek()?;
-        let lib_pass = artifact_for_pass()?;
-        let pkg_llvm = resolver_llvm.path_install().to_path_buf();
+        let artifact_llvm = ArtifactLLVM::seek()?;
+        let artifact_oracle = ArtifactOracle::seek()?;
+        let path_llvm_bin = artifact_llvm.path_install.join("bin");
 
         Ok(Self {
-            bin_clang: pkg_llvm.join("bin").join("clang"),
-            bin_llvm_link: pkg_llvm.join("bin").join("llvm-link"),
-            bin_llvm_as: pkg_llvm.join("bin").join("llvm-as"),
-            bin_llvm_dis: pkg_llvm.join("bin").join("llvm-dis"),
-            bin_opt: pkg_llvm.join("bin").join("opt"),
-            pkg_llvm,
-            lib_pass: lib_pass.to_path_buf(),
+            pkg_llvm: artifact_llvm.path_install.clone(),
+            bin_clang: path_llvm_bin.join("clang"),
+            bin_llvm_link: path_llvm_bin.join("llvm-link"),
+            bin_llvm_as: path_llvm_bin.join("llvm-as"),
+            bin_llvm_dis: path_llvm_bin.join("llvm-dis"),
+            bin_opt: path_llvm_bin.join("opt"),
+            lib_pass_oracle: artifact_oracle.path_lib,
         })
     }
 
@@ -147,7 +147,7 @@ impl Context {
     /// Serialize a bitcode file to JSON
     fn serialize(&self, input: &Path, output: &Path) -> Result<()> {
         let lib_pass = self
-            .lib_pass
+            .lib_pass_oracle
             .to_str()
             .ok_or_else(|| anyhow!("non-ascii path"))?;
         self.run_opt(

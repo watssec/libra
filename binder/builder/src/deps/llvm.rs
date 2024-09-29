@@ -125,11 +125,11 @@ impl Dependency for DepLLVM {
 
 /// Artifact to be used in LLVM pass building
 #[non_exhaustive]
-pub struct ArtifactForPass {
+pub struct ArtifactLLVM {
     pub path_install: PathBuf,
 }
 
-impl ArtifactForPass {
+impl ArtifactLLVM {
     pub fn seek() -> Result<Self> {
         let path_wks = DepState::<DepLLVM>::new()?.artifact()?;
         Ok(Self {

@@ -1,5 +1,5 @@
-mod deps;
-mod pass;
+pub mod deps;
+pub mod pass;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

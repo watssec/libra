@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use libra_shared::config::PATH_ROOT;
 use libra_shared::dep::{DepState, Dependency};
 
-use crate::deps::llvm::ArtifactForPass;
+use crate::deps::llvm::ArtifactLLVM;
 
 /// Represent the Oracle dependency
 pub struct DepOracle {}
@@ -23,7 +23,7 @@ impl Dependency for DepOracle {
     fn build(path_wks: &Path) -> Result<()> {
         // prepare paths and deps
         let path_src = PATH_ROOT.join("oracle");
-        let artifact_llvm = ArtifactForPass::seek()?;
+        let artifact_llvm = ArtifactLLVM::seek()?;
 
         // configure
         let mut cmd = Command::new("cmake");
@@ -59,11 +59,11 @@ impl Dependency for DepOracle {
 
 /// Artifact to be consumed by the analysis engine
 #[non_exhaustive]
-pub struct Artifact {
+pub struct ArtifactOracle {
     pub path_lib: PathBuf,
 }
 
-impl Artifact {
+impl ArtifactOracle {
     pub fn seek() -> Result<Self> {
         let path_wks = DepState::<DepOracle>::new()?.artifact()?;
         Ok(Self {
