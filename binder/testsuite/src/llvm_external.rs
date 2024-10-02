@@ -235,8 +235,10 @@ impl DepLLVMExternal {
     }
 
     fn lit_test_discovery(path_wks: &Path) -> Result<Vec<TestCaseExternal>> {
+        let path_build = path_wks.join("build");
+
         // parse the compilation database
-        let path_compile_db = path_wks.join("build").join("compile_commands.json");
+        let path_compile_db = path_build.join("compile_commands.json");
         let mut commands = Self::parse_compile_database(&path_compile_db)?;
 
         // locate the lit tool
@@ -246,7 +248,7 @@ impl DepLLVMExternal {
         // run discovery
         let output = Command::new(bin_lit)
             .arg("--show-tests")
-            .arg(path_wks)
+            .arg(&path_build)
             .output()?;
 
         // sanity check the execution
@@ -286,7 +288,7 @@ impl DepLLVMExternal {
             };
 
             // check existence
-            let path_test = path_wks.join(name);
+            let path_test = path_build.join(name);
             if !path_test.exists() {
                 bail!("test marker does not exist: {}", name);
             }
