@@ -7,10 +7,6 @@
 
 namespace libra {
 
-// TODO: need to create a dummy set to host instructions from constant expr
-extern BasicBlock *dummy_block;
-extern Function *dummy_function;
-extern Instruction *dummy_instruction;
 void prepare_for_serialization(Module &module);
 
 [[nodiscard]] json::Object serialize_module(const Module &module);

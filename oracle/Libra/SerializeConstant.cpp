@@ -213,7 +213,7 @@ json::Object serialize_const_expr(const ConstantExpr &expr) {
   json::Object result;
 
   FunctionSerializationContext ctxt;
-  const auto *inst = expr.getAsInstruction(dummy_instruction);
+  const auto *inst = expr.getAsInstruction();
   result["inst"] = ctxt.serialize_inst(*inst);
 
   return result;

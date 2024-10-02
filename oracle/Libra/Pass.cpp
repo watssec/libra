@@ -15,14 +15,14 @@ constexpr const char *PASS_NAME = "Libra";
 struct LibraPass : PassInfoMixin<LibraPass> {
   // pass entrypoint
   static PreservedAnalyses run(Module &module, ModuleAnalysisManager &) {
-    // start of execution
+    // init logger
     auto level = Logger::Level::Info;
     if (OptVerbose) {
       level = Logger::Level::Debug;
     }
     init_default_logger(level, OptVerbose);
 
-    // initialization
+    // init module IR
     if (auto e = module.materializeAll()) {
       LOG->fatal("unable to materialize module: {0}", e);
     }
@@ -30,11 +30,13 @@ struct LibraPass : PassInfoMixin<LibraPass> {
       LOG->fatal("unable to materialize metadata: {0}", e);
     }
 
-    // TODO: hack for constant expressions
+    // init global variables
     prepare_for_serialization(module);
 
-    // serialize and dump to file
+    // serialize
     auto data = serialize_module(module);
+
+    // dump to file
     std::error_code ec;
     raw_fd_ostream stm(OptOutput, ec,
                        sys::fs::CreationDisposition::CD_CreateNew);
@@ -58,7 +60,7 @@ struct LibraPass : PassInfoMixin<LibraPass> {
 //-----------------------------------------------------------------------------
 // Pass Registration
 //-----------------------------------------------------------------------------
-llvm::PassPluginLibraryInfo getPassInfo() {
+PassPluginLibraryInfo getPassInfo() {
   return {LLVM_PLUGIN_API_VERSION, PASS_NAME, LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
             // allow this pass to run directly by name

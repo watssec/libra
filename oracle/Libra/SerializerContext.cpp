@@ -2,10 +2,6 @@
 
 namespace libra {
 
-BasicBlock *dummy_block = nullptr;
-Function *dummy_function = nullptr;
-Instruction *dummy_instruction = nullptr;
-
 void prepare_for_serialization(Module &module) {
   // collect functional contexts
   for (const auto &func : module.functions()) {
@@ -29,30 +25,21 @@ void prepare_for_serialization(Module &module) {
     // add it to the global context list
     contexts.emplace(&func, func_ctxt);
   }
-
-  // create dummy ones
-  auto &ctxt = module.getContext();
-  dummy_function =
-      Function::Create(FunctionType::get(Type::getVoidTy(ctxt), false),
-                       GlobalValue::LinkageTypes::InternalLinkage, "", &module);
-  dummy_block = BasicBlock::Create(ctxt, "", dummy_function);
-  dummy_instruction = new UnreachableInst(ctxt, dummy_block);
 }
 
-void FunctionSerializationContext::add_block(const llvm::BasicBlock &block) {
+void FunctionSerializationContext::add_block(const BasicBlock &block) {
   auto index = block_labels_.size();
   auto res = block_labels_.emplace(&block, index);
   assert(res.second);
 }
 
-void FunctionSerializationContext::add_instruction(
-    const llvm::Instruction &inst) {
+void FunctionSerializationContext::add_instruction(const Instruction &inst) {
   auto index = inst_labels_.size();
   auto res = inst_labels_.emplace(&inst, index);
   assert(res.second);
 }
 
-void FunctionSerializationContext::add_argument(const llvm::Argument &arg) {
+void FunctionSerializationContext::add_argument(const Argument &arg) {
   auto index = arg_labels_.size();
   auto res = arg_labels_.emplace(&arg, index);
   assert(res.second);

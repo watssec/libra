@@ -29,10 +29,6 @@ json::Object serialize_module(const Module &module) {
   // functions
   json::Array functions;
   for (const auto &func : module.functions()) {
-    // filter out the dummy function
-    if (&func == dummy_function) {
-      continue;
-    }
     // filter out debug functions
     if (is_debug_function(func)) {
       continue;
