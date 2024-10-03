@@ -8,9 +8,9 @@ set(CLANG_BOOTSTRAP_TARGETS
     check-all
     check-llvm
     check-clang
+    llvm-config
+    test-depends
     test-suite
-    package
-    install
     CACHE STRING "")
 
 # Stage 1: build core with system cc
@@ -21,14 +21,6 @@ set(STAGE1_RUNTIMES "")
 set(LLVM_TARGETS_TO_BUILD Native CACHE STRING "")
 set(LLVM_ENABLE_PROJECTS ${STAGE1_PROJECTS} CACHE STRING "")
 set(LLVM_ENABLE_RUNTIMES ${STAGE1_RUNTIMES} CACHE STRING "")
-
-# Stage 2 setup
-set(BOOTSTRAP_CLANG_ENABLE_BOOTSTRAP ON CACHE STRING "")
-set(BOOTSTRAP_CLANG_BOOTSTRAP_TARGETS
-    clang
-    check-all
-    check-llvm
-    check-clang CACHE STRING "")
 
 # Stage 2: build core with stage1-clang -flto=thin
 #          the new clang will have -flto and -stdlib=libc++ support
