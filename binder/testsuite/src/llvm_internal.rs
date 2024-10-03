@@ -100,6 +100,10 @@ impl DepLLVMInternal {
             let mut tokens = line.trim().split(" :: ");
 
             let ty = tokens.next().ok_or_else(|| anyhow!("expect test type"))?;
+            if ty == "LLVM-Unit" {
+                // cannot handle this type as they are essentially binary files
+                continue;
+            }
             if ty != "LLVM" {
                 bail!("unexpected test type: {}", ty);
             }
