@@ -105,7 +105,7 @@ impl Dependency for DepLLVM {
         cmd.arg("--build")
             .arg(&pack.path_build)
             .arg("--target")
-            .arg("stage3");
+            .arg("stage2-package");
         let status = cmd.status()?;
         if !status.success() {
             bail!("Build failed with status {}", status);
@@ -116,7 +116,7 @@ impl Dependency for DepLLVM {
         cmd.arg("--build")
             .arg(&pack.path_build)
             .arg("--target")
-            .arg("stage3-install");
+            .arg("stage2-install");
         let status = cmd.status()?;
         if !status.success() {
             bail!("Install failed with status {}", status);
