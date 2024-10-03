@@ -52,6 +52,9 @@ json::Object serialize_const(const Constant &val) {
   } else if (isa<NoCFIValue>(val)) {
     result["Marker"] =
         serialize_const_marker(*cast<NoCFIValue>(val).getGlobalValue());
+  } else if (isa<ConstantPtrAuth>(val)) {
+    // TODO: create a separate category for ConstantPtrAuth?
+    result["Extension"] = json::Value(nullptr);
   }
 
   // constant data
@@ -64,9 +67,7 @@ json::Object serialize_const(const Constant &val) {
       result["Null"] = json::Value(nullptr);
     } else if (isa<ConstantTokenNone>(val)) {
       result["None"] = json::Value(nullptr);
-    } else if (isa<ConstantTargetNone>(val)
-               // TODO: create a separate category for ConstantPtrAuth?
-               || isa<ConstantPtrAuth>(val)) {
+    } else if (isa<ConstantTargetNone>(val)) {
       result["Extension"] = json::Value(nullptr);
     } else if (isa<UndefValue>(val)) {
       result["Undef"] = json::Value(nullptr);
