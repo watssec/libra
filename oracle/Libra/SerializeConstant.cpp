@@ -64,7 +64,9 @@ json::Object serialize_const(const Constant &val) {
       result["Null"] = json::Value(nullptr);
     } else if (isa<ConstantTokenNone>(val)) {
       result["None"] = json::Value(nullptr);
-    } else if (isa<ConstantTargetNone>(val)) {
+    } else if (isa<ConstantTargetNone>(val)
+               // TODO: create a separate category for ConstantPtrAuth?
+               || isa<ConstantPtrAuth>(val)) {
       result["Extension"] = json::Value(nullptr);
     } else if (isa<UndefValue>(val)) {
       result["Undef"] = json::Value(nullptr);
