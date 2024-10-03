@@ -243,7 +243,10 @@ impl DepLLVMExternal {
 
         // locate the lit tool
         let artifact_llvm = ArtifactLLVM::seek()?;
-        let bin_lit = artifact_llvm.path_build.join("bin").join("llvm-lit");
+        let bin_lit = artifact_llvm
+            .path_build_final_stage
+            .join("bin")
+            .join("llvm-lit");
 
         // run discovery
         let output = Command::new(bin_lit)

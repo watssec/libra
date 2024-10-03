@@ -30,7 +30,21 @@ impl Dependency for DepLLVMInternal {
     }
 
     fn build(_path_wks: &Path) -> Result<()> {
-        bail!("attempting to build LLVM internal test suite");
+        let artifact_llvm = ArtifactLLVM::seek()?;
+
+        // check
+        let mut cmd = Command::new("cmake");
+        cmd.arg("--build")
+            .arg(&artifact_llvm.path_build)
+            .arg("--target")
+            .arg("stage2-check-llvm");
+        let status = cmd.status()?;
+        if !status.success() {
+            bail!("Check failed with status {}", status);
+        }
+
+        // done
+        Ok(())
     }
 }
 
@@ -48,12 +62,15 @@ impl DepLLVMInternal {
     fn lit_test_discovery() -> Result<Vec<TestCaseInternal>> {
         // locate the paths and the lit tool
         let artifact_llvm = ArtifactLLVM::seek()?;
-        let bin_lit = artifact_llvm.path_build.join("bin").join("llvm-lit");
+        let bin_lit = artifact_llvm
+            .path_build_final_stage
+            .join("bin")
+            .join("llvm-lit");
 
         // run discovery
         let output = Command::new(bin_lit)
             .arg("--show-tests")
-            .arg(artifact_llvm.path_build.join("test"))
+            .arg(artifact_llvm.path_build_final_stage.join("test"))
             .output()?;
 
         // sanity check the execution

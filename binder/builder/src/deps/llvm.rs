@@ -132,6 +132,7 @@ impl Dependency for DepLLVM {
 pub struct ArtifactLLVM {
     pub path_src: PathBuf,
     pub path_build: PathBuf,
+    pub path_build_final_stage: PathBuf,
     pub path_install: PathBuf,
 }
 
@@ -141,6 +142,11 @@ impl ArtifactLLVM {
         Ok(Self {
             path_src: path_wks.join("src"),
             path_build: path_wks.join("build"),
+            path_build_final_stage: path_wks
+                .join("build")
+                .join("tools")
+                .join("clang")
+                .join("stage2-bins"),
             path_install: path_wks.join("install"),
         })
     }
