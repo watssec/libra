@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail, Result};
 use log::debug;
 
 use libra_builder::deps::llvm::ArtifactLLVM;
-use libra_engine::error::{EngineError, EngineResult};
+use libra_engine::error::{EngineError, EngineResult, Tool};
 use libra_engine::flow::fixedpoint::FlowFixedpoint;
 use libra_engine::flow::shared::Context;
 use libra_shared::compile_db::{
@@ -326,9 +326,9 @@ impl TestCaseExternal {
         // compile
         let bc_init = output.join("init.bc");
         ctxt.compile_to_bitcode(input, &bc_init, command.gen_args_for_libra())
-            .map_err(|e| EngineError::CompilationError(format!("Error during clang: {}", e)))?;
+            .map_err(|e| EngineError::CompilationError(Tool::ClangCompile, e.to_string()))?;
         ctxt.disassemble_in_place(&bc_init)
-            .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+            .map_err(|e| EngineError::CompilationError(Tool::LLVMDis, e.to_string()))?;
 
         // fixedpoint
         let flow_fp = FlowFixedpoint::new(

@@ -133,11 +133,33 @@ impl Display for Unsupported {
     }
 }
 
+/// A set of tools
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Tool {
+    ClangCompile,
+    LLVMDis,
+    LLVMLink,
+    OptVerify,
+    OptPipeline(String),
+}
+
+impl Display for Tool {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ClangCompile => write!(f, "clang|-c|"),
+            Self::LLVMDis => write!(f, "llvm-dis"),
+            Self::LLVMLink => write!(f, "llvm-link"),
+            Self::OptVerify => write!(f, "opt|-verify|"),
+            Self::OptPipeline(s) => write!(f, "opt|{}|", s),
+        }
+    }
+}
+
 /// A custom error message for the analysis engine
 #[derive(Debug, Clone)]
 pub enum EngineError {
     /// Error during the compilation of the input
-    CompilationError(String),
+    CompilationError(Tool, String),
     /// Error during the loading of a compiled LLVM module
     LLVMLoadingError(String),
     /// Invalid assumption made about the program
@@ -153,8 +175,8 @@ pub type EngineResult<T> = Result<T, EngineError>;
 impl Display for EngineError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CompilationError(msg) => {
-                write!(f, "[libra::compilation] {}", msg)
+            Self::CompilationError(tool, msg) => {
+                write!(f, "[libra::compilation] {}: {}", tool, msg)
             }
             Self::LLVMLoadingError(msg) => {
                 write!(f, "[libra::loading] {}", msg)

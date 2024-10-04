@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::error::{EngineError, EngineResult};
+use crate::error::{EngineError, EngineResult, Tool};
 use crate::flow::shared::Context;
 
 /// Default flags to be sent to clang
@@ -64,9 +64,9 @@ impl<'a> FlowBuildSimple<'a> {
         for (i, src) in inputs.iter().enumerate() {
             let bc_path = output.join(format!("init-{}.bc", i));
             ctxt.compile_to_bitcode(src, &bc_path, flags.iter().map(|i| i.as_str()))
-                .map_err(|e| EngineError::CompilationError(format!("Error during clang: {}", e)))?;
+                .map_err(|e| EngineError::CompilationError(Tool::ClangCompile, e.to_string()))?;
             ctxt.disassemble_in_place(&bc_path)
-                .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+                .map_err(|e| EngineError::CompilationError(Tool::LLVMDis, e.to_string()))?;
             init_bc_files.push(bc_path);
         }
 
@@ -74,7 +74,7 @@ impl<'a> FlowBuildSimple<'a> {
         let path_refs: Vec<_> = init_bc_files.iter().map(|p| p.as_path()).collect();
         let merged_bc_path = output.join("merged.bc");
         ctxt.link_bitcode(&path_refs, &merged_bc_path)
-            .map_err(|e| EngineError::CompilationError(format!("Error during llvm-link: {}", e)))?;
+            .map_err(|e| EngineError::CompilationError(Tool::LLVMLink, e.to_string()))?;
 
         // return the merged bitcode file
         Ok(merged_bc_path)

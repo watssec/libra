@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use log::debug;
 
-use crate::error::EngineError;
 use crate::error::EngineResult;
+use crate::error::{EngineError, Tool};
 use crate::flow::shared::Context;
 use crate::ir::bridge;
 
@@ -38,11 +38,10 @@ impl<'a> FlowFixedpoint<'a> {
         } = self;
 
         // sanity checking
-        ctxt.opt_verify(&input).map_err(|e| {
-            EngineError::CompilationError(format!("Error during opt -passes=verify: {}", e))
-        })?;
+        ctxt.opt_verify(&input)
+            .map_err(|e| EngineError::CompilationError(Tool::OptVerify, e.to_string()))?;
         ctxt.disassemble_in_place(&input)
-            .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+            .map_err(|e| EngineError::CompilationError(Tool::LLVMDis, e.to_string()))?;
         debug!("[0] sanity checked");
 
         // baseline loading
@@ -64,9 +63,14 @@ impl<'a> FlowFixedpoint<'a> {
             // optimization
             let this_path = output.join(format!("step-{}.bc", step));
             ctxt.opt_pipeline(last_path, &this_path, "default<O3>")
-                .map_err(|e| EngineError::CompilationError(format!("Error during opt: {}", e)))?;
+                .map_err(|e| {
+                    EngineError::CompilationError(
+                        Tool::OptPipeline("default<O3>".to_string()),
+                        e.to_string(),
+                    )
+                })?;
             ctxt.disassemble_in_place(&this_path)
-                .map_err(|e| EngineError::CompilationError(format!("Error during disas: {}", e)))?;
+                .map_err(|e| EngineError::CompilationError(Tool::LLVMDis, e.to_string()))?;
             debug!("[{}] optimization done", step);
 
             // loading

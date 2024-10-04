@@ -133,7 +133,7 @@ pub trait TestSuite<C: TestCase> {
 /// A utility to check whether this error means a potential bug
 fn shall_halt<T>(output: &Option<EngineResult<T>>) -> Option<&str> {
     match output.as_ref()?.as_ref().err()? {
-        EngineError::NotSupportedYet(_) | EngineError::CompilationError(_) => None,
+        EngineError::NotSupportedYet(..) | EngineError::CompilationError(..) => None,
         EngineError::LLVMLoadingError(reason)
         | EngineError::InvalidAssumption(reason)
         | EngineError::InvariantViolation(reason) => Some(reason),
@@ -145,7 +145,7 @@ fn shall_halt<T>(output: &Option<EngineResult<T>>) -> Option<&str> {
 pub struct Summary {
     passed: Vec<String>,
     skipped: Vec<String>,
-    failed_compile: Vec<String>,
+    failed_compile: BTreeMap<String, Vec<String>>,
     failed_loading: Vec<String>,
     failed_invariant: Vec<String>,
     failed_assumption: Vec<String>,
@@ -159,7 +159,7 @@ impl Summary {
         // split the results
         let mut passed = vec![];
         let mut skipped = vec![];
-        let mut failed_compile = vec![];
+        let mut failed_compile = BTreeMap::new();
         let mut failed_loading = vec![];
         let mut failed_invariant = vec![];
         let mut failed_assumption = vec![];
@@ -173,8 +173,11 @@ impl Summary {
                 Some(Ok(_)) => passed.push(name),
                 Some(Err(err)) => match err {
                     // potential setup issue
-                    EngineError::CompilationError(_) => {
-                        failed_compile.push(name);
+                    EngineError::CompilationError(tool, _) => {
+                        failed_compile
+                            .entry(tool)
+                            .or_insert_with(Vec::new)
+                            .push(name);
                     }
                     // known issues
                     EngineError::NotSupportedYet(reason) => {
@@ -209,7 +212,10 @@ impl Summary {
         Self {
             passed,
             skipped,
-            failed_compile,
+            failed_compile: failed_compile
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v))
+                .collect(),
             failed_loading,
             failed_invariant,
             failed_assumption,
