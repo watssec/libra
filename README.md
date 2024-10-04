@@ -60,6 +60,11 @@ performs either static analysis or dynamic interpretation from there.
   ```
 
 - Check the `binder/testsuite` pass
+    *NOTE*: as the project evolve with LLVM and the testsuites,
+            the expected output can be different.
+            See the table below for the testsuite outputs
+            based on historical commits.
+
   - For `external` test cases
     ```bash
     cd <libra>/binder/testsuite
@@ -71,39 +76,41 @@ performs either static analysis or dynamic interpretation from there.
     cargo run -- external build --force
     cargo run -- external run --force
     ```
-    **Expected output:**
-    - a vast majority of tests ($> 99\\%$) pass
-    - a few tests ($< 10$) are skipped
-    - a small portion of tests ($< 1\\%$) are not supported (with a breakdown of reasons)
-    - **NO** failure cases for whatever reason
 
   - For `internal` test cases
     ```bash
     cd <libra>/binder/testsuite
+    cargo run -- internal build
     cargo run -- internal run
     ```
     *NOTE*: If a prior run fails or you want to force a re-run, use
     ```bash
+    cargo run -- internal build --force
     cargo run -- internal run --force
     ```
-    **Expected output:**
-    - a vast majority of tests ($> 95\\%$) pass
-    - a few tests ($< 50$) are skipped
-    - a small portion of tests ($< 5\\%$) are not supported (with a breakdown of reasons)
-    - a few tests ($< 50$) fail due to compilation error
-    - **NO** other failure cases
+
+**Historical outputs on testsuites**
+
+- Testsuite: `external`
+
+| Commit                                   | Date         | # Passed | # Skipped | # Failed | # Unsupported |
+| ---------------------------------------- | ------------ | -------- | --------- | -------- | ------------- |
+| 88bc259cc55efbbeeecce1f21f5f1111c8c980da | Oct 03, 2024 | 1710     | 0         | 0        | 121           |
+
+
+- Testsuite: `internal`
+
+| Commit                                   | Date         | # Passed | # Skipped | # Failed | # Unsupported |
+| ---------------------------------------- | ------------ | -------- | --------- | -------- | ------------- |
+| 88bc259cc55efbbeeecce1f21f5f1111c8c980da | Oct 03, 2024 | 11833    | 648       | 42       | 2083          |
 
 ### Troubleshooting
 
-**NOTE**: Libra is currently only tested on
-- Ubuntu 22.04 LTS
-- MacOS 13+ with Apple Silicon
+**NOTE**: Libra is currently only tested and supported on Ubuntu 24.04.1 LTS.
 
 If you run into error in the building steps,
 likely they are caused by missing packages / dependencies
-which can usually be resolved with
-`apt-get install` (for Ubuntu) or
-`brew install` (for MacOS).
+which can usually be resolved with `apt-get install`.
 Read the error message and try to resolve them yourself.
 If you are blocked by any message, raise a GitHub issue.
 
@@ -112,7 +119,7 @@ If you are blocked by any message, raise a GitHub issue.
 - The `main` branch enforces linear history and hence,
   does not take merge commits.
   Familiarize yourself with `git rebase` and learn
-  how to create a linear GIT history from Google
+  how to create a linear Git history from Google
   (e.g., [here](https://www.atlassian.com/git/tutorials/merging-vs-rebasing)
   is a good starting point)
 
