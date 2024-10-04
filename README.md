@@ -93,16 +93,17 @@ performs either static analysis or dynamic interpretation from there.
 
 - Testsuite: `external`
 
-| Commit                                   | Date         | # Passed | # Skipped | # Failed | # Unsupported |
-| ---------------------------------------- | ------------ | -------- | --------- | -------- | ------------- |
-| 88bc259cc55efbbeeecce1f21f5f1111c8c980da | Oct 03, 2024 | 1710     | 0         | 0        | 121           |
+| Commit                                   | Date         | Passed | Skipped | Failed | Unsupported |
+| ---------------------------------------- | ------------ | ------ | ------- | ------ | ----------- |
+| 88bc259cc55efbbeeecce1f21f5f1111c8c980da | Oct 03, 2024 | 1710   | 0       | 0      | 121         |
 
 
 - Testsuite: `internal`
 
-| Commit                                   | Date         | # Passed | # Skipped | # Failed | # Unsupported |
-| ---------------------------------------- | ------------ | -------- | --------- | -------- | ------------- |
-| 88bc259cc55efbbeeecce1f21f5f1111c8c980da | Oct 03, 2024 | 11833    | 648       | 42       | 2083          |
+| Commit                                   | Date         | Passed | Skipped | Failed | Unsupported |
+| ---------------------------------------- | ------------ | ------ | ------- | ------ | ----------- |
+| 88bc259cc55efbbeeecce1f21f5f1111c8c980da | Oct 03, 2024 | 11833  | 648     | 42     | 2083        |
+
 
 ### Troubleshooting
 
