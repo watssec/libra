@@ -238,7 +238,13 @@ impl Summary {
             println!("skipped: {}", self.skipped.len());
         }
         if !self.failed_compile.is_empty() {
-            println!("failed [compile]: {}", self.failed_compile.len());
+            println!(
+                "failed [compile]: {}",
+                self.failed_compile.values().map(|v| v.len()).sum::<usize>()
+            );
+            for (category, tests) in &self.failed_compile {
+                println!("  - {}: {}", category, tests.len());
+            }
         }
         if !self.failed_loading.is_empty() {
             println!("failed [loading]: {}", self.failed_loading.len());
@@ -249,15 +255,17 @@ impl Summary {
         if !self.failed_assumption.is_empty() {
             println!("failed [assumption]: {}", self.failed_assumption.len());
         }
-        println!(
-            "unsupported: {}",
-            self.failed_unsupported
-                .values()
-                .map(|v| v.len())
-                .sum::<usize>()
-        );
-        for (category, tests) in &self.failed_unsupported {
-            println!("  - {}: {}", category, tests.len());
+        if !self.failed_unsupported.is_empty() {
+            println!(
+                "unsupported: {}",
+                self.failed_unsupported
+                    .values()
+                    .map(|v| v.len())
+                    .sum::<usize>()
+            );
+            for (category, tests) in &self.failed_unsupported {
+                println!("  - {}: {}", category, tests.len());
+            }
         }
     }
 }
