@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use petgraph::algo::is_isomorphic_matching;
 use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::Direction;
 use rug::Integer;
 
 use crate::error::{EngineError, EngineResult};
@@ -12,6 +13,8 @@ use crate::ir::bridge::shared::SymbolRegistry;
 use crate::ir::bridge::typing::{Type, TypeRegistry};
 use crate::ir::bridge::value::BlockLabel;
 
+use super::value::RegisterSlot;
+
 /// An adapted representation of an LLVM basic block
 #[derive(Eq, PartialEq)]
 pub struct Block {
@@ -19,6 +22,20 @@ pub struct Block {
     sequence: Vec<Instruction>,
     /// terminator of the block
     terminator: Terminator,
+}
+
+impl Block {
+    pub fn get_instructions(&self) -> &Vec<Instruction> {
+        &self.sequence
+    }
+
+    pub fn collect_variables(&self) -> BTreeSet<RegisterSlot> {
+        let mut result = BTreeSet::new();
+        for instruction in &self.sequence {
+            result.append(&mut instruction.collect_variables())
+        }
+        result
+    }
 }
 
 /// A representation of CFG edges
@@ -313,5 +330,47 @@ impl ControlFlowGraph {
         self.block_label_to_index
             .get(label)
             .and_then(|idx| self.graph.node_weight(*idx))
+    }
+
+    //
+    // Use of some unsafe unwraps. Fix later
+    //
+    pub fn get_block_label_by_index(&self, node: NodeIndex) -> Option<&BlockLabel> {
+        self.block_label_to_index
+            .iter()
+            .find(|(key, value)| **value == node)
+            .map(|(key, _)| key)
+    }
+
+    pub fn get_blocks(&self) -> Vec<&BlockLabel> {
+        self.graph
+            .node_indices()
+            .map(|i| self.get_block_label_by_index(i).unwrap())
+            .collect()
+    }
+
+    pub fn get_successors(&self, block: &BlockLabel) -> Vec<&BlockLabel> {
+        let index = self.block_label_to_index.get(block).unwrap();
+        self.graph
+            .neighbors_directed(*index, Direction::Outgoing)
+            .map(|i| self.get_block_label_by_index(i).unwrap())
+            .collect()
+    }
+
+    pub fn get_predecessors(&self, block: &BlockLabel) -> Vec<&BlockLabel> {
+        let index = self.block_label_to_index.get(block).unwrap();
+        self.graph
+            .neighbors_directed(*index, Direction::Incoming)
+            .map(|i| self.get_block_label_by_index(i).unwrap())
+            .collect()
+    }
+
+    pub fn collect_variables(&self) -> BTreeSet<RegisterSlot> {
+        let mut result = BTreeSet::new();
+        for label in self.get_blocks() {
+            let block = self.get_block_by_label(label).unwrap();
+            result.append(&mut block.collect_variables())
+        }
+        result
     }
 }

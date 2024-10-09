@@ -2,7 +2,7 @@ use crate::error::{EngineError, EngineResult};
 use crate::ir::bridge::constant::Constant;
 use crate::ir::bridge::typing::Type;
 
-#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Debug)]
 pub struct BlockLabel(usize);
 
 impl From<usize> for BlockLabel {
@@ -16,7 +16,7 @@ impl From<&usize> for BlockLabel {
     }
 }
 
-#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Debug)]
 pub struct RegisterSlot(usize);
 
 impl From<usize> for RegisterSlot {

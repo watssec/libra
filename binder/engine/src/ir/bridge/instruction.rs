@@ -242,6 +242,54 @@ pub enum Instruction {
     },
 }
 
+impl Instruction {
+    pub fn collect_variables(&self) -> BTreeSet<RegisterSlot> {
+        let mut vars = BTreeSet::new();
+
+        match self {
+            Instruction::Store { pointer, .. } => match pointer {
+                Value::Register { index, .. } => {
+                    vars.insert(*index);
+                }
+                Value::Constant(..) => (),
+                Value::Argument { .. } => (),
+            },
+
+            Instruction::Load { result, .. }
+            | Instruction::Alloca { result, .. }
+            | Instruction::UnaryArith { result, .. }
+            | Instruction::BinaryArith { result, .. }
+            | Instruction::BinaryBitwise { result, .. }
+            | Instruction::BinaryShift { result, .. }
+            | Instruction::CompareBitvec { result, .. }
+            | Instruction::CompareOrder { result, .. }
+            | Instruction::ComparePtr { result, .. }
+            | Instruction::CastBitvecSize { result, .. }
+            | Instruction::CastBitvecRepr { result, .. }
+            | Instruction::CastBitvecFree { result, .. }
+            | Instruction::CastPtr { result, .. }
+            | Instruction::CastPtrToInt { result, .. }
+            | Instruction::CastIntToPtr { result, .. }
+            | Instruction::GEP { result, .. }
+            | Instruction::GEPNop { result, .. }
+            | Instruction::ITEOne { result, .. }
+            | Instruction::ITEVec { result, .. }
+            | Instruction::Phi { result, .. }
+            | Instruction::GetValue { result, .. }
+            | Instruction::SetValue { result, .. }
+            | Instruction::GetElement { result, .. }
+            | Instruction::SetElement { result, .. }
+            | Instruction::ShuffleVec { result, .. }
+            | Instruction::LandingPad { result, .. } => {
+                vars.insert(*result);
+            }
+            _ => {}
+        }
+
+        vars
+    }
+}
+
 #[derive(Eq, PartialEq, Clone)]
 pub enum UnaryOpArith {
     Neg,
